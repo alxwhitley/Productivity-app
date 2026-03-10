@@ -365,13 +365,16 @@ const css = `
   .tl-dot.done{background:var(--green);}
   .tl-connector{width:1px;flex:1;min-height:8px;background:var(--border2);}
 
-  .tl-swipe-wrap{position:relative;overflow:hidden;border-radius:14px;margin:8px 0 6px;touch-action:pan-y;}
-  .tl-swipe-bg{position:absolute;inset:0;display:flex;align-items:center;border-radius:14px;transition:opacity .15s;}
-  .tl-swipe-bg.complete{background:var(--green);justify-content:flex-start;padding-left:20px;}
-  .tl-swipe-bg.reschedule{background:#4A90D9;justify-content:flex-end;padding-right:20px;}
-  .tl-swipe-bg-lbl{font-size:12px;font-weight:700;color:#fff;letter-spacing:.05em;text-transform:uppercase;}
-  .tl-swipe-card{position:relative;z-index:1;transition:transform .25s cubic-bezier(.25,.46,.45,.94);}
+  .tl-swipe-wrap{position:relative;border-radius:14px;margin:8px 0 6px;touch-action:pan-y;overflow:hidden;}
+  .tl-swipe-actions{position:absolute;top:0;bottom:0;left:0;right:0;display:flex;align-items:stretch;border-radius:14px;overflow:hidden;}
+  .tl-swipe-action-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:0 18px;cursor:pointer;border:none;font-family:'DM Sans',sans-serif;min-width:90px;}
+  .tl-swipe-action-btn.swap{background:var(--accent);color:#000;}
+  .tl-swipe-action-btn.tomorrow{background:var(--bg4);color:var(--text);}
+  .tl-swipe-action-lbl{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;}
+  .tl-swipe-action-ico{font-size:16px;line-height:1;}
+  .tl-swipe-card{position:relative;z-index:1;transition:transform .3s cubic-bezier(.25,.46,.45,.94);will-change:transform;}
   .tl-swipe-card.swiping{transition:none;}
+  .tl-swap-panel{background:var(--bg3);border-radius:0 0 14px 14px;padding:8px;display:flex;flex-direction:column;gap:1px;border-top:1px solid var(--border);}
   .tl-drag-handle{width:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:grab;opacity:.35;flex-shrink:0;padding:14px 0;}
   .tl-drag-handle:active{cursor:grabbing;opacity:.7;}
   .tl-drag-handle span{display:block;width:14px;height:2px;background:var(--text3);border-radius:2px;}
@@ -380,10 +383,10 @@ const css = `
 
   .tl-card{flex:1;background:var(--bg2);border-radius:14px;margin:8px 0 6px;overflow:hidden;transition:opacity .2s,border-color .2s,box-shadow .2s;}
   .tl-card.done-card{opacity:.42;filter:saturate(0.15);}
-  .tl-card.missed-card{border:1px solid var(--domain-color, rgba(255,255,255,.18));box-shadow:0 0 16px rgba(0,0,0,.1);}
+  .tl-card.missed-card{}
   .tl-card.now-card{border:1px solid rgba(232,160,48,.25);box-shadow:0 0 24px rgba(232,160,48,.09);}
   .tl-card.active-card{border:1px solid rgba(232,160,48,.25);box-shadow:0 0 24px rgba(232,160,48,.09);}
-  .tl-card.upcoming-card{border:1px solid var(--domain-color, rgba(255,255,255,.12));box-shadow:0 0 18px rgba(0,0,0,.06);}
+  .tl-card.upcoming-card{}
   .tl-check-icon.missed{width:20px;height:20px;border-radius:50%;border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
   .tl-card-head{display:flex;align-items:center;gap:10px;padding:13px 14px;cursor:pointer;}
   .tl-stripe{width:3px;border-radius:2px;align-self:stretch;min-height:28px;flex-shrink:0;}
@@ -929,9 +932,13 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
   const [dragId, setDragId] = useState(null);
   const [dragOverId, setDragOverId] = useState(null);
   const swipeState = useRef({});
+  const [revealedBlockId, setRevealedBlockId] = useState(null);
+
+  const REVEAL_WIDTH = 188; // width of two action buttons
 
   const rescheduleToTomorrow = (blockId) => {
     setData(d => ({ ...d, blocks: d.blocks.map(b => b.id === blockId ? { ...b, dayOffset: (b.dayOffset || 0) + 1 } : b) }));
+    setRevealedBlockId(null);
   };
 
   const handleDragStart = (e, blockId) => {
@@ -952,7 +959,6 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
       if (fromIdx < 0 || toIdx < 0) return d;
       const fromBlk = blocks[fromIdx];
       const toBlk = blocks[toIdx];
-      // Swap times
       const newBlocks = blocks.map(b => {
         if (b.id === dragId) return { ...b, startHour: toBlk.startHour, startMin: toBlk.startMin };
         if (b.id === targetId) return { ...b, startHour: fromBlk.startHour, startMin: fromBlk.startMin };
@@ -963,9 +969,16 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
     setDragId(null); setDragOverId(null);
   };
 
-  const initSwipe = (e, blockId, onComplete, onReschedule) => {
+  const initSwipe = (e, blockId) => {
+    if (isCompleted) return;
     const touch = e.touches[0];
-    swipeState.current[blockId] = { startX: touch.clientX, startY: touch.clientY, swiping: false };
+    const alreadyRevealed = revealedBlockId === blockId;
+    swipeState.current[blockId] = {
+      startX: touch.clientX,
+      startY: touch.clientY,
+      swiping: false,
+      startOffset: alreadyRevealed ? -REVEAL_WIDTH : 0
+    };
   };
   const moveSwipe = (e, blockId, el) => {
     const s = swipeState.current[blockId];
@@ -973,21 +986,34 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
     const touch = e.touches[0];
     const dx = touch.clientX - s.startX;
     const dy = touch.clientY - s.startY;
-    if (!s.swiping && Math.abs(dy) > Math.abs(dx)) { delete swipeState.current[blockId]; return; }
-    if (!s.swiping && Math.abs(dx) > 8) s.swiping = true;
+    if (!s.swiping && Math.abs(dy) > Math.abs(dx) + 3) { delete swipeState.current[blockId]; return; }
+    if (!s.swiping && Math.abs(dx) > 6) s.swiping = true;
     if (!s.swiping) return;
     e.preventDefault();
-    s.dx = dx;
-    if (el) { el.style.transform = `translateX(${Math.max(-120, Math.min(120, dx))}px)`; el.classList.add("swiping"); }
+    const raw = s.startOffset + dx;
+    // Only allow sliding left (negative) to reveal buttons, or back right to 0
+    const clamped = Math.min(0, Math.max(-REVEAL_WIDTH - 10, raw));
+    s.currentOffset = clamped;
+    if (el) { el.style.transform = `translateX(${clamped}px)`; el.classList.add("swiping"); }
   };
-  const endSwipe = (e, blockId, el, onComplete, onReschedule) => {
+  const endSwipe = (e, blockId, el) => {
     const s = swipeState.current[blockId];
     if (!s || !s.swiping) { delete swipeState.current[blockId]; return; }
-    const dx = s.dx || 0;
+    const offset = s.currentOffset || 0;
     delete swipeState.current[blockId];
-    if (el) { el.style.transform = ""; el.classList.remove("swiping"); }
-    if (dx > 80) onComplete();
-    else if (dx < -80) onReschedule();
+    if (el) { el.classList.remove("swiping"); }
+    // Snap to revealed or closed
+    if (offset < -REVEAL_WIDTH / 2) {
+      if (el) el.style.transform = `translateX(-${REVEAL_WIDTH}px)`;
+      setRevealedBlockId(blockId);
+    } else {
+      if (el) el.style.transform = "translateX(0)";
+      setRevealedBlockId(null);
+    }
+  };
+  const closeReveal = (blockId, el) => {
+    if (el) el.style.transform = "translateX(0)";
+    setRevealedBlockId(null);
   };
   const [newTaskText, setNewTaskText] = useState({});
   const [tick, setTick] = useState(0);
@@ -1478,15 +1504,25 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                       <div className="tl-connector" />
                     </div>
                     <div className="tl-swipe-wrap"
-                      onTouchStart={e => !isCompleted && initSwipe(e, blk.id)}
-                      onTouchMove={e => { if(isCompleted) return; const el = e.currentTarget.querySelector(".tl-swipe-card"); moveSwipe(e, blk.id, el); }}
-                      onTouchEnd={e => { if(isCompleted) return; const el = e.currentTarget.querySelector(".tl-swipe-card"); endSwipe(e, blk.id, el, () => markManualDone(blk.id, proj?.id, blk.todayTasks), () => rescheduleToTomorrow(blk.id)); }}
+                      onTouchStart={e => initSwipe(e, blk.id)}
+                      onTouchMove={e => { const el = e.currentTarget.querySelector(".tl-swipe-card"); moveSwipe(e, blk.id, el); }}
+                      onTouchEnd={e => { const el = e.currentTarget.querySelector(".tl-swipe-card"); endSwipe(e, blk.id, el); }}
                     >
-                      {/* Swipe right = complete (only for non-completed blocks) */}
-                      {!isCompleted && <div className="tl-swipe-bg complete"><span className="tl-swipe-bg-lbl">✓ Done</span></div>}
-                      {/* Swipe left = reschedule to tomorrow (only for missed/upcoming) */}
-                      {(isMissedAndNotStarted || isUpcoming) && <div className="tl-swipe-bg reschedule"><span className="tl-swipe-bg-lbl">Tomorrow →</span></div>}
-                      <div className={`tl-swipe-card ${cardClass}`} style={{ "--domain-color": domainCardColor + "50" }}>
+                      {/* Revealed action buttons — shown when swiped left */}
+                      {!isCompleted && (
+                        <div className="tl-swipe-actions">
+                          <div style={{flex:1}} onClick={() => { const el = document.querySelector(`[data-blockid="${blk.id}"]`); closeReveal(blk.id, el); }} />
+                          <button className="tl-swipe-action-btn swap" onClick={e => { e.stopPropagation(); setSwapBlockId(swapBlockId === blk.id ? null : blk.id); }}>
+                            <span className="tl-swipe-action-ico">⇄</span>
+                            <span className="tl-swipe-action-lbl">Swap</span>
+                          </button>
+                          <button className="tl-swipe-action-btn tomorrow" onClick={e => { e.stopPropagation(); rescheduleToTomorrow(blk.id); }}>
+                            <span className="tl-swipe-action-ico">→</span>
+                            <span className="tl-swipe-action-lbl">Tomorrow</span>
+                          </button>
+                        </div>
+                      )}
+                      <div className={`tl-swipe-card ${cardClass}`} data-blockid={blk.id} style={{ "--domain-color": domainCardColor + "50" }}>
                       {/* Conflict warning */}
                       {showConflict && (
                         <div className="tl-conflict-warn">
@@ -1499,31 +1535,7 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                       <div className="tl-card-head" onClick={() => setExpandedId(isExp ? null : item.id)}>
                         <div className="tl-stripe" style={{ background: domain?.color || "var(--bg4)" }} />
                         <div className="tl-info">
-                          <div style={{display:"flex",alignItems:"center",gap:6}}>
-                            <div className="tl-name">{proj?.name || blk.label || "Block"}</div>
-                            {proj && !isCompleted && isExp && (
-                              <button
-                                onClick={e => { e.stopPropagation(); setSwapBlockId(swapBlockId === blk.id ? null : blk.id); }}
-                                style={{ background:"none", border:"1px solid var(--border)", borderRadius:6, padding:"1px 6px", fontSize:10, color:"var(--text3)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", flexShrink:0 }}
-                              >swap</button>
-                            )}
-                          </div>
-                          {swapBlockId === blk.id && (
-                            <div style={{ marginTop:4, background:"var(--bg3)", borderRadius:10, padding:6, display:"flex", flexDirection:"column", gap:2 }} onClick={e => e.stopPropagation()}>
-                              {data.projects.filter(p => p.status === "active" && p.id !== proj?.id).map(p => {
-                                const d2 = data.domains?.find(d => d.id === p.domainId);
-                                return (
-                                  <button key={p.id} onClick={() => {
-                                    setData(d => ({ ...d, blocks: d.blocks.map(b => b.id === blk.id ? { ...b, projectId: p.id, todayTasks: undefined } : b) }));
-                                    setSwapBlockId(null);
-                                  }} style={{ background:"none", border:"none", textAlign:"left", padding:"7px 10px", borderRadius:8, cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontSize:13, color:"var(--text)", display:"flex", alignItems:"center", gap:8 }}>
-                                    <span style={{ width:8, height:8, borderRadius:"50%", background: d2?.color || "var(--text3)", flexShrink:0, display:"inline-block" }} />
-                                    {p.name}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          )}
+                          <div className="tl-name">{proj?.name || blk.label || "Block"}</div>
                           <div className="tl-meta">
                             {domain ? `${domain.name} · ` : ""}{blk.durationMin} min
                             {(() => {
@@ -1565,7 +1577,7 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                         <span style={{ fontSize:13, color:"var(--text3)", marginLeft:4, transform: isExp ? "rotate(90deg)" : "none", transition:"transform .2s", display:"inline-block" }}>›</span>
                       </div>
                       {isExp && proj && (() => {
-                        const todayTaskIds = blk.todayTasks; // undefined or array
+                        const todayTaskIds = blk.todayTasks;
                         const hasPicked = Array.isArray(todayTaskIds) && todayTaskIds.length > 0;
                         const isPicking = pickerState?.blockId === blk.id;
 
@@ -1668,6 +1680,27 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                                     Start →
                                   </button>
                                 )}
+                              </div>
+                            )}
+                            {/* Swap project panel — shown after tapping Swap in swipe actions */}
+                            {swapBlockId === blk.id && (
+                              <div className="tl-swap-panel">
+                                <div style={{ fontSize:11, color:"var(--text3)", fontWeight:600, letterSpacing:".06em", textTransform:"uppercase", marginBottom:6, padding:"0 6px" }}>Choose project</div>
+                                {data.projects.filter(p => p.status === "active" && p.id !== proj?.id).map(p => {
+                                  const d2 = data.domains?.find(d => d.id === p.domainId);
+                                  return (
+                                    <button key={p.id} onClick={() => {
+                                      setData(d => ({ ...d, blocks: d.blocks.map(b => b.id === blk.id ? { ...b, projectId: p.id, todayTasks: undefined } : b) }));
+                                      setSwapBlockId(null);
+                                      setRevealedBlockId(null);
+                                      const el = document.querySelector(`[data-blockid="${blk.id}"]`);
+                                      if (el) el.style.transform = "translateX(0)";
+                                    }} style={{ background:"none", border:"none", textAlign:"left", padding:"8px 10px", borderRadius:8, cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontSize:13, color:"var(--text)", display:"flex", alignItems:"center", gap:8, width:"100%" }}>
+                                      <span style={{ width:8, height:8, borderRadius:"50%", background: d2?.color || "var(--text3)", flexShrink:0, display:"inline-block" }} />
+                                      {p.name}
+                                    </button>
+                                  );
+                                })}
                               </div>
                             )}
                           </div>
