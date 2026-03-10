@@ -4287,49 +4287,46 @@ function LoginScreen() {
   const f = "'DM Sans',sans-serif";
 
   return (
-    <div style={{ height:"100%", width:"100%", display:"flex", flexDirection:"column", background:"#101213", fontFamily:f }}>
+    <div style={{ position:"fixed", inset:0, display:"flex", flexDirection:"column", background:"#101213", fontFamily:f }}>
       {/* Top section — branding */}
       <div style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"0 32px" }}>
-        <div style={{ width:52, height:52, borderRadius:16, background:"rgba(232,160,48,.15)", border:"1px solid rgba(232,160,48,.3)", display:"flex", alignItems:"center", justifyContent:"center", marginBottom:20 }}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-            <path d="M12 3L4 7v5c0 4.5 3.5 8.7 8 9.9 4.5-1.2 8-5.4 8-9.9V7l-8-4z" fill="rgba(232,160,48,.8)"/>
-          </svg>
-        </div>
-        <div style={{ fontSize:32, fontWeight:700, color:"#fff", letterSpacing:"-.02em", marginBottom:8 }}>Clearwork</div>
-        <div style={{ fontSize:14, color:"#666", textAlign:"center", lineHeight:1.5, maxWidth:260 }}>The Productivity App that makes you love getting things done</div>
+        <div style={{ fontSize:36, fontWeight:700, color:"#fff", letterSpacing:"-.02em", marginBottom:10 }}>Clearwork</div>
+        <div style={{ fontSize:14, color:"#555", textAlign:"center", lineHeight:1.6, maxWidth:240 }}>The Productivity App that makes you love getting things done</div>
       </div>
 
       {/* Bottom section — form */}
-      <div style={{ padding:"32px 24px 48px", borderTop:"1px solid #1E2122" }}>
-        {!sent ? (
-          <>
-            <div style={{ fontSize:13, color:"#888", marginBottom:10 }}>Sign in with your email</div>
-            <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && sendLink()}
-              placeholder="you@example.com"
-              style={{ width:"100%", padding:"14px 16px", background:"#1E2122", border:"1px solid #2C3032", borderRadius:14, color:"#fff", fontSize:15, fontFamily:f, outline:"none", marginBottom:12, display:"block" }}
-              autoFocus
-            />
-            {error && <div style={{ fontSize:12, color:"#E05555", marginBottom:10 }}>{error}</div>}
-            <button
-              onClick={sendLink}
-              disabled={loading || !email.trim()}
-              style={{ width:"100%", padding:"15px", background: email.trim() ? "#E8A030" : "#1E2122", color: email.trim() ? "#000" : "#444", border: email.trim() ? "none" : "1px solid #2C3032", borderRadius:14, fontSize:15, fontWeight:700, cursor: email.trim() ? "pointer" : "default", fontFamily:f, transition:"all .2s" }}
-            >
-              {loading ? "Sending…" : "Send Link"}
-            </button>
-          </>
-        ) : (
-          <div style={{ textAlign:"center", padding:"16px 0" }}>
-            <div style={{ fontSize:40, marginBottom:16 }}>📬</div>
-            <div style={{ fontSize:17, fontWeight:700, color:"#fff", marginBottom:10 }}>Check Your Inbox</div>
-            <div style={{ fontSize:13, color:"#888", lineHeight:1.6, marginBottom:24 }}>We sent a magic link to<br/><span style={{color:"#ccc", fontWeight:600}}>{email}</span></div>
-            <button onClick={() => setSent(false)} style={{ width:"100%", padding:"15px", background:"#E8A030", color:"#000", border:"none", borderRadius:14, fontSize:15, fontWeight:700, cursor:"pointer", fontFamily:f }}>Use a different email</button>
-          </div>
-        )}
+      <div style={{ padding:"28px 24px 52px", borderTop:"1px solid #1E2122" }}>
+        <div style={{ maxWidth:340, margin:"0 auto" }}>
+          {!sent ? (
+            <>
+              <div style={{ fontSize:12, color:"#666", marginBottom:8, textTransform:"uppercase", letterSpacing:".06em" }}>Sign in with your email</div>
+              <input
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && sendLink()}
+                placeholder="you@example.com"
+                style={{ width:"100%", padding:"14px 16px", background:"#1E2122", border:"1px solid #2C3032", borderRadius:12, color:"#fff", fontSize:15, fontFamily:f, outline:"none", marginBottom:10, display:"block", boxSizing:"border-box" }}
+                autoFocus
+              />
+              {error && <div style={{ fontSize:12, color:"#E05555", marginBottom:8 }}>{error}</div>}
+              <button
+                onClick={sendLink}
+                disabled={loading}
+                style={{ width:"100%", padding:"15px", background:"#E8A030", color:"#000", border:"none", borderRadius:12, fontSize:15, fontWeight:700, cursor:"pointer", fontFamily:f, transition:"opacity .15s", opacity: loading ? .6 : 1 }}
+              >
+                {loading ? "Sending…" : "Send Link"}
+              </button>
+            </>
+          ) : (
+            <div style={{ textAlign:"center", padding:"8px 0" }}>
+              <div style={{ fontSize:40, marginBottom:14 }}>📬</div>
+              <div style={{ fontSize:17, fontWeight:700, color:"#fff", marginBottom:8 }}>Check Your Inbox</div>
+              <div style={{ fontSize:13, color:"#888", lineHeight:1.6, marginBottom:24 }}>We sent a magic link to<br/><span style={{color:"#ccc", fontWeight:600}}>{email}</span></div>
+              <button onClick={() => setSent(false)} style={{ width:"100%", padding:"15px", background:"#E8A030", color:"#000", border:"none", borderRadius:12, fontSize:15, fontWeight:700, cursor:"pointer", fontFamily:f }}>Use a different email</button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
