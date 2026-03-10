@@ -380,9 +380,9 @@ const css = `
   .tl-swipe-card{position:relative;z-index:1;transition:transform .3s cubic-bezier(.25,.46,.45,.94);will-change:transform;background:var(--bg2);border-radius:14px;width:100%;}
   .tl-swipe-card.swiping{transition:none;}
   /* Deep Work Slots */
-  .dw-empty{width:100%;background:transparent;border:1.5px dashed rgba(255,255,255,.14);border-radius:14px;padding:18px 16px;cursor:pointer;display:flex;align-items:center;gap:14px;transition:border-color .2s,background .2s;font-family:"DM Sans",sans-serif;min-height:72px;}
+  .dw-empty{width:100%;background:transparent;border:1.5px dashed rgba(255,255,255,.14);border-radius:14px;padding:10px 14px;cursor:pointer;display:flex;align-items:center;gap:12px;transition:border-color .2s,background .2s;font-family:"DM Sans",sans-serif;min-height:48px;}
   .dw-empty:active{background:rgba(255,255,255,.03);}
-  .dw-plus{width:30px;height:30px;border-radius:50%;border:1.5px solid rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.35);font-size:18px;font-weight:300;flex-shrink:0;}
+  .dw-plus{width:24px;height:24px;border-radius:50%;border:1.5px solid rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.35);font-size:16px;font-weight:300;flex-shrink:0;}
   .dw-empty-label{font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:rgba(255,255,255,.25);margin-bottom:3px;}
   .dw-empty-sub{font-size:13px;color:rgba(255,255,255,.2);}
   .dw-empty-dur{font-size:11px;color:rgba(255,255,255,.2);margin-left:auto;flex-shrink:0;}
@@ -1936,6 +1936,7 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                           {pickerStep === "project" && (
                             <>
                               <div className="dw-picker-sect">Choose a project</div>
+                              <div style={{ maxHeight:220, overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
                               {data.projects.filter(p => p.status === "active").map(p => {
                                 const d2 = data.domains?.find(d => d.id === p.domainId);
                                 return (
@@ -1952,6 +1953,7 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                                   </div>
                                 );
                               })}
+                              </div>
                             </>
                           )}
                           {pickerStep === "confirm" && pickerProj && (
@@ -2931,16 +2933,17 @@ function PlanScreen({ data, setData, openAddBlock, onGoToSeason, lightMode, togg
   const [wkDwPickerStep, setWkDwPickerStep] = useState({}); // { [key]: "project"|"confirm" }
   const [wkDwPickerProj, setWkDwPickerProj] = useState({}); // { [key]: projectId }
   const [wkDwPickerTime, setWkDwPickerTime] = useState({}); // { [key]: { startHour, startMin, durationMin } }
+  const [wkDwPickerTasks, setWkDwPickerTasks] = useState({}); // { [key]: [taskId, ...] }
 
   const saveIntention = () => { setData(d => ({ ...d, weekIntention: intentionDraft })); setEditingIntention(false); };
   const deleteBlock   = id => setData(d => ({ ...d, blocks: d.blocks.filter(b => b.id !== id) }));
   const updateBlock   = (id, changes) => { setData(d => ({ ...d, blocks: d.blocks.map(b => b.id===id?{...b,...changes}:b) })); setEditingBlockId(null); };
 
-  const saveDWSlotForDate = (dateStr, slotIndex, projectId, startHour, startMin, durationMin) => {
+  const saveDWSlotForDate = (dateStr, slotIndex, projectId, startHour, startMin, durationMin, todayTasks) => {
     setData(prev => {
       const existing = [...((prev.deepWorkSlots || {})[dateStr] || [])];
       while (existing.length <= slotIndex) existing.push({});
-      existing[slotIndex] = { projectId, startHour, startMin, durationMin, todayTasks: null };
+      existing[slotIndex] = { projectId, startHour, startMin, durationMin, todayTasks: todayTasks || null };
       return { ...prev, deepWorkSlots: { ...(prev.deepWorkSlots || {}), [dateStr]: existing } };
     });
   };
@@ -3170,6 +3173,7 @@ function PlanScreen({ data, setData, openAddBlock, onGoToSeason, lightMode, togg
                         {pickerStep2 === "project" && (
                           <>
                             <div className="dw-picker-sect">Choose a project</div>
+                            <div style={{ maxHeight:220, overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
                             {data.projects.filter(p => p.status === "active").map(p => {
                               const d2 = data.domains?.find(d => d.id === p.domainId);
                               return (
@@ -3186,9 +3190,20 @@ function PlanScreen({ data, setData, openAddBlock, onGoToSeason, lightMode, togg
                                 </div>
                               );
                             })}
+                            </div>
                           </>
                         )}
-                        {pickerStep2 === "confirm" && pickerProj2 && (
+                        {pickerStep2 === "confirm" && pickerProj2 && (() => {
+                          const projTasks = (pickerProj2.tasks || []).filter(t => !t.done);
+                          const selectedTasks = wkDwPickerTasks[pickerKey] || [];
+                          const toggleTask2 = (taskId) => {
+                            setWkDwPickerTasks(st => {
+                              const cur = st[pickerKey] || [];
+                              const next = cur.includes(taskId) ? cur.filter(id => id !== taskId) : [...cur, taskId];
+                              return { ...st, [pickerKey]: next };
+                            });
+                          };
+                          return (
                           <div className="dw-confirm-wrap">
                             <div style={{ fontSize:13, fontWeight:600, color:"var(--text)", marginBottom:10 }}>{pickerProj2.name}</div>
                             <div className="dw-time-row">
@@ -3209,15 +3224,41 @@ function PlanScreen({ data, setData, openAddBlock, onGoToSeason, lightMode, togg
                                 </select>
                               </div>
                             </div>
+                            {projTasks.length > 0 && (
+                              <div style={{ marginBottom:10 }}>
+                                <div className="dw-picker-sect" style={{ padding:"0 0 6px" }}>Focus tasks <span style={{ color:"var(--text3)", fontWeight:400, textTransform:"none", letterSpacing:0 }}>(optional)</span></div>
+                                {projTasks.map(t => {
+                                  const isSel = selectedTasks.includes(t.id);
+                                  return (
+                                    <div key={t.id} onClick={() => toggleTask2(t.id)}
+                                      style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 4px", cursor:"pointer", borderRadius:8 }}>
+                                      <div style={{
+                                        width:18, height:18, borderRadius:5,
+                                        border: isSel ? "none" : "1.5px solid var(--border)",
+                                        background: isSel ? "var(--accent)" : "transparent",
+                                        display:"flex", alignItems:"center", justifyContent:"center",
+                                        flexShrink:0, transition:"all .15s"
+                                      }}>
+                                        {isSel && <span style={{ fontSize:10, color:"#000", fontWeight:800 }}>✓</span>}
+                                      </div>
+                                      <span style={{ fontSize:13, color: isSel ? "var(--text)" : "var(--text2)" }}>{t.text}</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
                             <button className="dw-confirm-btn" onClick={() => {
-                              saveDWSlotForDate(row.dateStr, s.slotIndex, pickerProj2.id, pickerTime2.startHour, pickerTime2.startMin, pickerTime2.durationMin);
+                              const tasks = selectedTasks.length > 0 ? selectedTasks : null;
+                              saveDWSlotForDate(row.dateStr, s.slotIndex, pickerProj2.id, pickerTime2.startHour, pickerTime2.startMin, pickerTime2.durationMin, tasks);
                               setWkDwPickerOpen(null);
                               setWkDwPickerStep(st => { const n={...st}; delete n[pickerKey]; return n; });
                               setWkDwPickerProj(st => { const n={...st}; delete n[pickerKey]; return n; });
+                              setWkDwPickerTasks(st => { const n={...st}; delete n[pickerKey]; return n; });
                             }}>✓ Confirm</button>
-                            <button className="dw-back" onClick={() => setWkDwPickerStep(st => ({ ...st, [pickerKey]: "project" }))}>← Back</button>
+                            <button className="dw-back" onClick={() => { setWkDwPickerStep(st => ({ ...st, [pickerKey]: "project" })); setWkDwPickerTasks(st => { const n={...st}; delete n[pickerKey]; return n; }); }}>← Back</button>
                           </div>
-                        )}
+                          );
+                        })()}
                       </div>
                     )}
                   </div>
