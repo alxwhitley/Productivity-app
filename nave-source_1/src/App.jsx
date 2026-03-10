@@ -2919,7 +2919,6 @@ function PlanScreen({ data, setData, openAddBlock, onGoToSeason, lightMode, togg
   const [editingIntention, setEditingIntention] = useState(false);
   const [intentionDraft, setIntentionDraft] = useState(weekIntention);
   const [editingBlockId, setEditingBlockId] = useState(null);
-  const [assigningGhost, setAssigningGhost] = useState(null); // {dayOffset, slot}
   const [showWorkWeek, setShowWorkWeek] = useState(false);
 
   const getProject = id => projects.find(p => p.id === id);
@@ -2928,53 +2927,95 @@ function PlanScreen({ data, setData, openAddBlock, onGoToSeason, lightMode, togg
   const days       = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
   const months     = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
+  const [wkDwPickerOpen, setWkDwPickerOpen] = useState(null); // `${dateStr}-${slotIndex}`
+  const [wkDwPickerStep, setWkDwPickerStep] = useState({}); // { [key]: "project"|"confirm" }
+  const [wkDwPickerProj, setWkDwPickerProj] = useState({}); // { [key]: projectId }
+  const [wkDwPickerTime, setWkDwPickerTime] = useState({}); // { [key]: { startHour, startMin, durationMin } }
+
   const saveIntention = () => { setData(d => ({ ...d, weekIntention: intentionDraft })); setEditingIntention(false); };
   const deleteBlock   = id => setData(d => ({ ...d, blocks: d.blocks.filter(b => b.id !== id) }));
   const updateBlock   = (id, changes) => { setData(d => ({ ...d, blocks: d.blocks.map(b => b.id===id?{...b,...changes}:b) })); setEditingBlockId(null); };
 
+  const saveDWSlotForDate = (dateStr, slotIndex, projectId, startHour, startMin, durationMin) => {
+    setData(prev => {
+      const existing = [...((prev.deepWorkSlots || {})[dateStr] || [])];
+      while (existing.length <= slotIndex) existing.push({});
+      existing[slotIndex] = { projectId, startHour, startMin, durationMin, todayTasks: null };
+      return { ...prev, deepWorkSlots: { ...(prev.deepWorkSlots || {}), [dateStr]: existing } };
+    });
+  };
+
+  const clearDWSlotForDate = (dateStr, slotIndex) => {
+    setData(prev => {
+      const existing = [...((prev.deepWorkSlots || {})[dateStr] || [])];
+      while (existing.length <= slotIndex) existing.push({});
+      existing[slotIndex] = {};
+      return { ...prev, deepWorkSlots: { ...(prev.deepWorkSlots || {}), [dateStr]: existing } };
+    });
+  };
+
   // Live slot definitions for this user
   const deepSlots = getDeepSlots(data);
 
-  // For a given dayOffset, build the merged sorted list of real blocks + ghost slots
+  // For a given dayOffset, build the merged sorted list of real blocks + DW slots (filled + empty)
   const getMergedRows = (offset) => {
     const dayDate = new Date(today); dayDate.setDate(today.getDate() + offset);
     const dow = dayDate.getDay();
     const isWorkDay = workWeek.includes(dow);
+    const dateStr = `${dayDate.getFullYear()}-${String(dayDate.getMonth()+1).padStart(2,"0")}-${String(dayDate.getDate()).padStart(2,"0")}`;
     const realBlocks = blocks.filter(b => b.dayOffset === offset)
       .sort((a,b) => a.startHour*60+a.startMin-(b.startHour*60+b.startMin));
 
     if (!isWorkDay) return realBlocks.map(b => ({ type: "real", block: b }));
 
-    const allItems = [];
+    // Filled DW slots for this day
+    const savedDW = (data.deepWorkSlots || {})[dateStr] || [];
+    const filledDWSlots = deepSlots.map((def, i) => {
+      const saved = savedDW[i] || {};
+      if (!saved.projectId) return null;
+      return {
+        type: "deepwork-filled",
+        dateStr,
+        slotIndex: i,
+        startHour: saved.startHour ?? def.startHour,
+        startMin: saved.startMin ?? def.startMin,
+        durationMin: saved.durationMin ?? def.durationMin,
+        projectId: saved.projectId,
+      };
+    }).filter(Boolean);
 
-    // Add ghost slots for any deep work slot not covered by a real block
-    deepSlots.forEach(slot => {
-      const slotMin = slot.startHour*60+slot.startMin;
-      const slotEnd = slotMin + slot.durationMin;
-      const covered = realBlocks.some(b => {
-        const bMin = b.startHour*60+b.startMin;
-        return bMin < slotEnd && (bMin+b.durationMin) > slotMin;
-      });
-      if (!covered) allItems.push({ type: "ghost", slot, origSlot: slot, dayOffset: offset });
-    });
+    // How many filled DW slots exist? Empty = 3 - filled (min 0)
+    const filledCount = filledDWSlots.length;
+    const emptyCount = Math.max(0, 3 - filledCount);
 
-    realBlocks.forEach(b => allItems.push({ type: "real", block: b }));
+    // Empty DW slots: use the deepSlots that are NOT filled, up to emptyCount
+    const emptyDWSlots = deepSlots
+      .filter((def, i) => !(savedDW[i] || {}).projectId)
+      .slice(0, emptyCount)
+      .map((def, arrIdx) => ({
+        type: "ghost",
+        dateStr,
+        slot: def,
+        origSlot: def,
+        dayOffset: offset,
+      }));
+
+    const allItems = [
+      ...realBlocks.map(b => ({ type: "real", block: b })),
+      ...filledDWSlots,
+      ...emptyDWSlots,
+    ];
 
     allItems.sort((a, b) => {
-      const aMin = a.type === "real" ? a.block.startHour*60+a.block.startMin : a.slot.startHour*60+a.slot.startMin;
-      const bMin = b.type === "real" ? b.block.startHour*60+b.block.startMin : b.slot.startHour*60+b.slot.startMin;
-      return aMin - bMin;
+      const getMin = x => {
+        if (x.type === "real") return x.block.startHour*60+x.block.startMin;
+        if (x.type === "deepwork-filled") return x.startHour*60+x.startMin;
+        return x.slot.startHour*60+x.slot.startMin;
+      };
+      return getMin(a) - getMin(b);
     });
 
     return allItems;
-  };
-
-  // Determine if a ghost is in the past
-  const isGhostPast = (offset, slot) => {
-    if (offset > 0) return false;
-    if (offset < 0) return true;
-    const now = new Date();
-    return (now.getHours()*60+now.getMinutes()) > (slot.startHour*60+slot.startMin+slot.durationMin);
   };
 
   return (
@@ -3058,25 +3099,127 @@ function PlanScreen({ data, setData, openAddBlock, onGoToSeason, lightMode, togg
                   );
                 }
 
-                // ghost deep work block
-                const s = row.slot;
-                const past = isGhostPast(offset, s);
-                return (
-                  <div key={`ghost_${offset}_${s.slotIndex}`}
-                    className="ghost-block"
-                    style={{ opacity: past ? .35 : 1 }}
-                    onClick={past ? undefined : () => setAssigningGhost({ dayOffset: offset, slot: s, origSlot: row.origSlot || s })}
-                  >
-                    <span className="ghost-time">{fmtRange(s.startHour, s.startMin, s.durationMin)}</span>
-                    <div className="ghost-stripe" />
-                    <div className="ghost-inner">
-                      <div className="ghost-label" style={{ color: past ? "var(--text3)" : "var(--text2)" }}>
-                        {past ? "Deep Work — missed" : "Deep Work — open"}
+                // Filled deep work slot
+                if (row.type === "deepwork-filled") {
+                  const proj2 = getProject(row.projectId);
+                  const domain2 = proj2 ? getDomain(proj2.domainId) : null;
+                  const domainColor2 = domain2?.color || null;
+                  const cardKey = `dwfilled_${row.dateStr}_${row.slotIndex}`;
+                  const isExpFilled = wkDwPickerOpen === cardKey + "_exp";
+                  return (
+                    <div key={cardKey} style={{ padding: "6px 12px 2px" }}>
+                      <div
+                        style={{
+                          background: "var(--bg3)",
+                          border: domainColor2 ? `1px solid ${domainColor2}60` : "1px solid var(--border)",
+                          boxShadow: domainColor2 ? `0 0 14px ${domainColor2}1a` : "none",
+                          borderRadius: 12,
+                          overflow: "hidden",
+                          cursor: "pointer",
+                        }}
+                        onClick={() => setWkDwPickerOpen(isExpFilled ? null : cardKey + "_exp")}
+                      >
+                        <div style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 12px" }}>
+                          <div style={{ width:3, borderRadius:2, alignSelf:"stretch", minHeight:28, background: domainColor2 || "var(--bg4)", flexShrink:0 }} />
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ fontSize:13, fontWeight:600, color:"var(--text)" }}>{proj2?.name || "—"}</div>
+                            <div style={{ fontSize:11, color:"var(--text3)", marginTop:2 }}>{domain2?.name} · {row.durationMin} min · {fmtTime(row.startHour, row.startMin)}</div>
+                          </div>
+                          <div style={{ fontSize:10, fontWeight:700, letterSpacing:".07em", textTransform:"uppercase", color: domainColor2 || "var(--accent)", opacity:.8, flexShrink:0 }}>DW</div>
+                        </div>
+                        {isExpFilled && (
+                          <div style={{ padding:"4px 12px 12px", borderTop:"1px solid var(--border2)" }}>
+                            <button
+                              onClick={e => { e.stopPropagation(); clearDWSlotForDate(row.dateStr, row.slotIndex); setWkDwPickerOpen(null); }}
+                              style={{ background:"rgba(224,85,85,.1)", color:"var(--red)", border:"none", borderRadius:8, padding:"8px 14px", fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}
+                            >Clear slot</button>
+                          </div>
+                        )}
                       </div>
-                      <div className="ghost-hint">{s.durationMin} min</div>
                     </div>
-                    {!past && <span className="ghost-assign">+ Assign</span>}
-                    {past && <span style={{ fontSize:10, fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", color:"var(--red)", opacity:.5, padding:"2px 7px", border:"1px solid rgba(224,85,85,.2)", borderRadius:20 }}>Missed</span>}
+                  );
+                }
+
+                // Empty deep work slot — inline picker (matches Today tab design)
+                const s = row.slot;
+                const pickerKey = `${row.dateStr}-${s.slotIndex}`;
+                const isPickerOpen2 = wkDwPickerOpen === pickerKey;
+                const pickerStep2 = wkDwPickerStep[pickerKey] || "project";
+                const pickerProj2 = wkDwPickerProj[pickerKey] ? getProject(wkDwPickerProj[pickerKey]) : null;
+                const pickerTime2 = wkDwPickerTime[pickerKey] || { startHour: s.startHour, startMin: s.startMin, durationMin: s.durationMin };
+                const timeOptions2 = [];
+                for (let h = 5; h <= 21; h++) for (let m of [0, 15, 30, 45]) timeOptions2.push({ h, m });
+                const fmt2 = (h, m) => { const hh = h > 12 ? h-12 : h===0?12:h; const mm = m===0?"":`:${String(m).padStart(2,"0")}`; return `${hh}${mm}${h>=12?"pm":"am"}`; };
+                return (
+                  <div key={`ghost_${row.dateStr}_${s.slotIndex}`} style={{ padding: "6px 12px 2px" }}>
+                    <button className="dw-empty" style={{ borderRadius: isPickerOpen2 ? "14px 14px 0 0" : 14 }}
+                      onClick={() => {
+                        setWkDwPickerOpen(isPickerOpen2 ? null : pickerKey);
+                        setWkDwPickerStep(st => ({ ...st, [pickerKey]: "project" }));
+                      }}
+                    >
+                      <div className="dw-plus">+</div>
+                      <div style={{ flex:1, textAlign:"left" }}>
+                        <div className="dw-empty-label">Deep Work Block</div>
+                        <div className="dw-empty-sub">{s.durationMin} min · {fmt2(s.startHour, s.startMin)} · tap to assign</div>
+                      </div>
+                      <div className="dw-empty-dur">{s.durationMin}m</div>
+                    </button>
+                    {isPickerOpen2 && (
+                      <div className="dw-picker-wrap">
+                        {pickerStep2 === "project" && (
+                          <>
+                            <div className="dw-picker-sect">Choose a project</div>
+                            {data.projects.filter(p => p.status === "active").map(p => {
+                              const d2 = data.domains?.find(d => d.id === p.domainId);
+                              return (
+                                <div key={p.id} className="dw-proj-row"
+                                  onClick={() => {
+                                    setWkDwPickerProj(st => ({ ...st, [pickerKey]: p.id }));
+                                    setWkDwPickerTime(st => ({ ...st, [pickerKey]: { startHour: s.startHour, startMin: s.startMin, durationMin: s.durationMin } }));
+                                    setWkDwPickerStep(st => ({ ...st, [pickerKey]: "confirm" }));
+                                  }}
+                                >
+                                  <div className="dw-proj-dot" style={{ background: d2?.color || "var(--text3)" }} />
+                                  <div className="dw-proj-name">{p.name}</div>
+                                  <div className="dw-proj-domain">{d2?.name}</div>
+                                </div>
+                              );
+                            })}
+                          </>
+                        )}
+                        {pickerStep2 === "confirm" && pickerProj2 && (
+                          <div className="dw-confirm-wrap">
+                            <div style={{ fontSize:13, fontWeight:600, color:"var(--text)", marginBottom:10 }}>{pickerProj2.name}</div>
+                            <div className="dw-time-row">
+                              <div style={{ flex:1 }}>
+                                <div className="dw-picker-sect" style={{ padding:"0 0 4px" }}>Start time</div>
+                                <select className="dw-time-sel"
+                                  value={`${pickerTime2.startHour}:${pickerTime2.startMin}`}
+                                  onChange={e => { const [h,m] = e.target.value.split(":").map(Number); setWkDwPickerTime(st => ({ ...st, [pickerKey]: { ...st[pickerKey], startHour:h, startMin:m } })); }}>
+                                  {timeOptions2.map(({h,m}) => <option key={`${h}${m}`} value={`${h}:${m}`}>{fmt2(h,m)}</option>)}
+                                </select>
+                              </div>
+                              <div style={{ flex:1 }}>
+                                <div className="dw-picker-sect" style={{ padding:"0 0 4px" }}>Duration</div>
+                                <select className="dw-time-sel"
+                                  value={pickerTime2.durationMin}
+                                  onChange={e => setWkDwPickerTime(st => ({ ...st, [pickerKey]: { ...st[pickerKey], durationMin: Number(e.target.value) } }))}>
+                                  {[30,45,60,75,90,105,120].map(d => <option key={d} value={d}>{d} min</option>)}
+                                </select>
+                              </div>
+                            </div>
+                            <button className="dw-confirm-btn" onClick={() => {
+                              saveDWSlotForDate(row.dateStr, s.slotIndex, pickerProj2.id, pickerTime2.startHour, pickerTime2.startMin, pickerTime2.durationMin);
+                              setWkDwPickerOpen(null);
+                              setWkDwPickerStep(st => { const n={...st}; delete n[pickerKey]; return n; });
+                              setWkDwPickerProj(st => { const n={...st}; delete n[pickerKey]; return n; });
+                            }}>✓ Confirm</button>
+                            <button className="dw-back" onClick={() => setWkDwPickerStep(st => ({ ...st, [pickerKey]: "project" }))}>← Back</button>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })})()}
@@ -3090,29 +3233,6 @@ function PlanScreen({ data, setData, openAddBlock, onGoToSeason, lightMode, togg
         })}
         <div className="spacer" />
       </div>
-
-      {assigningGhost && (
-        <AssignGhostSheet
-          data={data}
-          ghost={assigningGhost}
-          onClose={() => setAssigningGhost(null)}
-          onAssign={(block) => {
-            setData(d => ({ ...d, blocks: [...d.blocks, block] }));
-            setAssigningGhost(null);
-          }}
-          onUpdateSlotDefault={(slotIndex, override) => {
-            setData(d => {
-              const current = d.deepBlockDefaults || DEFAULT_DEEP_SLOTS.map(s => ({ startHour: s.startHour, startMin: s.startMin, durationMin: s.durationMin }));
-              const next = current.map((s, i) => i === slotIndex ? { ...s, ...override } : s);
-              return { ...d, deepBlockDefaults: next };
-            });
-          }}
-          onCreateProject={(newProj, onDone) => {
-            setData(d => ({ ...d, projects: [...d.projects, newProj] }));
-            onDone(newProj.id);
-          }}
-        />
-      )}
 
       {showWorkWeek && (
         <WorkWeekSheet
