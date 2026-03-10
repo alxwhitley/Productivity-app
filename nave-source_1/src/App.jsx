@@ -139,6 +139,7 @@ const FIELD_DEFAULTS = {
   todayPrefs:     { name:"", showShutdown:true, defaultBlock:"9" },
   blockCompletions: [], // [{ blockId, date, durationMin }] — "I did this" / Done logs
   deepWorkTargets: { dailyHours: 4, weeklyHours: 20 }, // user-configurable
+  deepWorkSlots: {}, // { [dateStr]: [{ projectId, startHour, startMin, durationMin, todayTasks }] }
   todayLoosePicks: {}, // { [dateStr]: [looseTaskId, ...] } — tasks picked for today's loose block
 };
 
@@ -378,6 +379,25 @@ const css = `
   .tl-swipe-action-ico{font-size:16px;line-height:1;}
   .tl-swipe-card{position:relative;z-index:1;transition:transform .3s cubic-bezier(.25,.46,.45,.94);will-change:transform;background:var(--bg2);border-radius:14px;width:100%;}
   .tl-swipe-card.swiping{transition:none;}
+  /* Deep Work Slots */
+  .dw-empty{width:100%;background:transparent;border:1.5px dashed rgba(255,255,255,.14);border-radius:14px;padding:18px 16px;cursor:pointer;display:flex;align-items:center;gap:14px;transition:border-color .2s,background .2s;font-family:"DM Sans",sans-serif;min-height:72px;}
+  .dw-empty:active{background:rgba(255,255,255,.03);}
+  .dw-plus{width:30px;height:30px;border-radius:50%;border:1.5px solid rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.35);font-size:18px;font-weight:300;flex-shrink:0;}
+  .dw-empty-label{font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:rgba(255,255,255,.25);margin-bottom:3px;}
+  .dw-empty-sub{font-size:13px;color:rgba(255,255,255,.2);}
+  .dw-empty-dur{font-size:11px;color:rgba(255,255,255,.2);margin-left:auto;flex-shrink:0;}
+  .dw-picker-wrap{background:var(--bg3);border:1.5px dashed rgba(255,255,255,.14);border-top:none;border-radius:0 0 14px 14px;overflow:hidden;}
+  .dw-picker-sect{padding:10px 10px 6px;font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text3);}
+  .dw-proj-row{display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;border-radius:8px;margin:0 4px;}
+  .dw-proj-row:active{background:var(--bg4);}
+  .dw-proj-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+  .dw-proj-name{font-size:14px;color:var(--text);flex:1;}
+  .dw-proj-domain{font-size:11px;color:var(--text3);}
+  .dw-confirm-wrap{padding:12px;}
+  .dw-time-row{display:flex;gap:8px;margin-bottom:12px;}
+  .dw-time-sel{flex:1;background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:9px 10px;color:var(--text);font-family:"DM Sans",sans-serif;font-size:16px;outline:none;appearance:none;}
+  .dw-confirm-btn{width:100%;background:var(--accent);color:#000;border:none;border-radius:10px;padding:11px;font-size:14px;font-weight:700;cursor:pointer;font-family:"DM Sans",sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;}
+  .dw-back{background:none;border:none;color:var(--text3);font-size:12px;cursor:pointer;font-family:"DM Sans",sans-serif;padding:8px 0 0;display:block;width:100%;text-align:center;}
   .tl-swap-panel{background:var(--bg3);border-radius:0 0 14px 14px;padding:8px;display:flex;flex-direction:column;gap:1px;border-top:1px solid var(--border);}
   .tl-drag-handle{width:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:grab;opacity:.35;flex-shrink:0;padding:14px 0;}
   .tl-drag-handle:active{cursor:grabbing;opacity:.7;}
@@ -937,12 +957,36 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
   const [dragOverId, setDragOverId] = useState(null);
   const swipeState = useRef({});
   const [revealedBlockId, setRevealedBlockId] = useState(null);
+  const [dwPickerOpen, setDwPickerOpen] = useState(null); // slotId of open picker
+  const [dwPickerStep, setDwPickerStep] = useState({}); // { [slotId]: "project" | "confirm" }
+  const [dwPickerProj, setDwPickerProj] = useState({}); // { [slotId]: projectId }
+  const [dwPickerTime, setDwPickerTime] = useState({}); // { [slotId]: { startHour, startMin, durationMin } }
 
   const REVEAL_WIDTH = 188; // width of two action buttons
 
   const rescheduleToTomorrow = (blockId) => {
     setData(d => ({ ...d, blocks: d.blocks.map(b => b.id === blockId ? { ...b, dayOffset: (b.dayOffset || 0) + 1 } : b) }));
     setRevealedBlockId(null);
+  };
+
+  const saveDWSlot = (slotId, slotIndex, projectId, startHour, startMin, durationMin, todayTasks) => {
+    const dateKeyISO2 = (() => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}-${String(t.getDate()).padStart(2,"0")}`; })();
+    setData(prev => {
+      const existing = [...((prev.deepWorkSlots || {})[dateKeyISO2] || [])];
+      while (existing.length <= slotIndex) existing.push({});
+      existing[slotIndex] = { projectId, startHour, startMin, durationMin, todayTasks: todayTasks || null };
+      return { ...prev, deepWorkSlots: { ...(prev.deepWorkSlots || {}), [dateKeyISO2]: existing } };
+    });
+  };
+
+  const clearDWSlot = (slotIndex) => {
+    const dateKeyISO2 = (() => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}-${String(t.getDate()).padStart(2,"0")}`; })();
+    setData(prev => {
+      const existing = [...((prev.deepWorkSlots || {})[dateKeyISO2] || [])];
+      while (existing.length <= slotIndex) existing.push({});
+      existing[slotIndex] = {};
+      return { ...prev, deepWorkSlots: { ...(prev.deepWorkSlots || {}), [dateKeyISO2]: existing } };
+    });
   };
 
   const handleDragStart = (e, blockId) => {
@@ -1240,10 +1284,30 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
   const todayBlocksSorted = [...todayBlocks].sort((a,b) => a.startHour*60+a.startMin - (b.startHour*60+b.startMin));
   const todayRoutines = getRoutinesForDate(data.routineBlocks || [], today);
   const dateKey = today.toDateString();
+  const dateKeyISO = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}-${String(today.getDate()).padStart(2,"0")}`;
+
+  // Build deep work slots for today
+  const deepDefaults = getDeepSlots(data);
+  const savedDWSlots = (data.deepWorkSlots || {})[dateKeyISO] || [];
+  const todayDWSlots = deepDefaults.map((def, i) => {
+    const saved = savedDWSlots[i] || {};
+    const endMins2 = (saved.startHour ?? def.startHour) * 60 + (saved.startMin ?? def.startMin) + (saved.durationMin ?? def.durationMin);
+    if (endMins2 <= nowMins && !saved.projectId) return null; // hide unfilled past slots
+    return {
+      id: `dw-${dateKeyISO}-${i}`,
+      slotIndex: i,
+      startHour: saved.startHour ?? def.startHour,
+      startMin: saved.startMin ?? def.startMin,
+      durationMin: saved.durationMin ?? def.durationMin,
+      projectId: saved.projectId || null,
+      todayTasks: saved.todayTasks || null,
+    };
+  }).filter(Boolean);
 
   const timeline = [
     ...todayBlocks.map(b => ({ type: "block", id: b.id, mins: b.startHour * 60 + b.startMin, data: b })),
     ...todayRoutines.map(r => ({ type: "routine", id: r.id, mins: r.startHour * 60 + r.startMin, data: r })),
+    ...todayDWSlots.map(s => ({ type: "deepwork", id: s.id, mins: s.startHour * 60 + s.startMin, data: s })),
   ].sort((a, b) => a.mins - b.mins);
 
   // Prime window — first project block of the day, if it starts between 6am–11am
@@ -1725,6 +1789,200 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                         </div>
                       </div>
                     )}
+                    </div>
+                  </div>
+                );
+              }
+
+              // Deep Work slot
+              if (item.type === "deepwork") {
+                const slot = item.data;
+                const proj = slot.projectId ? getProject(slot.projectId) : null;
+                const domain = proj ? getDomain(proj.domainId) : null;
+                const domainColor = domain?.color || null;
+                const isFilled = !!proj;
+                const isExp = expandedId === slot.id;
+                const isPickerOpen = dwPickerOpen === slot.id;
+                const pickerStep = dwPickerStep[slot.id] || "project";
+                const pickerProj = dwPickerProj[slot.id] ? getProject(dwPickerProj[slot.id]) : null;
+                const pickerTime = dwPickerTime[slot.id] || { startHour: slot.startHour, startMin: slot.startMin, durationMin: slot.durationMin };
+                const fmt = (h, m) => { const hh = h > 12 ? h-12 : h===0?12:h; const mm = m===0?"":`:${String(m).padStart(2,"0")}`; return `${hh}${mm}${h>=12?"pm":"am"}`; };
+
+                const timeOptions = [];
+                for (let h = 5; h <= 21; h++) for (let m of [0, 15, 30, 45]) timeOptions.push({ h, m });
+
+                // If filled — render as a full project card (reuse block logic)
+                if (isFilled) {
+                  const blk = { id: slot.id, projectId: slot.projectId, startHour: slot.startHour, startMin: slot.startMin, durationMin: slot.durationMin, todayTasks: slot.todayTasks, _isDW: true, _dwSlotIndex: slot.slotIndex };
+                  const doneTasks = proj?.tasks.filter(t=>t.done).length || 0;
+                  const totalTasks = proj?.tasks.length || 0;
+                  const todayTaskIds = slot.todayTasks;
+                  const hasTodayTasks = Array.isArray(todayTaskIds) && todayTaskIds.length > 0;
+                  const relevantTasks = hasTodayTasks ? todayTaskIds.map(id => proj?.tasks.find(t => t.id === id)).filter(Boolean) : (proj?.tasks || []);
+                  const relevantDone = relevantTasks.filter(t => t.done).length;
+                  const allTasksDone = relevantTasks.length > 0 && relevantDone === relevantTasks.length;
+                  const isPastSlot = (slot.startHour * 60 + slot.startMin + slot.durationMin) <= nowMins;
+                  const isCompleted = allTasksDone;
+                  const cardBorder = domainColor ? `1px solid ${domainColor}60` : undefined;
+                  const cardShadow = domainColor ? `0 0 18px ${domainColor}22` : undefined;
+
+                  return (
+                    <div key={slot.id} className="tl-item" style={{ opacity: isPastSlot && !isCompleted ? 0.5 : 1 }}>
+                      <div className="tl-left">
+                        <span className="tl-time-btn" style={{ fontSize:10 }} onClick={e => { e.stopPropagation(); }}>{fmt(slot.startHour, slot.startMin)}</span>
+                        <div className="tl-connector" />
+                      </div>
+                      <div className="tl-swipe-wrap"
+                        onTouchStart={e => onSwipeTouchStart(e, slot.id)}
+                        onTouchMove={e => onSwipeTouchMove(e, slot.id)}
+                        onTouchEnd={e => onSwipeTouchEnd(e, slot.id)}
+                      >
+                        {/* Swipe actions */}
+                        <div className="tl-swipe-actions">
+                          <button className="tl-swipe-action-btn swap" onPointerUp={e => { e.stopPropagation(); setSwapBlockId(swapBlockId === slot.id ? null : slot.id); }}>
+                            <span className="tl-swipe-action-ico">⇄</span>
+                            <span className="tl-swipe-action-lbl">Swap</span>
+                          </button>
+                          <button className="tl-swipe-action-btn tomorrow" onPointerUp={e => { e.stopPropagation(); clearDWSlot(slot.slotIndex); setRevealedBlockId(null); }}>
+                            <span className="tl-swipe-action-ico">→</span>
+                            <span className="tl-swipe-action-lbl">Tomorrow</span>
+                          </button>
+                        </div>
+                        <div className={`tl-swipe-card tl-card${isExp ? " active-card" : ""}`}
+                          data-blockid={slot.id}
+                          style={{ border: cardBorder, boxShadow: cardShadow }}
+                          onClick={() => setExpandedId(isExp ? null : slot.id)}
+                        >
+                          <div className="tl-card-head">
+                            <div className="tl-stripe" style={{ background: domainColor || "var(--bg4)" }} />
+                            <div style={{ flex:1, minWidth:0 }}>
+                              <div className="tl-name">{proj.name}</div>
+                              <div className="tl-meta">{domain?.name} · {slot.durationMin} min{relevantTasks.length > 0 ? ` · ${relevantDone}/${relevantTasks.length} today` : ""}</div>
+                            </div>
+                            <div className="tl-dur">{slot.durationMin}m</div>
+                            <div style={{ width:26, height:26, borderRadius:"50%", border:`1.5px solid ${isCompleted ? "var(--green)" : "var(--border)"}`, background: isCompleted ? "var(--green)" : "transparent", display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, color:"#fff", flexShrink:0 }}>
+                              {isCompleted ? "✓" : ""}
+                            </div>
+                          </div>
+                          {isExp && (
+                            <div style={{ padding:"0 14px 14px" }}>
+                              {relevantTasks.map(t => (
+                                <div key={t.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"7px 0", borderTop:"1px solid var(--border2)" }}>
+                                  <div className={`t-check${t.done ? " done" : ""}`} onClick={e => { e.stopPropagation(); toggleTaskDone(proj.id, t.id); }} />
+                                  <span className="tl-task-txt" style={{ textDecoration: t.done ? "line-through" : "none", opacity: t.done ? .5 : 1 }}>{t.text}</span>
+                                </div>
+                              ))}
+                              <div style={{ display:"flex", gap:8, marginTop:10 }}>
+                                <button className="tl-start-btn" onClick={e => { e.stopPropagation(); setFocusBlockId(slot.id); setFocusMode(true); }}>Start →</button>
+                                <button className="tl-start-btn" style={{ background:"rgba(69,193,122,.12)", color:"var(--green)", borderColor:"rgba(69,193,122,.3)" }}
+                                  onClick={e => { e.stopPropagation(); markManualDone(slot.id, proj.id, slot.todayTasks); }}>I did this ✓</button>
+                                <button className="tl-start-btn" style={{ background:"rgba(224,85,85,.1)", color:"var(--red)", borderColor:"rgba(224,85,85,.25)", marginLeft:"auto" }}
+                                  onClick={e => { e.stopPropagation(); clearDWSlot(slot.slotIndex); setExpandedId(null); }}>Clear slot</button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        {/* Swap panel */}
+                        {swapBlockId === slot.id && (
+                          <div style={{ marginTop:-4, marginBottom:6 }}>
+                            <div style={{ background:"var(--bg3)", borderRadius:"0 0 12px 12px", padding:8, border:"1px solid var(--border)", borderTop:"none" }}>
+                              <div style={{ fontSize:11, color:"var(--text3)", fontWeight:600, letterSpacing:".06em", textTransform:"uppercase", marginBottom:4, padding:"0 4px" }}>Choose project</div>
+                              {data.projects.filter(p => p.status === "active" && p.id !== slot.projectId).map(p => {
+                                const d2 = data.domains?.find(d => d.id === p.domainId);
+                                return (
+                                  <button key={p.id} onClick={() => {
+                                    saveDWSlot(slot.id, slot.slotIndex, p.id, slot.startHour, slot.startMin, slot.durationMin, null);
+                                    setSwapBlockId(null); setRevealedBlockId(null);
+                                    const el = document.querySelector(`[data-blockid="${slot.id}"]`);
+                                    if (el) { el.style.transition=""; el.style.transform="translateX(0)"; }
+                                  }} style={{ background:"none", border:"none", textAlign:"left", padding:"9px 10px", borderRadius:8, cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontSize:14, color:"var(--text)", display:"flex", alignItems:"center", gap:10, width:"100%" }}>
+                                    <span style={{ width:9, height:9, borderRadius:"50%", background: d2?.color || "var(--text3)", flexShrink:0, display:"inline-block" }} />
+                                    {p.name}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+
+                // Empty deep work slot
+                return (
+                  <div key={slot.id} className="tl-item">
+                    <div className="tl-left">
+                      <span className="tl-time" style={{ fontSize:10 }}>{fmt(slot.startHour, slot.startMin)}</span>
+                      <div className="tl-connector" />
+                    </div>
+                    <div style={{ flex:1, minWidth:0, paddingRight:0, marginTop:8, marginBottom:6 }}>
+                      <button className="dw-empty" style={{ borderRadius: isPickerOpen ? "14px 14px 0 0" : 14 }}
+                        onClick={() => {
+                          setDwPickerOpen(isPickerOpen ? null : slot.id);
+                          setDwPickerStep(s => ({ ...s, [slot.id]: "project" }));
+                        }}
+                      >
+                        <div className="dw-plus">+</div>
+                        <div style={{ flex:1, textAlign:"left" }}>
+                          <div className="dw-empty-label">Deep Work Block</div>
+                          <div className="dw-empty-sub">{slot.durationMin} min · tap to assign</div>
+                        </div>
+                        <div className="dw-empty-dur">{slot.durationMin}m</div>
+                      </button>
+
+                      {isPickerOpen && (
+                        <div className="dw-picker-wrap">
+                          {pickerStep === "project" && (
+                            <>
+                              <div className="dw-picker-sect">Choose a project</div>
+                              {data.projects.filter(p => p.status === "active").map(p => {
+                                const d2 = data.domains?.find(d => d.id === p.domainId);
+                                return (
+                                  <div key={p.id} className="dw-proj-row"
+                                    onClick={() => {
+                                      setDwPickerProj(s => ({ ...s, [slot.id]: p.id }));
+                                      setDwPickerTime(s => ({ ...s, [slot.id]: { startHour: slot.startHour, startMin: slot.startMin, durationMin: slot.durationMin } }));
+                                      setDwPickerStep(s => ({ ...s, [slot.id]: "confirm" }));
+                                    }}
+                                  >
+                                    <div className="dw-proj-dot" style={{ background: d2?.color || "var(--text3)" }} />
+                                    <div className="dw-proj-name">{p.name}</div>
+                                    <div className="dw-proj-domain">{d2?.name}</div>
+                                  </div>
+                                );
+                              })}
+                            </>
+                          )}
+                          {pickerStep === "confirm" && pickerProj && (
+                            <div className="dw-confirm-wrap">
+                              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:12 }}>
+                                <div style={{ width:10, height:10, borderRadius:"50%", background: data.domains?.find(d => d.id === pickerProj.domainId)?.color || "var(--text3)", flexShrink:0 }} />
+                                <div style={{ fontSize:14, fontWeight:600, color:"var(--text)" }}>{pickerProj.name}</div>
+                              </div>
+                              <div className="dw-time-row">
+                                <select className="dw-time-sel" value={`${pickerTime.startHour}:${pickerTime.startMin}`}
+                                  onChange={e => { const [h,m] = e.target.value.split(":").map(Number); setDwPickerTime(s => ({ ...s, [slot.id]: { ...s[slot.id], startHour:h, startMin:m } })); }}>
+                                  {timeOptions.map(({h,m}) => <option key={`${h}:${m}`} value={`${h}:${m}`}>{fmt(h,m)}</option>)}
+                                </select>
+                                <select className="dw-time-sel" value={pickerTime.durationMin}
+                                  onChange={e => setDwPickerTime(s => ({ ...s, [slot.id]: { ...s[slot.id], durationMin: Number(e.target.value) } }))}>
+                                  {[30,45,60,90,120].map(d => <option key={d} value={d}>{d} min</option>)}
+                                </select>
+                              </div>
+                              <button className="dw-confirm-btn"
+                                onClick={() => {
+                                  saveDWSlot(slot.id, slot.slotIndex, pickerProj.id, pickerTime.startHour, pickerTime.startMin, pickerTime.durationMin, null);
+                                  setDwPickerOpen(null);
+                                  setDwPickerStep(s => ({ ...s, [slot.id]: "project" }));
+                                  setDwPickerProj(s => { const n={...s}; delete n[slot.id]; return n; });
+                                }}
+                              >✓ Confirm</button>
+                              <button className="dw-back" onClick={() => setDwPickerStep(s => ({ ...s, [slot.id]: "project" }))}>← Back</button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
