@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "./supabase.js";
 
 const DOMAIN_COLORS = ["#5B8AF0","#9B72CF","#45C17A","#E8A030","#E05555","#4BAABB"];
@@ -91,9 +91,6 @@ function getRoutinesForDate(routineBlocks, date) {
   });
 }
 
-function getRoutineDateKey(date) {
-  return date.toDateString();
-}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DATA LAYER — versioned, migration-safe, Supabase-ready
@@ -367,6 +364,20 @@ const css = `
   .tl-dot.now{background:var(--accent);box-shadow:0 0 0 3px rgba(232,160,48,.2);}
   .tl-dot.done{background:var(--green);}
   .tl-connector{width:1px;flex:1;min-height:8px;background:var(--border2);}
+
+  .tl-swipe-wrap{position:relative;overflow:hidden;border-radius:14px;margin:8px 0 6px;touch-action:pan-y;}
+  .tl-swipe-bg{position:absolute;inset:0;display:flex;align-items:center;border-radius:14px;transition:opacity .15s;}
+  .tl-swipe-bg.complete{background:var(--green);justify-content:flex-start;padding-left:20px;}
+  .tl-swipe-bg.reschedule{background:#4A90D9;justify-content:flex-end;padding-right:20px;}
+  .tl-swipe-bg-lbl{font-size:12px;font-weight:700;color:#fff;letter-spacing:.05em;text-transform:uppercase;}
+  .tl-swipe-card{position:relative;z-index:1;transition:transform .25s cubic-bezier(.25,.46,.45,.94);}
+  .tl-swipe-card.swiping{transition:none;}
+  .tl-drag-handle{width:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:grab;opacity:.35;flex-shrink:0;padding:14px 0;}
+  .tl-drag-handle:active{cursor:grabbing;opacity:.7;}
+  .tl-drag-handle span{display:block;width:14px;height:2px;background:var(--text3);border-radius:2px;}
+  .tl-item.dragging{opacity:.4;border:1px dashed var(--border);}
+  .tl-item.drag-over{border-top:2px solid var(--accent);}
+
   .tl-card{flex:1;background:var(--bg2);border-radius:14px;margin:8px 0 6px;overflow:hidden;transition:opacity .2s,border-color .2s,box-shadow .2s;}
   .tl-card.done-card{opacity:.38;}
   .tl-card.missed-card{border:1px solid var(--domain-color, rgba(255,255,255,.18));box-shadow:0 0 16px rgba(0,0,0,.1);}
@@ -914,6 +925,70 @@ function SwipeRow({ onDelete, children, className = "" }) {
 function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: focusModeprop, setFocusMode: setFocusModeApp, onSignOut }) {
   const [showTodaySettings, setShowTodaySettings] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
+  const [swapBlockId, setSwapBlockId] = useState(null);
+  const [dragId, setDragId] = useState(null);
+  const [dragOverId, setDragOverId] = useState(null);
+  const swipeState = useRef({});
+
+  const rescheduleToTomorrow = (blockId) => {
+    setData(d => ({ ...d, blocks: d.blocks.map(b => b.id === blockId ? { ...b, dayOffset: (b.dayOffset || 0) + 1 } : b) }));
+  };
+
+  const handleDragStart = (e, blockId) => {
+    setDragId(blockId);
+    e.dataTransfer.effectAllowed = "move";
+  };
+  const handleDragOver = (e, blockId) => {
+    e.preventDefault();
+    setDragOverId(blockId);
+  };
+  const handleDrop = (e, targetId) => {
+    e.preventDefault();
+    if (!dragId || dragId === targetId) { setDragId(null); setDragOverId(null); return; }
+    setData(d => {
+      const blocks = [...d.blocks];
+      const fromIdx = blocks.findIndex(b => b.id === dragId);
+      const toIdx = blocks.findIndex(b => b.id === targetId);
+      if (fromIdx < 0 || toIdx < 0) return d;
+      const fromBlk = blocks[fromIdx];
+      const toBlk = blocks[toIdx];
+      // Swap times
+      const newBlocks = blocks.map(b => {
+        if (b.id === dragId) return { ...b, startHour: toBlk.startHour, startMin: toBlk.startMin };
+        if (b.id === targetId) return { ...b, startHour: fromBlk.startHour, startMin: fromBlk.startMin };
+        return b;
+      });
+      return { ...d, blocks: newBlocks };
+    });
+    setDragId(null); setDragOverId(null);
+  };
+
+  const initSwipe = (e, blockId, onComplete, onReschedule) => {
+    const touch = e.touches[0];
+    swipeState.current[blockId] = { startX: touch.clientX, startY: touch.clientY, swiping: false };
+  };
+  const moveSwipe = (e, blockId, el) => {
+    const s = swipeState.current[blockId];
+    if (!s) return;
+    const touch = e.touches[0];
+    const dx = touch.clientX - s.startX;
+    const dy = touch.clientY - s.startY;
+    if (!s.swiping && Math.abs(dy) > Math.abs(dx)) { delete swipeState.current[blockId]; return; }
+    if (!s.swiping && Math.abs(dx) > 8) s.swiping = true;
+    if (!s.swiping) return;
+    e.preventDefault();
+    s.dx = dx;
+    if (el) { el.style.transform = `translateX(${Math.max(-120, Math.min(120, dx))}px)`; el.classList.add("swiping"); }
+  };
+  const endSwipe = (e, blockId, el, onComplete, onReschedule) => {
+    const s = swipeState.current[blockId];
+    if (!s || !s.swiping) { delete swipeState.current[blockId]; return; }
+    const dx = s.dx || 0;
+    delete swipeState.current[blockId];
+    if (el) { el.style.transform = ""; el.classList.remove("swiping"); }
+    if (dx > 80) onComplete();
+    else if (dx < -80) onReschedule();
+  };
   const [newTaskText, setNewTaskText] = useState({});
   const [tick, setTick] = useState(0);
   // lateStarted: { [blockId]: { startedAt: ISO string } }
@@ -1315,9 +1390,6 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                 const isCompleted = isManualDone || countdownExpired;
                 const isPastUnworked = isPast && !isNow && !isLateActive && !isManualDone;
                 const isMissedAndNotStarted = isPastUnworked;
-                const showFullCheck = isCompleted && (relevantTasks.length === 0 || allTasksDone);
-                const showPartialCheck = isCompleted && relevantTasks.length > 0 && !allTasksDone;
-
                 const dotState = isLateActive || isNow ? "now" : isCompleted ? "done" : "";
                 const isUpcoming = !isNow && !isLateActive && !isMissedAndNotStarted && !isManualDone && !countdownExpired && !isPast;
                 const domainCardColor = domain?.color || "rgba(255,255,255,.18)";
@@ -1338,7 +1410,15 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                 const showConflict = conflictWarning?.id === blk.id;
 
                 return (
-                  <div key={item.id} className="tl-item">
+                  <div
+                    key={item.id}
+                    className={["tl-item", dragId===blk.id?"dragging":"", dragOverId===blk.id?"drag-over":""].filter(Boolean).join(" ")}
+                    draggable={!isCompleted && !isNow && !isLateActive}
+                    onDragStart={e => handleDragStart(e, blk.id)}
+                    onDragOver={e => handleDragOver(e, blk.id)}
+                    onDrop={e => handleDrop(e, blk.id)}
+                    onDragEnd={() => { setDragId(null); setDragOverId(null); }}
+                  >
                     <div className="tl-left">
                       {isLateActive ? (
                         <div className="tl-time" style={{ color:"var(--accent)", paddingTop:14 }}>
@@ -1397,7 +1477,16 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                       } />
                       <div className="tl-connector" />
                     </div>
-                    <div className={cardClass} style={{ "--domain-color": domainCardColor + "50" }}>
+                    <div className="tl-swipe-wrap"
+                      onTouchStart={e => initSwipe(e, blk.id)}
+                      onTouchMove={e => { const el = e.currentTarget.querySelector(".tl-swipe-card"); moveSwipe(e, blk.id, el); }}
+                      onTouchEnd={e => { const el = e.currentTarget.querySelector(".tl-swipe-card"); endSwipe(e, blk.id, el, () => markManualDone(blk.id, proj?.id, blk.todayTasks), () => rescheduleToTomorrow(blk.id)); }}
+                    >
+                      {/* Swipe right = complete */}
+                      <div className="tl-swipe-bg complete"><span className="tl-swipe-bg-lbl">✓ Done</span></div>
+                      {/* Swipe left = reschedule to tomorrow (only for missed/upcoming) */}
+                      {(isMissedAndNotStarted || isUpcoming) && <div className="tl-swipe-bg reschedule"><span className="tl-swipe-bg-lbl">Tomorrow →</span></div>}
+                      <div className={`tl-swipe-card ${cardClass}`} style={{ "--domain-color": domainCardColor + "50" }}>
                       {/* Conflict warning */}
                       {showConflict && (
                         <div className="tl-conflict-warn">
@@ -1410,7 +1499,31 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                       <div className="tl-card-head" onClick={() => setExpandedId(isExp ? null : item.id)}>
                         <div className="tl-stripe" style={{ background: domain?.color || "var(--bg4)" }} />
                         <div className="tl-info">
-                          <div className="tl-name">{proj?.name || blk.label || "Block"}</div>
+                          <div style={{display:"flex",alignItems:"center",gap:6}}>
+                            <div className="tl-name">{proj?.name || blk.label || "Block"}</div>
+                            {proj && !isCompleted && (
+                              <button
+                                onClick={e => { e.stopPropagation(); setSwapBlockId(swapBlockId === blk.id ? null : blk.id); }}
+                                style={{ background:"none", border:"1px solid var(--border)", borderRadius:6, padding:"1px 6px", fontSize:10, color:"var(--text3)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", flexShrink:0 }}
+                              >swap</button>
+                            )}
+                          </div>
+                          {swapBlockId === blk.id && (
+                            <div style={{ marginTop:4, background:"var(--bg3)", borderRadius:10, padding:6, display:"flex", flexDirection:"column", gap:2 }} onClick={e => e.stopPropagation()}>
+                              {data.projects.filter(p => p.status === "active" && p.id !== proj?.id).map(p => {
+                                const d2 = data.domains?.find(d => d.id === p.domainId);
+                                return (
+                                  <button key={p.id} onClick={() => {
+                                    setData(d => ({ ...d, blocks: d.blocks.map(b => b.id === blk.id ? { ...b, projectId: p.id, todayTasks: undefined } : b) }));
+                                    setSwapBlockId(null);
+                                  }} style={{ background:"none", border:"none", textAlign:"left", padding:"7px 10px", borderRadius:8, cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontSize:13, color:"var(--text)", display:"flex", alignItems:"center", gap:8 }}>
+                                    <span style={{ width:8, height:8, borderRadius:"50%", background: d2?.color || "var(--text3)", flexShrink:0, display:"inline-block" }} />
+                                    {p.name}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
                           <div className="tl-meta">
                             {domain ? `${domain.name} · ` : ""}{blk.durationMin} min
                             {(() => {
@@ -1561,6 +1674,7 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                         );
                       })()}
                     </div>
+                    </div>
                   </div>
                 );
               }
@@ -1581,7 +1695,15 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                   }));
                 };
                 return (
-                  <div key={item.id} className="tl-item">
+                  <div
+                    key={item.id}
+                    className={["tl-item", dragId===rb.id?"dragging":"", dragOverId===rb.id?"drag-over":""].filter(Boolean).join(" ")}
+                    draggable={!isPast}
+                    onDragStart={e => handleDragStart(e, rb.id)}
+                    onDragOver={e => handleDragOver(e, rb.id)}
+                    onDrop={e => handleDrop(e, rb.id)}
+                    onDragEnd={() => { setDragId(null); setDragOverId(null); }}
+                  >
                     <div className="tl-left">
                       <div className="tl-time">{fmtTime(rb.startHour, rb.startMin)}</div>
                       <div className={`tl-dot ${isNow ? "now" : isPast ? "done" : ""}`} />
@@ -2300,12 +2422,6 @@ function ProjectsScreen({ data, setData, openCategorize }) {
       p.id === projectId ? { ...p, tasks: p.tasks.map(t => t.id === taskId ? { ...t, text } : t) } : p
     )
   }));
-
-  const saveProjectName = (projectId) => {
-    const name = editingProjName.trim();
-    if (name) setData(d => ({ ...d, projects: d.projects.map(p => p.id === projectId ? { ...p, name } : p) }));
-    setEditingProjId(null);
-  };
 
   const saveProjectEdit = (projectId, { name }) => {
     setData(d => ({
@@ -3913,7 +4029,7 @@ function QuickReminders({ onClose, onAddAll }) {
   return (
     <>
       {/* Tap-outside backdrop — dismisses without saving */}
-      <div className="qr-backdrop" onClick={onClose} />
+      <div className="qr-backdrop" onClick={finish} />
       <div className="qr-panel" onClick={e => e.stopPropagation()}>
         <div className="qr-header">Quick Reminders</div>
 
@@ -4189,10 +4305,10 @@ function InboxSwipeRow({ item, projects, domains, onCategorize, onDismiss, defau
       {/* Swipeable card */}
       <div
         className="inbox-item"
-        style={{ transform: `translateX(${offset}px)`, transition: startX.current === null ? "transform .2s ease" : "none",
+        style={{ transform: `translateX(${offset}px)`,
+          transition: startX.current === null ? "transform .2s ease, box-shadow .15s" : "box-shadow .1s",
           boxShadow: offset > 20 ? `0 0 0 1.5px ${offset > THRESHOLD ? "var(--green)" : "rgba(69,193,122,.3)"}` :
-                     offset < -20 ? `0 0 0 1.5px ${offset < -THRESHOLD ? "var(--red)" : "rgba(224,85,85,.3)"}` : "none",
-          transition: startX.current === null ? "transform .2s ease, box-shadow .15s" : "box-shadow .1s"
+                     offset < -20 ? `0 0 0 1.5px ${offset < -THRESHOLD ? "var(--red)" : "rgba(224,85,85,.3)"}` : "none"
         }}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
