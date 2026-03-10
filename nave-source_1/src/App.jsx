@@ -1693,31 +1693,34 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                                 )}
                               </div>
                             )}
-                            {/* Swap project panel — shown after tapping Swap in swipe actions */}
-                            {swapBlockId === blk.id && (
-                              <div className="tl-swap-panel">
-                                <div style={{ fontSize:11, color:"var(--text3)", fontWeight:600, letterSpacing:".06em", textTransform:"uppercase", marginBottom:6, padding:"0 6px" }}>Choose project</div>
-                                {data.projects.filter(p => p.status === "active" && p.id !== proj?.id).map(p => {
-                                  const d2 = data.domains?.find(d => d.id === p.domainId);
-                                  return (
-                                    <button key={p.id} onClick={() => {
-                                      setData(d => ({ ...d, blocks: d.blocks.map(b => b.id === blk.id ? { ...b, projectId: p.id, todayTasks: undefined } : b) }));
-                                      setSwapBlockId(null);
-                                      setRevealedBlockId(null);
-                                      const el = document.querySelector(`[data-blockid="${blk.id}"]`);
-                                      if (el) { el.style.transition=""; el.style.transform = "translateX(0)"; }
-                                    }} style={{ background:"none", border:"none", textAlign:"left", padding:"8px 10px", borderRadius:8, cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontSize:13, color:"var(--text)", display:"flex", alignItems:"center", gap:8, width:"100%" }}>
-                                      <span style={{ width:8, height:8, borderRadius:"50%", background: d2?.color || "var(--text3)", flexShrink:0, display:"inline-block" }} />
-                                      {p.name}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            )}
+
                           </div>
                         );
                       })()}
                     </div>
+                    {/* Swap panel — outside swipe-wrap so it's not clipped */}
+                    {swapBlockId === blk.id && (
+                      <div style={{ marginLeft:68, paddingRight:16, marginTop:-4, marginBottom:6 }}>
+                        <div style={{ background:"var(--bg3)", borderRadius:"0 0 12px 12px", padding:8, border:"1px solid var(--border)", borderTop:"none" }}>
+                          <div style={{ fontSize:11, color:"var(--text3)", fontWeight:600, letterSpacing:".06em", textTransform:"uppercase", marginBottom:4, padding:"0 4px" }}>Choose project</div>
+                          {data.projects.filter(p => p.status === "active" && p.id !== proj?.id).map(p => {
+                            const d2 = data.domains?.find(d => d.id === p.domainId);
+                            return (
+                              <button key={p.id} onClick={() => {
+                                setData(d => ({ ...d, blocks: d.blocks.map(b => b.id === blk.id ? { ...b, projectId: p.id, todayTasks: undefined } : b) }));
+                                setSwapBlockId(null);
+                                setRevealedBlockId(null);
+                                const el = document.querySelector(`[data-blockid="${blk.id}"]`);
+                                if (el) { el.style.transition=""; el.style.transform = "translateX(0)"; }
+                              }} style={{ background:"none", border:"none", textAlign:"left", padding:"9px 10px", borderRadius:8, cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontSize:14, color:"var(--text)", display:"flex", alignItems:"center", gap:10, width:"100%" }}>
+                                <span style={{ width:9, height:9, borderRadius:"50%", background: d2?.color || "var(--text3)", flexShrink:0, display:"inline-block" }} />
+                                {p.name}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                     </div>
                   </div>
                 );
