@@ -379,7 +379,7 @@ const css = `
   .tl-item.drag-over{border-top:2px solid var(--accent);}
 
   .tl-card{flex:1;background:var(--bg2);border-radius:14px;margin:8px 0 6px;overflow:hidden;transition:opacity .2s,border-color .2s,box-shadow .2s;}
-  .tl-card.done-card{opacity:.38;}
+  .tl-card.done-card{opacity:.42;filter:saturate(0.15);}
   .tl-card.missed-card{border:1px solid var(--domain-color, rgba(255,255,255,.18));box-shadow:0 0 16px rgba(0,0,0,.1);}
   .tl-card.now-card{border:1px solid rgba(232,160,48,.25);box-shadow:0 0 24px rgba(232,160,48,.09);}
   .tl-card.active-card{border:1px solid rgba(232,160,48,.25);box-shadow:0 0 24px rgba(232,160,48,.09);}
@@ -1478,12 +1478,12 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                       <div className="tl-connector" />
                     </div>
                     <div className="tl-swipe-wrap"
-                      onTouchStart={e => initSwipe(e, blk.id)}
-                      onTouchMove={e => { const el = e.currentTarget.querySelector(".tl-swipe-card"); moveSwipe(e, blk.id, el); }}
-                      onTouchEnd={e => { const el = e.currentTarget.querySelector(".tl-swipe-card"); endSwipe(e, blk.id, el, () => markManualDone(blk.id, proj?.id, blk.todayTasks), () => rescheduleToTomorrow(blk.id)); }}
+                      onTouchStart={e => !isCompleted && initSwipe(e, blk.id)}
+                      onTouchMove={e => { if(isCompleted) return; const el = e.currentTarget.querySelector(".tl-swipe-card"); moveSwipe(e, blk.id, el); }}
+                      onTouchEnd={e => { if(isCompleted) return; const el = e.currentTarget.querySelector(".tl-swipe-card"); endSwipe(e, blk.id, el, () => markManualDone(blk.id, proj?.id, blk.todayTasks), () => rescheduleToTomorrow(blk.id)); }}
                     >
-                      {/* Swipe right = complete */}
-                      <div className="tl-swipe-bg complete"><span className="tl-swipe-bg-lbl">✓ Done</span></div>
+                      {/* Swipe right = complete (only for non-completed blocks) */}
+                      {!isCompleted && <div className="tl-swipe-bg complete"><span className="tl-swipe-bg-lbl">✓ Done</span></div>}
                       {/* Swipe left = reschedule to tomorrow (only for missed/upcoming) */}
                       {(isMissedAndNotStarted || isUpcoming) && <div className="tl-swipe-bg reschedule"><span className="tl-swipe-bg-lbl">Tomorrow →</span></div>}
                       <div className={`tl-swipe-card ${cardClass}`} style={{ "--domain-color": domainCardColor + "50" }}>
@@ -1501,7 +1501,7 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                         <div className="tl-info">
                           <div style={{display:"flex",alignItems:"center",gap:6}}>
                             <div className="tl-name">{proj?.name || blk.label || "Block"}</div>
-                            {proj && !isCompleted && (
+                            {proj && !isCompleted && isExp && (
                               <button
                                 onClick={e => { e.stopPropagation(); setSwapBlockId(swapBlockId === blk.id ? null : blk.id); }}
                                 style={{ background:"none", border:"1px solid var(--border)", borderRadius:6, padding:"1px 6px", fontSize:10, color:"var(--text3)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", flexShrink:0 }}
