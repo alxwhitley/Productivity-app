@@ -139,7 +139,6 @@ const FIELD_DEFAULTS = {
   todayPrefs:     { name:"", showShutdown:true, defaultBlock:"9" },
   blockCompletions: [], // [{ blockId, date, durationMin }] — "I did this" / Done logs
   deepWorkTargets: { dailyHours: 4, weeklyHours: 20 }, // user-configurable
-  deepWorkSlots: {}, // { [dateStr]: [{ id, startHour, startMin, durationMin, projectId, todayTasks }] }
   todayLoosePicks: {}, // { [dateStr]: [looseTaskId, ...] } — tasks picked for today's loose block
 };
 
@@ -380,18 +379,6 @@ const css = `
   .tl-swipe-card{position:relative;z-index:1;transition:transform .3s cubic-bezier(.25,.46,.45,.94);will-change:transform;background:var(--bg2);border-radius:14px;width:100%;}
   .tl-swipe-card.swiping{transition:none;}
   .tl-swap-panel{background:var(--bg3);border-radius:0 0 14px 14px;padding:8px;display:flex;flex-direction:column;gap:1px;border-top:1px solid var(--border);}
-  .dw-slot{width:100%;background:transparent;border:1.5px dashed var(--border);border-radius:14px;padding:14px 16px;cursor:pointer;display:flex;align-items:center;gap:12px;transition:border-color .2s,background .2s;font-family:"DM Sans",sans-serif;}
-  .dw-slot:active{opacity:.8;}
-  .dw-slot.filled{border-style:dashed;border-width:1.5px;}
-  .dw-slot-icon{width:28px;height:28px;border-radius:8px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
-  .dw-slot-body{flex:1;min-width:0;text-align:left;}
-  .dw-slot-label{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);margin-bottom:2px;}
-  .dw-slot-sub{font-size:13px;color:var(--text2);}
-  .dw-slot-time{font-size:11px;color:var(--text3);font-variant-numeric:tabular-nums;white-space:nowrap;}
-  .dw-picker{background:var(--bg3);border-radius:0 0 14px 14px;border:1.5px dashed var(--border);border-top:none;padding:8px;}
-  .dw-picker-title{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text3);padding:4px 6px 8px;}
-  .dw-proj-btn{width:100%;background:none;border:none;text-align:left;padding:9px 10px;border-radius:8px;cursor:pointer;font-family:"DM Sans",sans-serif;font-size:14px;color:var(--text);display:flex;align-items:center;gap:10px;}
-  .dw-proj-btn:active{background:var(--bg4);}
   .tl-drag-handle{width:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:grab;opacity:.35;flex-shrink:0;padding:14px 0;}
   .tl-drag-handle:active{cursor:grabbing;opacity:.7;}
   .tl-drag-handle span{display:block;width:14px;height:2px;background:var(--text3);border-radius:2px;}
@@ -1254,19 +1241,9 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
   const todayRoutines = getRoutinesForDate(data.routineBlocks || [], today);
   const dateKey = today.toDateString();
 
-  // Deep work slots for today
-  const dateKey2 = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}-${String(today.getDate()).padStart(2,"0")}`;
-  const deepDefaults = getDeepSlots(data);
-  const savedDWSlots = (data.deepWorkSlots || {})[dateKey2] || [];
-  // Build today's DW slots: merge defaults with saved assignments
-  const todayDWSlots = deepDefaults.map((def, i) => {
-    const saved = savedDWSlots[i] || {};
-    return { id: `dw-${dateKey2}-${i}`, startHour: def.startHour, startMin: def.startMin, durationMin: def.durationMin, projectId: saved.projectId || null, todayTasks: saved.todayTasks || null, slotIndex: i };
-  });
-
   const timeline = [
+    ...todayBlocks.map(b => ({ type: "block", id: b.id, mins: b.startHour * 60 + b.startMin, data: b })),
     ...todayRoutines.map(r => ({ type: "routine", id: r.id, mins: r.startHour * 60 + r.startMin, data: r })),
-    ...todayDWSlots.map(s => ({ type: "deepwork", id: s.id, mins: s.startHour * 60 + s.startMin, data: s })),
   ].sort((a, b) => a.mins - b.mins);
 
   // Prime window — first project block of the day, if it starts between 6am–11am
@@ -1748,93 +1725,6 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                         </div>
                       </div>
                     )}
-                    </div>
-                  </div>
-                );
-              }
-
-              // Deep Work slot
-              if (item.type === "deepwork") {
-                const slot = item.data;
-                const proj = slot.projectId ? getProject(slot.projectId) : null;
-                const domain = proj ? getDomain(proj.domainId) : null;
-                const domainColor = domain?.color || null;
-                const isFilled = !!proj;
-                const isPastSlot = (slot.startHour * 60 + slot.startMin + slot.durationMin) <= nowMins;
-                const isPickerOpen = expandedId === slot.id;
-                const fmt = (h, m) => { const hh = h > 12 ? h-12 : h===0?12:h; const mm = m===0?"":`:${String(m).padStart(2,"0")}`; const ap = h>=12?"pm":"am"; return `${hh}${mm}${ap}`; };
-                const timeLabel = fmt(slot.startHour, slot.startMin);
-
-                return (
-                  <div key={slot.id} className="tl-item" style={{ opacity: isPastSlot && !isFilled ? 0.45 : 1 }}>
-                    <div className="tl-left">
-                      <span className="tl-time" style={{ fontSize:10 }}>{timeLabel}</span>
-                      <div className="tl-connector" />
-                    </div>
-                    <div style={{ flex:1, minWidth:0, paddingRight:0 }}>
-                      <button
-                        className={`dw-slot${isFilled ? " filled" : ""}`}
-                        style={isFilled ? { borderColor: domainColor + "80", background: domainColor + "18" } : {}}
-                        onClick={() => setExpandedId(isPickerOpen ? null : slot.id)}
-                      >
-                        <div className="dw-slot-icon" style={isFilled ? { background: domainColor + "30" } : {}}>
-                          {isFilled ? <span style={{ fontSize:12 }}>🔥</span> : <span style={{ color:"var(--text3)", fontSize:16, fontWeight:300 }}>+</span>}
-                        </div>
-                        <div className="dw-slot-body">
-                          <div className="dw-slot-label" style={isFilled ? { color: domainColor } : {}}>
-                            {isFilled ? "Deep Work" : "Deep Work Block"}
-                          </div>
-                          <div className="dw-slot-sub">
-                            {isFilled ? proj.name : `${slot.durationMin} min · tap to assign`}
-                          </div>
-                        </div>
-                        <div className="dw-slot-time">{slot.durationMin}m</div>
-                      </button>
-                      {isPickerOpen && (
-                        <div className="dw-picker" style={isFilled ? { borderColor: domainColor + "80" } : {}}>
-                          <div className="dw-picker-title">Assign a project</div>
-                          {data.projects.filter(p => p.status === "active").map(p => {
-                            const d2 = data.domains?.find(d => d.id === p.domainId);
-                            const isSelected = slot.projectId === p.id;
-                            return (
-                              <button key={p.id} className="dw-proj-btn"
-                                style={isSelected ? { background: d2?.color + "22" } : {}}
-                                onClick={e => {
-                                  e.stopPropagation();
-                                  setData(prev => {
-                                    const existing = (prev.deepWorkSlots || {})[dateKey2] || [];
-                                    const updated = [...deepDefaults.map((_, i) => existing[i] || {})];
-                                    updated[slot.slotIndex] = { ...updated[slot.slotIndex], projectId: p.id };
-                                    return { ...prev, deepWorkSlots: { ...(prev.deepWorkSlots || {}), [dateKey2]: updated } };
-                                  });
-                                  setExpandedId(null);
-                                }}
-                              >
-                                <span style={{ width:10, height:10, borderRadius:"50%", background: d2?.color || "var(--text3)", flexShrink:0, display:"inline-block" }} />
-                                <span>{p.name}</span>
-                                <span style={{ fontSize:11, color:"var(--text3)", marginLeft:"auto" }}>{d2?.name}</span>
-                                {isSelected && <span style={{ color: d2?.color, fontSize:14 }}>✓</span>}
-                              </button>
-                            );
-                          })}
-                          {isFilled && (
-                            <button className="dw-proj-btn" style={{ color:"var(--red)", marginTop:4, borderTop:"1px solid var(--border)", borderRadius:0, paddingTop:10 }}
-                              onClick={e => {
-                                e.stopPropagation();
-                                setData(prev => {
-                                  const existing = (prev.deepWorkSlots || {})[dateKey2] || [];
-                                  const updated = [...deepDefaults.map((_, i) => existing[i] || {})];
-                                  updated[slot.slotIndex] = {};
-                                  return { ...prev, deepWorkSlots: { ...(prev.deepWorkSlots || {}), [dateKey2]: updated } };
-                                });
-                                setExpandedId(null);
-                              }}
-                            >
-                              <span>✕</span> Clear slot
-                            </button>
-                          )}
-                        </div>
-                      )}
                     </div>
                   </div>
                 );
