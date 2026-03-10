@@ -380,13 +380,13 @@ const css = `
   .tl-swipe-card{position:relative;z-index:1;transition:transform .3s cubic-bezier(.25,.46,.45,.94);will-change:transform;background:var(--bg2);border-radius:14px;width:100%;}
   .tl-swipe-card.swiping{transition:none;}
   /* Deep Work Slots */
-  .dw-empty{width:100%;background:transparent;border:1.5px dashed rgba(255,255,255,.14);border-radius:14px;padding:10px 14px;cursor:pointer;display:flex;align-items:center;gap:12px;transition:border-color .2s,background .2s;font-family:"DM Sans",sans-serif;min-height:48px;}
+  .dw-empty{width:100%;background:transparent;border:1.5px dashed rgba(255,255,255,.14);border-radius:14px;padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:12px;transition:border-color .2s,background .2s;font-family:"DM Sans",sans-serif;min-height:44px;}
   .dw-empty:active{background:rgba(255,255,255,.03);}
-  .dw-plus{width:24px;height:24px;border-radius:50%;border:1.5px solid rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.35);font-size:16px;font-weight:300;flex-shrink:0;}
-  .dw-empty-label{font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:rgba(255,255,255,.25);margin-bottom:3px;}
-  .dw-empty-sub{font-size:13px;color:rgba(255,255,255,.2);}
-  .dw-empty-dur{font-size:11px;color:rgba(255,255,255,.2);margin-left:auto;flex-shrink:0;}
-  .dw-picker-wrap{background:var(--bg3);border:1.5px dashed rgba(255,255,255,.14);border-top:none;border-radius:0 0 14px 14px;overflow:hidden;}
+  .dw-plus{width:22px;height:22px;border-radius:50%;border:1.5px solid rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.35);font-size:14px;font-weight:300;flex-shrink:0;}
+  .dw-empty-label{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:rgba(255,255,255,.25);margin-bottom:1px;}
+  .dw-empty-sub{font-size:12px;color:rgba(255,255,255,.18);}
+  .dw-empty-dur{font-size:11px;color:rgba(255,255,255,.18);margin-left:auto;flex-shrink:0;}
+  .dw-picker-wrap{background:var(--bg3);border:1.5px dashed rgba(255,255,255,.14);border-top:none;border-radius:0 0 14px 14px;overflow:visible;}
   .dw-picker-sect{padding:10px 10px 6px;font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text3);}
   .dw-proj-row{display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;border-radius:8px;margin:0 4px;}
   .dw-proj-row:active{background:var(--bg4);}
@@ -1853,9 +1853,10 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                           style={{ border: cardBorder, boxShadow: cardShadow }}
                           onClick={() => setExpandedId(isExp ? null : slot.id)}
                         >
-                          <div className="tl-card-head">
+                          <div className="tl-card-head" style={{ padding:"15px 14px" }}>
                             <div className="tl-stripe" style={{ background: domainColor || "var(--bg4)" }} />
                             <div style={{ flex:1, minWidth:0 }}>
+                              <div style={{ fontSize:10, fontWeight:700, letterSpacing:".08em", textTransform:"uppercase", color: domainColor || "var(--accent)", marginBottom:3, opacity:.9 }}>Deep Work</div>
                               <div className="tl-name">{proj.name}</div>
                               <div className="tl-meta">{domain?.name} · {slot.durationMin} min{relevantTasks.length > 0 ? ` · ${relevantDone}/${relevantTasks.length} today` : ""}</div>
                             </div>
@@ -3109,6 +3110,29 @@ function PlanScreen({ data, setData, openAddBlock, onGoToSeason, lightMode, togg
                   const domainColor2 = domain2?.color || null;
                   const cardKey = `dwfilled_${row.dateStr}_${row.slotIndex}`;
                   const isExpFilled = wkDwPickerOpen === cardKey + "_exp";
+                  const savedDW2 = (data.deepWorkSlots || {})[row.dateStr] || [];
+                  const savedSlot2 = savedDW2[row.slotIndex] || {};
+                  const assignedTaskIds = savedSlot2.todayTasks || null;
+                  const projTasks3 = (proj2?.tasks || []).filter(t => !t.done);
+                  const selectedTasks3 = wkDwPickerTasks[cardKey] !== undefined
+                    ? wkDwPickerTasks[cardKey]
+                    : (assignedTaskIds || []);
+
+                  const toggleTask3 = (taskId) => {
+                    setWkDwPickerTasks(st => {
+                      const cur = st[cardKey] !== undefined ? st[cardKey] : (assignedTaskIds || []);
+                      const next = cur.includes(taskId) ? cur.filter(id => id !== taskId) : [...cur, taskId];
+                      return { ...st, [cardKey]: next };
+                    });
+                  };
+
+                  const saveTasksForFilled = () => {
+                    const tasks = selectedTasks3.length > 0 ? selectedTasks3 : null;
+                    saveDWSlotForDate(row.dateStr, row.slotIndex, row.projectId, row.startHour, row.startMin, row.durationMin, tasks);
+                    setWkDwPickerOpen(null);
+                    setWkDwPickerTasks(st => { const n={...st}; delete n[cardKey]; return n; });
+                  };
+
                   return (
                     <div key={cardKey} style={{ padding: "6px 12px 2px" }}>
                       <div
@@ -3120,22 +3144,61 @@ function PlanScreen({ data, setData, openAddBlock, onGoToSeason, lightMode, togg
                           overflow: "hidden",
                           cursor: "pointer",
                         }}
-                        onClick={() => setWkDwPickerOpen(isExpFilled ? null : cardKey + "_exp")}
+                        onClick={() => { setWkDwPickerOpen(isExpFilled ? null : cardKey + "_exp"); }}
                       >
-                        <div style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 12px" }}>
-                          <div style={{ width:3, borderRadius:2, alignSelf:"stretch", minHeight:28, background: domainColor2 || "var(--bg4)", flexShrink:0 }} />
+                        <div style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 14px" }}>
+                          <div style={{ width:3, borderRadius:2, alignSelf:"stretch", minHeight:36, background: domainColor2 || "var(--bg4)", flexShrink:0 }} />
                           <div style={{ flex:1, minWidth:0 }}>
-                            <div style={{ fontSize:13, fontWeight:600, color:"var(--text)" }}>{proj2?.name || "—"}</div>
-                            <div style={{ fontSize:11, color:"var(--text3)", marginTop:2 }}>{domain2?.name} · {row.durationMin} min · {fmtTime(row.startHour, row.startMin)}</div>
+                            <div style={{ fontSize:14, fontWeight:600, color:"var(--text)" }}>{proj2?.name || "—"}</div>
+                            <div style={{ fontSize:11, color:"var(--text3)", marginTop:3 }}>
+                              {domain2?.name} · {row.durationMin} min · {fmtTime(row.startHour, row.startMin)}
+                              {assignedTaskIds?.length > 0 ? ` · ${assignedTaskIds.length} task${assignedTaskIds.length > 1 ? "s" : ""}` : ""}
+                            </div>
                           </div>
-                          <div style={{ fontSize:10, fontWeight:700, letterSpacing:".07em", textTransform:"uppercase", color: domainColor2 || "var(--accent)", opacity:.8, flexShrink:0 }}>DW</div>
+                          <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                            <div style={{ fontSize:10, fontWeight:700, letterSpacing:".07em", textTransform:"uppercase", color: domainColor2 || "var(--accent)", opacity:.8 }}>DW</div>
+                            <div style={{ fontSize:14, color:"var(--text3)", transform: isExpFilled ? "rotate(90deg)" : "rotate(0deg)", transition:"transform .2s" }}>›</div>
+                          </div>
                         </div>
                         {isExpFilled && (
-                          <div style={{ padding:"4px 12px 12px", borderTop:"1px solid var(--border2)" }}>
-                            <button
-                              onClick={e => { e.stopPropagation(); clearDWSlotForDate(row.dateStr, row.slotIndex); setWkDwPickerOpen(null); }}
-                              style={{ background:"rgba(224,85,85,.1)", color:"var(--red)", border:"none", borderRadius:8, padding:"8px 14px", fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}
-                            >Clear slot</button>
+                          <div style={{ borderTop:"1px solid var(--border2)" }} onClick={e => e.stopPropagation()}>
+                            {projTasks3.length > 0 && (
+                              <div style={{ padding:"10px 14px 4px" }}>
+                                <div style={{ fontSize:11, fontWeight:700, letterSpacing:".07em", textTransform:"uppercase", color:"var(--text3)", marginBottom:6 }}>
+                                  Focus tasks <span style={{ color:"var(--text3)", fontWeight:400, textTransform:"none", letterSpacing:0 }}>(optional)</span>
+                                </div>
+                                {projTasks3.map(t => {
+                                  const isSel = selectedTasks3.includes(t.id);
+                                  return (
+                                    <div key={t.id} onClick={() => toggleTask3(t.id)}
+                                      style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 4px", cursor:"pointer", borderRadius:8 }}>
+                                      <div style={{
+                                        width:18, height:18, borderRadius:5,
+                                        border: isSel ? "none" : "1.5px solid var(--border)",
+                                        background: isSel ? "var(--accent)" : "transparent",
+                                        display:"flex", alignItems:"center", justifyContent:"center",
+                                        flexShrink:0, transition:"all .15s"
+                                      }}>
+                                        {isSel && <span style={{ fontSize:10, color:"#000", fontWeight:800 }}>✓</span>}
+                                      </div>
+                                      <span style={{ fontSize:13, color: isSel ? "var(--text)" : "var(--text2)" }}>{t.text}</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                            <div style={{ display:"flex", gap:8, padding:"10px 14px 14px" }}>
+                              {projTasks3.length > 0 && (
+                                <button onClick={saveTasksForFilled}
+                                  style={{ flex:1, background:"var(--accent)", color:"#000", border:"none", borderRadius:8, padding:"9px", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
+                                  Save
+                                </button>
+                              )}
+                              <button onClick={e => { e.stopPropagation(); clearDWSlotForDate(row.dateStr, row.slotIndex); setWkDwPickerOpen(null); setWkDwPickerTasks(st => { const n={...st}; delete n[cardKey]; return n; }); }}
+                                style={{ flex:1, background:"rgba(224,85,85,.1)", color:"var(--red)", border:"none", borderRadius:8, padding:"9px", fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
+                                Clear slot
+                              </button>
+                            </div>
                           </div>
                         )}
                       </div>
