@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { supabase } from "./supabase.js";
+// Preview mode - no auth
+const supabase = { auth: { getSession: async () => ({ data: { session: { user: { id: "preview" } } } }), onAuthStateChange: (_e, cb) => { cb("SIGNED_IN", { user: { id: "preview" } }); return { data: { subscription: { unsubscribe: () => {} } } }; }, signOut: async () => {} }, from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: null }) }) }), upsert: async () => ({}) }) };
 
 const DOMAIN_COLORS = ["#5B8AF0","#9B72CF","#45C17A","#E8A030","#E05555","#4BAABB"];
 
@@ -873,7 +874,7 @@ const css = `
   .qr-input::placeholder{color:var(--text3);}
 
   /* FAB */
-  .fab{width:50px;height:50px;border-radius:50%;background:rgba(232,160,48,0.18);border:1.5px solid rgba(232,160,48,0.35);color:var(--accent);font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative;bottom:28px;z-index:26;flex-shrink:0;transition:transform .15s,background .15s;font-family:'DM Sans',sans-serif;box-shadow:0 2px 16px rgba(0,0,0,.3);}
+  .fab{width:50px;height:50px;border-radius:50%;background:rgba(232,160,48,0.18);border:1.5px solid rgba(232,160,48,0.35);color:var(--accent);font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative;bottom:14px;z-index:26;flex-shrink:0;transition:transform .15s,background .15s;font-family:'DM Sans',sans-serif;box-shadow:0 2px 16px rgba(0,0,0,.3);}
   .fab.open{background:rgba(232,160,48,0.28);border-color:rgba(232,160,48,0.6);transform:scale(1.05);}
   .fab:active{transform:scale(.93);}
   .capture-input{width:100%;background:var(--bg3);border:1.5px solid var(--accent);border-radius:12px;padding:14px 16px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:16px;outline:none;margin-bottom:14px;}
@@ -2090,7 +2091,12 @@ function LooseTasksSection({ domainId, domain, data, setData, onAddProject }) {
                   onClick={e => { e.stopPropagation(); setEditingId(t.id); setEditDraft(t.text); }}
                 >{t.text}</span>
               )}
-              {false && assigningId === t.id && (
+              {domainProjects.length > 0 && editingId !== t.id && (
+                <button className="loose-assign-btn" onClick={e => { e.stopPropagation(); setAssigningId(assigningId === t.id ? null : t.id); }}>
+                  → Project
+                </button>
+              )}
+              {assigningId === t.id && (
                 <div className="loose-assign-pop" onClick={e => e.stopPropagation()}>
                   <div className="lap-title">Move to project</div>
                   {domainProjects.map(p => {
@@ -2336,16 +2342,8 @@ function ProjectCard({ proj, domain, isExp, newTaskText,
                   if (e.key === "Enter") { onAddTask(); setTimeout(() => taskInputRef.current?.focus(), 30); }
                   if (e.key === "Escape") { setAddingTask(false); onNewTaskChange(""); }
                 }}
+                onBlur={() => { if (!newTaskText.trim()) setAddingTask(false); }}
               />
-              <button
-                onMouseDown={e => { e.preventDefault(); if (newTaskText.trim()) { onAddTask(); setTimeout(() => taskInputRef.current?.focus(), 30); } else { setAddingTask(false); } }}
-                style={{ background: "none", border: "none", padding: "0 4px 0 8px", cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
-              >
-                <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
-                  <circle cx="13" cy="13" r="12" fill="rgba(232,160,48,0.15)" stroke="rgba(232,160,48,0.5)" strokeWidth="1.5"/>
-                  <path d="M13 8v10M8 13h10" stroke="#E8A030" strokeWidth="2" strokeLinecap="round"/>
-                </svg>
-              </button>
             </div>
           ) : (
             <div
@@ -2726,7 +2724,22 @@ function PlanScreen({ data, setData, openAddBlock, onGoToSeason, lightMode, togg
       </div>
       <div className="scroll">
         <ThisSeasonCard data={data} setData={setData} onGoToSeason={onGoToSeason} />
-        <div className="sh" style={{ paddingTop: 8 }}><span className="sh-label">Schedule</span></div>
+        <div className="sh" style={{ paddingTop: 8 }}><span className="sh-label">This Week's Intention</span></div>
+        <div className="intention-card">
+          {editingIntention ? (
+            <>
+              <textarea className="intent-textarea" rows={4} value={intentionDraft} onChange={e => setIntentionDraft(e.target.value)} autoFocus />
+              <button className="intent-save" onClick={saveIntention}>Save</button>
+            </>
+          ) : (
+            <>
+              <div className="ic-text">"{weekIntention}"</div>
+              <button className="ic-edit" onClick={() => { setIntentionDraft(weekIntention); setEditingIntention(true); }}>Edit intention</button>
+            </>
+          )}
+        </div>
+
+        <div className="sh"><span className="sh-label">Schedule</span></div>
 
         {[0,1,2,3,4,5,6].map(offset => {
           const dayDate = new Date(today); dayDate.setDate(today.getDate() + offset);
