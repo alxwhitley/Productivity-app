@@ -433,6 +433,21 @@ const css = `
   .tl-item.drag-over{border-top:2px solid var(--accent);}
   /* No-times mode */
   .tl-wrap.no-times{padding:0 16px;}
+  .today-plan-mode{background:rgba(232,160,48,.045);transition:background .6s ease;}
+  .today-work-mode{background:#12151F;transition:background .6s ease;}
+  .today-plan-mode .screen,.today-plan-mode{--bg:#181A1B;}
+  .today-work-mode .ph-eye{color:var(--blue)!important;}
+  .plan-block-row{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--bg2);border-radius:14px;margin:0 16px 8px;border:1px solid var(--border);cursor:pointer;transition:border-color .15s,background .15s;}
+  .plan-block-row:active{background:var(--bg3);}
+  .plan-block-row.assigned{border-color:var(--domain-color,var(--border));}
+  .begin-btn{display:block;width:calc(100% - 32px);margin:16px 16px 8px;padding:16px;background:var(--accent);color:#000;border:none;border-radius:16px;font-size:16px;font-weight:800;font-family:"DM Sans",sans-serif;letter-spacing:.01em;cursor:pointer;transition:transform .1s,opacity .1s;}
+  .begin-btn:active{transform:scale(.98);opacity:.9;}
+  .work-hero{margin:0 16px 12px;background:var(--bg2);border-radius:20px;overflow:hidden;border:1px solid var(--border);}
+  .work-hero.has-domain{border-color:var(--domain-color,var(--border));}
+  .work-next-strip{margin:0 16px 8px;display:flex;flex-direction:column;gap:6px;}
+  .work-next-card{background:var(--bg2);border-radius:12px;padding:11px 14px;border:1px solid var(--border);display:flex;align-items:center;gap:10;}
+  .earlier-link{text-align:center;padding:8px 0 4px;font-size:12px;color:var(--text3);font-weight:600;cursor:pointer;font-family:"DM Sans",sans-serif;letter-spacing:.02em;}
+  .replan-btn{background:none;border:none;font-size:11px;color:var(--text3);font-weight:600;cursor:pointer;font-family:"DM Sans",sans-serif;padding:0;letter-spacing:.03em;}
   .tl-wrap.no-times .tl-item{padding-right:0;gap:0;}
   .tl-wrap.no-times .tl-left{display:none;}
   .tl-wrap.no-times .tl-item+.tl-item{margin-top:8px;}
@@ -1286,6 +1301,8 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
   const [dwPickerStep, setDwPickerStep] = useState({}); // { [slotId]: "project" | "confirm" }
   const [dwPickerProj, setDwPickerProj] = useState({}); // { [slotId]: projectId }
   const [dwPickerTime, setDwPickerTime] = useState({}); // { [slotId]: { startHour, startMin, durationMin } }
+  const [workMode, setWorkMode] = useState(false); // false=Plan, true=Work
+  const [earlierOpen, setEarlierOpen] = useState(false); // "Earlier today" disclosure
 
 
   const rescheduleToTomorrow = (blockId) => {
@@ -1691,6 +1708,19 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
   // Jump to a specific block when navigating from Projects "Work Now"
   const scrollRef = useRef(null);
   const [tomorrowActive, setTomorrowActive] = useState(false);
+
+  // Scroll DW slot button to near top of screen when picker opens
+  useEffect(() => {
+    if (!dwPickerOpen) return;
+    setTimeout(() => {
+      const btn = document.querySelector(`[data-dwslot="${dwPickerOpen}"]`);
+      if (btn && scrollRef.current) {
+        const scrollEl = scrollRef.current;
+        const btnTop = btn.getBoundingClientRect().top - scrollEl.getBoundingClientRect().top + scrollEl.scrollTop;
+        scrollEl.scrollTo({ top: Math.max(0, btnTop - 80), behavior: "smooth" });
+      }
+    }, 30);
+  }, [dwPickerOpen]);
   const tomorrowTimerRef = useRef(null);
   useEffect(() => {
     const el = scrollRef.current;
@@ -1735,92 +1765,322 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
   const name = data.todayPrefs?.name;
 
   return (
-    <div className="screen active">
+    <div className={`screen active ${workMode ? "today-work-mode" : "today-plan-mode"}`} style={{ transition:"background .6s ease" }}>
       <StatusBar />
 
-      {/* HEADER */}
-      {true && (
-        <div className="ph" style={{ paddingBottom: 10, paddingTop: 10 }}>
-          {viewingTomorrow && (
-            <button onClick={() => setViewingTomorrow(false)} style={{ background:"none", border:"none", cursor:"pointer", padding:"0 0 8px", display:"flex", alignItems:"center", gap:4, color:"var(--text3)", fontFamily:"'DM Sans',sans-serif", fontSize:12, fontWeight:600 }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              Today
-            </button>
-          )}
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
-            <div>
-              <div style={{ display:"flex", alignItems:"baseline", gap:6 }}>
-                {!viewingTomorrow
-                  ? <><span className="today-clock">{clockH}:{clockM}</span><span className="today-clock-ampm">{clockAmpm}</span></>
-                  : <span className="today-clock" style={{ fontSize:28 }}>Tomorrow</span>
-                }
+      {/* ══════════════ PLAN MODE ══════════════ */}
+      {!workMode && (
+        <>
+          {/* Header */}
+          <div className="ph" style={{ paddingBottom:10, paddingTop:10 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+              <div>
+                <div className="ph-eye" style={{ color:"var(--accent)" }}>
+                  {days[today.getDay()]}, {months[today.getMonth()]} {today.getDate()}
+                </div>
+                <div className="ph-title">Plan Your Day</div>
               </div>
-              <div style={{ fontSize:13, color:"var(--text2)", marginTop:2, fontWeight:500 }}>
-                {days[viewDate.getDay()]}, {months[viewDate.getMonth()]} {viewDate.getDate()}
-              </div>
+              <button className="tab-gear" onClick={() => setShowTodaySettings(true)} onContextMenu={e => { e.preventDefault(); if(onSignOut) onSignOut(); }}><GearIcon size={20} /></button>
             </div>
-            <button className="tab-gear" onClick={() => setShowTodaySettings(true)} onContextMenu={e => { e.preventDefault(); if(onSignOut) onSignOut(); }}><GearIcon size={20} /></button>
+            {data.weekIntention ? (
+              <div style={{ marginTop:8, fontSize:13, color:"var(--text2)", fontStyle:"italic", lineHeight:1.5, borderLeft:"2px solid rgba(232,160,48,.4)", paddingLeft:10 }}>
+                "{data.weekIntention}"
+              </div>
+            ) : (
+              <div style={{ marginTop:6, fontSize:12, color:"var(--text3)" }}>Set a week intention in the Plan tab ↗</div>
+            )}
           </div>
-          <div style={{ fontSize:12, color:"var(--text3)", marginTop:6 }}>
-            {viewingTomorrow
-              ? `${timeline.length} block${timeline.length !== 1 ? "s" : ""} planned`
-              : `${greeting}${name ? `, ${name}` : ""}.${currentItem ? ` You're in a block.` : nextItem ? ` Next up at ${fmtTime(nextItem.data.startHour, nextItem.data.startMin)}.` : " No more blocks today."}`
-            }
+
+          <div className="scroll" ref={scrollRef}>
+            {/* Block sequence */}
+            {timeline.length === 0 ? (
+              <div style={{ margin:"16px", padding:"20px", background:"var(--bg2)", borderRadius:14, textAlign:"center" }}>
+                <div style={{ fontSize:13, color:"var(--text3)" }}>No blocks today. Add some in the Week tab.</div>
+              </div>
+            ) : (
+              <>
+                <div style={{ margin:"0 16px 6px" }}>
+                  <div style={{ fontSize:11, fontWeight:700, letterSpacing:".08em", textTransform:"uppercase", color:"var(--text3)" }}>Today's blocks</div>
+                </div>
+                {timeline.map((item) => {
+                  if (item.type === "deepwork") {
+                    const slot = item.data;
+                    const proj = slot.projectId ? getProject(slot.projectId) : null;
+                    const domain = proj ? getDomain(proj.domainId) : null;
+                    const domainColor = domain?.color;
+                    const isSessionMode = proj?.mode === "sessions";
+                    const incompleteTasks = proj ? (proj.tasks||[]).filter(t=>!t.done) : [];
+                    const isExpPlan = expandedId === slot.id;
+                    return (
+                      <div key={slot.id} style={{ margin:"0 16px 8px" }}>
+                        <div className={`plan-block-row${proj ? " assigned" : ""}`}
+                          style={{ "--domain-color": domainColor ? domainColor+"60" : undefined }}
+                          onClick={() => setExpandedId(isExpPlan ? null : slot.id)}
+                        >
+                          <div style={{ width:36, height:36, borderRadius:10, background: domainColor ? domainColor+"22" : "var(--bg3)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, border: domainColor ? `1px solid ${domainColor}40` : "1px solid var(--border)" }}>
+                            {proj ? (
+                              isSessionMode
+                                ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M20 12a8 8 0 1 1-2-5.3" stroke={domainColor||"var(--accent)"} strokeWidth="2.2" strokeLinecap="round"/><path d="M20 7v5h-5" stroke={domainColor||"var(--accent)"} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                : <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke={domainColor||"var(--accent)"} strokeWidth="2"/><path d="M9 12l2 2 4-4" stroke={domainColor||"var(--accent)"} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                            ) : (
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="var(--text3)" strokeWidth="1.5" strokeDasharray="3 2"/></svg>
+                            )}
+                          </div>
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ fontSize:13, fontWeight:700, color: proj ? "var(--text)" : "var(--text3)" }}>{proj ? proj.name : "Unassigned"}</div>
+                            <div style={{ fontSize:11, color:"var(--text3)", marginTop:1 }}>
+                              {data.todayPrefs?.hideTimes ? "" : `${fmtTime(slot.startHour, slot.startMin)} · `}{slot.durationMin} min{domain ? ` · ${domain.name}` : ""}
+                              {!isSessionMode && incompleteTasks.length > 0 ? ` · ${incompleteTasks.length} task${incompleteTasks.length!==1?"s":""}` : ""}
+                            </div>
+                          </div>
+                          {!proj && (
+                            <div style={{ fontSize:12, color:"rgba(232,160,48,.7)", fontWeight:600 }}>Assign →</div>
+                          )}
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style={{ flexShrink:0, color:"var(--text3)", opacity:.4, transform: isExpPlan ? "rotate(90deg)" : "none", transition:"transform .2s" }}><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        </div>
+
+                        {/* Expanded: task checklist or assign picker */}
+                        {isExpPlan && (
+                          <div style={{ margin:"0 0 4px", background:"var(--bg2)", borderRadius:"0 0 14px 14px", border:"1px solid var(--border)", borderTop:"none", padding:"10px 14px 12px" }}>
+                            {!proj ? (
+                              /* Assign picker */
+                              (() => {
+                                const ptKey = slot.id;
+                                const selProjId = dwPickerProj[ptKey] || null;
+                                const selProj = selProjId ? data.projects.find(p => p.id === selProjId) : null;
+                                const curTime = dwPickerTime[ptKey] || { startHour: slot.startHour, startMin: slot.startMin, durationMin: slot.durationMin };
+                                const curSelTasks = curTime._tasks !== undefined ? curTime._tasks : [];
+                                const toggleTask = (tid) => {
+                                  setDwPickerTime(s => {
+                                    const base = s[ptKey] || { startHour:slot.startHour, startMin:slot.startMin, durationMin:slot.durationMin };
+                                    const existing = base._tasks !== undefined ? base._tasks : [];
+                                    const next = existing.includes(tid) ? existing.filter(id=>id!==tid) : [...existing, tid];
+                                    return { ...s, [ptKey]: { ...base, _tasks: next } };
+                                  });
+                                };
+                                return (
+                                  <>
+                                    <div style={{ fontSize:11, fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", color:"var(--text3)", marginBottom:8 }}>Assign project</div>
+                                    <div style={{ display:"flex", flexDirection:"column", gap:6, marginBottom:10 }}>
+                                      {data.projects.filter(p => p.status === "active").map(p => {
+                                        const d2 = data.domains?.find(d => d.id === p.domainId);
+                                        const isSel = selProjId === p.id;
+                                        const incomp = (p.tasks||[]).filter(t=>!t.done);
+                                        const tasksSel = isSel ? curSelTasks : [];
+                                        return (
+                                          <div key={p.id} style={{ borderRadius:10, overflow:"hidden", border: isSel ? `1.5px solid ${d2?.color||"var(--accent)"}` : "1.5px solid var(--border2)", background: isSel ? `${d2?.color||"var(--accent)"}11` : "var(--bg3)", transition:"all .15s" }}>
+                                            <div style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 12px", cursor:"pointer" }}
+                                              onClick={() => {
+                                                if (isSel) {
+                                                  setDwPickerProj(s => { const n={...s}; delete n[ptKey]; return n; });
+                                                } else {
+                                                  setDwPickerProj(s => ({ ...s, [ptKey]: p.id }));
+                                                  setDwPickerTime(s => ({ ...s, [ptKey]: { startHour:slot.startHour, startMin:slot.startMin, durationMin:slot.durationMin, _tasks: [] } }));
+                                                }
+                                              }}
+                                            >
+                                              <div style={{ width:9, height:9, borderRadius:"50%", background: d2?.color||"var(--text3)", flexShrink:0 }} />
+                                              <div style={{ flex:1, minWidth:0 }}>
+                                                <div style={{ fontSize:13, fontWeight:600, color: isSel ? "var(--text)" : "var(--text2)" }}>{p.name}</div>
+                                                <div style={{ fontSize:11, color:"var(--text3)" }}>{d2?.name}{incomp.length>0?` · ${incomp.length} task${incomp.length!==1?"s":""}`:""}</div>
+                                              </div>
+                                              <div style={{ width:18, height:18, borderRadius:"50%", border: isSel ? "none" : "1.5px solid var(--border)", background: isSel ? (d2?.color||"var(--accent)") : "transparent", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, transition:"all .15s" }}>
+                                                {isSel && <span style={{ fontSize:9, color:"#000", fontWeight:800 }}>✓</span>}
+                                              </div>
+                                            </div>
+                                            {isSel && incomp.length > 0 && (
+                                              <div style={{ borderTop:"1px solid var(--border2)", padding:"6px 12px 10px" }}>
+                                                <div style={{ fontSize:10, fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", color:"var(--text3)", marginBottom:6 }}>Focus tasks</div>
+                                                {incomp.map(t => {
+                                                  const tSel = tasksSel.includes(t.id);
+                                                  return (
+                                                    <div key={t.id} onClick={() => toggleTask(t.id)} style={{ display:"flex", alignItems:"center", gap:10, padding:"6px 2px", cursor:"pointer" }}>
+                                                      <div style={{ width:16, height:16, borderRadius:4, border: tSel ? "none" : "1.5px solid var(--border)", background: tSel ? "var(--accent)" : "transparent", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, transition:"all .12s" }}>
+                                                        {tSel && <span style={{ fontSize:8, color:"#000", fontWeight:800 }}>✓</span>}
+                                                      </div>
+                                                      <span style={{ fontSize:13, color: tSel ? "var(--text)" : "var(--text2)" }}>{t.text}</span>
+                                                    </div>
+                                                  );
+                                                })}
+                                              </div>
+                                            )}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                    <button className="dw-confirm-btn"
+                                      disabled={!selProjId} style={{ opacity: selProjId ? 1 : 0.4 }}
+                                      onClick={() => {
+                                        if (!selProjId) return;
+                                        const t = dwPickerTime[ptKey] || { startHour:slot.startHour, startMin:slot.startMin, durationMin:slot.durationMin };
+                                        const tasks = (t._tasks && t._tasks.length > 0) ? t._tasks : null;
+                                        saveDWSlot(slot.id, slot.slotIndex, selProjId, t.startHour, t.startMin, t.durationMin, tasks);
+                                        setExpandedId(null);
+                                        setDwPickerProj(s => { const n={...s}; delete n[ptKey]; return n; });
+                                        setDwPickerTime(s => { const n={...s}; delete n[ptKey]; return n; });
+                                      }}
+                                    >✓ Assign</button>
+                                  </>
+                                );
+                              })()
+                            ) : (
+                              /* Tasks for assigned block */
+                              <>
+                                {incompleteTasks.length === 0 ? (
+                                  <div style={{ fontSize:12, color:"var(--text3)", textAlign:"center", padding:"4px 0 8px" }}>No open tasks</div>
+                                ) : (
+                                  incompleteTasks.slice(0,5).map(t => (
+                                    <div key={t.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"6px 2px" }}>
+                                      <div style={{ width:15, height:15, borderRadius:4, border:"1.5px solid var(--border)", flexShrink:0 }} />
+                                      <span style={{ fontSize:13, color:"var(--text2)" }}>{t.text}</span>
+                                    </div>
+                                  ))
+                                )}
+                                <button style={{ background:"none", border:"none", fontSize:11, color:"rgba(232,160,48,.7)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", padding:"6px 0 0", fontWeight:600 }}
+                                  onClick={() => { mutateDWSlot(toISODate(), slot.slotIndex, null); setExpandedId(null); }}>
+                                  ✕ Unassign
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+                  if (item.type === "routine") {
+                    const rb = item.data;
+                    return (
+                      <div key={rb.id} className="plan-block-row" style={{ margin:"0 16px 8px" }}>
+                        <div style={{ width:36, height:36, borderRadius:10, background:"var(--bg3)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, border:"1px solid var(--border)" }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 2v10l4 4" stroke="var(--teal)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><circle cx="12" cy="12" r="10" stroke="var(--teal)" strokeWidth="2"/></svg>
+                        </div>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontSize:13, fontWeight:700, color:"var(--text)" }}>{rb.title}</div>
+                          <div style={{ fontSize:11, color:"var(--text3)", marginTop:1 }}>
+                            {data.todayPrefs?.hideTimes ? "" : `${fmtTime(rb.startHour, rb.startMin)} · `}{rb.durationMin} min · Routine
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                })}
+              </>
+            )}
+
+            {/* Loose tasks quick view */}
+            {(() => {
+              const loose = (data.looseTasks||[]).filter(t => !t.done);
+              if (loose.length === 0) return null;
+              return (
+                <div style={{ margin:"8px 16px 0" }}>
+                  <div style={{ fontSize:11, fontWeight:700, letterSpacing:".08em", textTransform:"uppercase", color:"var(--text3)", marginBottom:6 }}>Loose tasks ({loose.length})</div>
+                  {loose.slice(0,3).map(t => {
+                    const dom = data.domains?.find(d => d.id === t.domainId);
+                    return (
+                      <div key={t.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"7px 0", borderBottom:"1px solid var(--border2)" }}>
+                        <div style={{ width:8, height:8, borderRadius:"50%", background: dom?.color||"var(--text3)", flexShrink:0 }} />
+                        <span style={{ fontSize:13, color:"var(--text2)" }}>{t.text}</span>
+                      </div>
+                    );
+                  })}
+                  {loose.length > 3 && <div style={{ fontSize:11, color:"var(--text3)", paddingTop:6 }}>+{loose.length-3} more</div>}
+                </div>
+              );
+            })()}
+
+            {/* Begin button */}
+            <button className="begin-btn" onClick={() => { setWorkMode(true); setExpandedId(currentItem?.id || null); }}>
+              Begin my day →
+            </button>
+
+            <div className="spacer" />
           </div>
-        </div>
+        </>
       )}
 
-      <div className="scroll" onClick={() => setEditingTime(null)}>
-          {/* TIMELINE */}
-          {timeline.length === 0 && (
-            <div style={{ margin:"16px", padding:"20px", background:"var(--bg2)", borderRadius:14, textAlign:"center" }}>
-              <div style={{ fontSize:13, color:"var(--text3)" }}>No blocks scheduled today.</div>
+      {/* ══════════════ WORK MODE ══════════════ */}
+      {workMode && (
+        <>
+          {/* Header */}
+          <div className="ph" style={{ paddingBottom:10, paddingTop:10 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+              <div>
+                <div className="ph-eye" style={{ color:"var(--blue)" }}>
+                  {days[today.getDay()]}, {months[today.getMonth()]} {today.getDate()} · {clockH}:{clockM} {clockAmpm}
+                </div>
+                <div className="ph-title" style={{ color:"var(--text)" }}>
+                  {currentItem ? "In Focus" : nextItem ? "Up Next" : "Day Complete"}
+                </div>
+              </div>
+              <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6 }}>
+                <button className="tab-gear" onClick={() => setShowTodaySettings(true)}><GearIcon size={20} /></button>
+                <button className="replan-btn" onClick={() => setWorkMode(false)}>← Re-plan</button>
+              </div>
             </div>
-          )}
+          </div>
 
-          <div className={`tl-wrap${data.todayPrefs?.hideTimes ? " no-times" : ""}`} style={{ paddingTop: 4 }}>
-            {timeline.map((item, idx) => {
-              const isPast = !viewingTomorrow && (item.mins + (item.data.durationMin || 60)) <= nowMins;
-              const isNow = !viewingTomorrow && currentItem?.id === item.id;
-              const isExp = expandedId === item.id;
+          <div className="scroll" ref={scrollRef} onClick={() => setEditingTime(null)}>
 
-              // Deep Work slot
+            {/* Earlier today disclosure */}
+            {(() => {
+              const pastItems = timeline.filter(item => (item.mins + (item.data.durationMin||60)) <= nowMins);
+              if (pastItems.length === 0) return null;
+              return (
+                <>
+                  <div className="earlier-link" onClick={() => setEarlierOpen(v => !v)}>
+                    {earlierOpen ? "▾" : "▸"} Earlier today ({pastItems.length} block{pastItems.length!==1?"s":""})
+                  </div>
+                  {earlierOpen && (
+                    <div style={{ margin:"0 16px 8px", display:"flex", flexDirection:"column", gap:6 }}>
+                      {pastItems.map(item => {
+                        const proj = item.type==="deepwork" && item.data.projectId ? getProject(item.data.projectId) : null;
+                        const dom = proj ? getDomain(proj.domainId) : null;
+                        const isDone = item.type==="deepwork" ? manualCompleted.has(item.id) : false;
+                        return (
+                          <div key={item.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 14px", background:"var(--bg2)", borderRadius:12, opacity:0.55, border:"1px solid var(--border)" }}>
+                            <div style={{ width:8, height:8, borderRadius:"50%", background: dom?.color||"var(--text3)", flexShrink:0 }} />
+                            <div style={{ flex:1 }}>
+                              <div style={{ fontSize:13, fontWeight:600, color:"var(--text)" }}>{proj?.name || (item.type==="routine" ? item.data.title : "Deep Work")}</div>
+                              <div style={{ fontSize:11, color:"var(--text3)" }}>{fmtTime(item.data.startHour, item.data.startMin)} · {item.data.durationMin} min</div>
+                            </div>
+                            {isDone && <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+
+            {/* ── CURRENT BLOCK HERO ── */}
+            {currentItem && (() => {
+              const item = currentItem;
+              const isExp = true; // always expanded in work mode
               if (item.type === "deepwork") {
                 const slot = item.data;
                 const proj = slot.projectId ? getProject(slot.projectId) : null;
                 const domain = proj ? getDomain(proj.domainId) : null;
                 const domainColor = domain?.color || null;
                 const isFilled = !!proj;
-                const isExp = expandedId === slot.id;
                 const isPickerOpen = dwPickerOpen === slot.id;
                 const pickerStep = dwPickerStep[slot.id] || "project";
                 const pickerProj = dwPickerProj[slot.id] ? getProject(dwPickerProj[slot.id]) : null;
                 const pickerTime = dwPickerTime[slot.id] || { startHour: slot.startHour, startMin: slot.startMin, durationMin: slot.durationMin };
                 const fmt = (h, m) => { const hh = h > 12 ? h-12 : h===0?12:h; const mm = m===0?"":`:${String(m).padStart(2,"0")}`; return `${hh}${mm}${h>=12?"pm":"am"}`; };
-
                 const timeOptions = [];
                 for (let h = 5; h <= 21; h++) for (let m of [0, 15, 30, 45]) timeOptions.push({ h, m });
 
-                // If filled — render as a full project card (reuse block logic)
                 if (isFilled) {
                   const isSessionMode = proj?.mode === "sessions";
                   const sessionNote = slot.sessionNote || null;
-                  const blk = { id: slot.id, projectId: slot.projectId, startHour: slot.startHour, startMin: slot.startMin, durationMin: slot.durationMin, todayTasks: slot.todayTasks, _isDW: true, _dwSlotIndex: slot.slotIndex };
-                  const doneTasks = proj?.tasks.filter(t=>t.done).length || 0;
-                  const totalTasks = proj?.tasks.length || 0;
                   const todayTaskIds = slot.todayTasks;
                   const hasTodayTasks = Array.isArray(todayTaskIds) && todayTaskIds.length > 0;
                   const relevantTasks = hasTodayTasks ? todayTaskIds.map(id => proj?.tasks.find(t => t.id === id)).filter(Boolean) : [];
                   const relevantDone = relevantTasks.filter(t => t.done).length;
-                  const allTasksDone = isSessionMode
-                    ? manualCompleted.has(slot.id)
-                    : (relevantTasks.length > 0 && relevantDone === relevantTasks.length);
-                  const isPastSlot = (slot.startHour * 60 + slot.startMin + slot.durationMin) <= nowMins;
+                  const allTasksDone = isSessionMode ? manualCompleted.has(slot.id) : (relevantTasks.length > 0 && relevantDone === relevantTasks.length);
                   const isCompleted = allTasksDone;
-                  const cardBorder = domainColor ? `1px solid ${domainColor}60` : undefined;
-                  const cardShadow = domainColor ? `0 0 18px ${domainColor}22` : undefined;
-
-                  const isNowSlot = nowMins >= (slot.startHour*60+slot.startMin) && nowMins < (slot.startHour*60+slot.startMin+slot.durationMin);
                   const lateInfo = lateStarted[slot.id];
                   const isRunning = !!lateInfo;
                   const cdStartMs = lateInfo ? new Date(lateInfo.startedAt).getTime() : 0;
@@ -1829,442 +2089,208 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                   const cdM = Math.floor(cdRemSec / 60), cdS = cdRemSec % 60;
                   const cdStr = `${cdM}:${cdS.toString().padStart(2,"0")}`;
                   const cdDone = isRunning && cdRemSec === 0;
+                  const isPicking = pickerState?.blockId === slot.id;
 
                   return (
-                    <div key={slot.id} className="tl-item" style={{ opacity: isPastSlot && !isCompleted ? 0.5 : 1 }}>
-                      <div className="tl-left">
-                        <div className="tl-connector-top" />
-                        <div className="time-pick-wrap">
-                          <button
-                            className={`tl-time-btn${editingTime === slot.id ? " open" : ""}`}
-                            style={{
-                              "--pill-bg": isCompleted ? "rgba(255,255,255,.06)" : isNowSlot ? "rgba(232,160,48,.2)" : isPastSlot ? "rgba(255,255,255,.06)" : "rgba(255,255,255,.1)",
-                              "--pill-color": isCompleted ? "rgba(255,255,255,.25)" : isNowSlot ? "var(--accent)" : isPastSlot ? "rgba(255,255,255,.25)" : "rgba(255,255,255,.55)",
-                            }}
-                            onClick={e => { e.stopPropagation(); setEditingTime(editingTime === slot.id ? null : slot.id); }}
-                            title="Tap to reschedule"
-                          >
-                            {fmt(slot.startHour, slot.startMin)}
-                          </button>
-                          {editingTime === slot.id && (() => {
-                            const slots2 = [];
-                            for (let h = 8; h <= 22; h++) for (let m of [0, 30]) { if (h === 22 && m === 30) continue; slots2.push({ h, m }); }
-                            const currentIdx = slots2.findIndex(s => s.h === slot.startHour && s.m === slot.startMin);
-                            return (
-                              <div className="time-popover" onClick={e => e.stopPropagation()}>
-                                <div className="time-popover-inner" ref={el => { if (el && currentIdx >= 0) el.scrollTop = currentIdx * 35; }}>
-                                  {slots2.map(({h, m}) => (
-                                    <div key={`${h}-${m}`} className={`time-slot${h === slot.startHour && m === slot.startMin ? " current" : ""}`}
-                                      onClick={() => rescheduleDWSlot(slot.slotIndex, h, m)}>
-                                      {fmtTime(h, m)}
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            );
-                          })()}
-                        </div>
-                        <div className="tl-connector" />
-                      </div>
-                      <div style={{ flex:1, minWidth:0, margin:"8px 0 6px" }}>
-                        <div className={`tl-card${isNowSlot ? " now-card" : ""}${isExp ? " active-card" : ""}`}
-                          data-blockid={slot.id}
-                          style={{ border: cardBorder, boxShadow: cardShadow, "--domain-color": domainColor + "50" }}
-                          onClick={() => { if (blockMenuOpen === slot.id) { setBlockMenuOpen(null); setBlockMenuMode(null); return; } setExpandedId(isExp ? null : slot.id); if (isExp) { setBlockMenuOpen(null); setBlockMenuMode(null); } }}
-                        >
-                          <div className="tl-card-head" style={{ padding:"15px 14px" }}>
-                            <div className="tl-stripe" style={{ background: domainColor || "var(--bg4)" }} />
-                            <div style={{ flex:1, minWidth:0 }}>
-                              <div style={{ display:"flex", alignItems:"center", gap:5, marginBottom:3 }}>
-                              <div style={{ width:16, height:16, borderRadius:"50%", background:`${domainColor || "var(--accent)"}22`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                                {isSessionMode
-                                  ? <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M20 12a8 8 0 1 1-2-5.3" stroke={domainColor || "var(--accent)"} strokeWidth="2.2" strokeLinecap="round"/><path d="M20 7v5h-5" stroke={domainColor || "var(--accent)"} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                                  : <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke={domainColor || "var(--accent)"} strokeWidth="2"/><path d="M9 12l2 2 4-4" stroke={domainColor || "var(--accent)"} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                                }
-                              </div>
-                              <span style={{ fontSize:10, fontWeight:700, letterSpacing:".08em", textTransform:"uppercase", color: domainColor || "var(--accent)", opacity:.9 }}>{isSessionMode ? "Session" : "Deep Work"}</span>
-                            </div>
-                              <div className="tl-name">{proj.name}</div>
-                              <div className="tl-meta" style={{ display:"flex", alignItems:"center", gap:5 }}>{isSessionMode && <WaveIcon size={11} color={domainColor || "var(--blue)"} />}{domain?.name} · {slot.durationMin} min{!isSessionMode && relevantTasks.length > 0 ? ` · ${relevantDone}/${relevantTasks.length} today` : ""}{isSessionMode && sessionNote ? <span style={{ fontStyle:"italic", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:140 }}> · {sessionNote}</span> : ""}</div>
-                            </div>
-                            {isNowSlot && !isExp && !isRunning && <span className="tl-now-pill">Now</span>}
-                            {/* Countdown timer badge — visible when running */}
-                            {isRunning && (
-                              <div style={{ flexShrink:0, display:"flex", flexDirection:"column", alignItems:"flex-end", gap:1 }}>
-                                <div style={{ fontSize:14, fontWeight:700, color: cdDone ? "var(--green)" : "var(--accent)", fontVariantNumeric:"tabular-nums", lineHeight:1 }}>{cdDone ? "✓" : cdStr}</div>
-                                <div style={{ fontSize:9, color:"var(--text3)", letterSpacing:".04em" }}>remaining</div>
-                              </div>
-                            )}
-                            {/* Gear icon when expanded, chevron when collapsed */}
-                            {isExp
-                              ? <button onClick={e => { e.stopPropagation(); setBlockMenuOpen(blockMenuOpen === slot.id ? null : slot.id); setBlockMenuMode(null); }}
-                                  className={`gear-btn-inline${blockMenuOpen === slot.id ? " open" : ""}`}>
-                                  <GearIcon size={17} />
-                                </button>
-                              : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ flexShrink:0, color:"var(--text3)", opacity:.4 }}><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    <div className={`work-hero has-domain`} style={{ "--domain-color": domainColor+"60", border: isCompleted ? "1px solid rgba(69,193,122,.3)" : `1px solid ${domainColor||"var(--border)"}60`, boxShadow: isCompleted ? "none" : domainColor ? `0 0 28px ${domainColor}22` : "none" }}>
+                      {/* Hero header */}
+                      <div style={{ padding:"18px 18px 14px", borderBottom:"1px solid var(--border2)" }}>
+                        <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
+                          <div style={{ width:14, height:14, borderRadius:"50%", background:`${domainColor||"var(--accent)"}22`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                            {isSessionMode
+                              ? <svg width="9" height="9" viewBox="0 0 24 24" fill="none"><path d="M20 12a8 8 0 1 1-2-5.3" stroke={domainColor||"var(--accent)"} strokeWidth="2.2" strokeLinecap="round"/><path d="M20 7v5h-5" stroke={domainColor||"var(--accent)"} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                              : <svg width="9" height="9" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke={domainColor||"var(--accent)"} strokeWidth="2"/><path d="M9 12l2 2 4-4" stroke={domainColor||"var(--accent)"} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                             }
                           </div>
-                          {/* Inline tasks on card face */}
-                          {!isExp && !isCompleted && (() => {
-                            if (isSessionMode) {
-                              if (!sessionNote) return null;
-                              return (
-                                <div style={{ padding:"0 14px 10px", borderTop:"1px solid var(--border2)" }} onClick={e => e.stopPropagation()}>
-                                  <div style={{ fontSize:12, color:"var(--text3)", fontStyle:"italic", lineHeight:1.4 }}>{sessionNote}</div>
-                                </div>
-                              );
-                            }
-                            if (relevantTasks.length === 0) return null;
-                            const visibleTasks = relevantTasks.slice(0, 3);
-                            const hiddenCount = relevantTasks.length - visibleTasks.length;
-                            return (
-                              <div style={{ padding:"0 14px 10px", borderTop:"1px solid var(--border2)" }} onClick={e => e.stopPropagation()}>
-                                {visibleTasks.map(t => (
-                                  <div key={t.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"5px 0", cursor:"pointer" }}
-                                    onClick={() => { setData(d => ({ ...d, projects: d.projects.map(p => p.id === proj.id ? { ...p, tasks: p.tasks.map(tk => tk.id === t.id ? { ...tk, done: !tk.done } : tk) } : p) })); }}>
-                                    <div className={`tl-check ${t.done ? "done" : ""}`} style={{ width:16, height:16, flexShrink:0 }}>
-                                      {t.done && <span style={{fontSize:8,color:"#fff",fontWeight:700}}>✓</span>}
-                                    </div>
-                                    <span className={`tl-task-txt ${t.done ? "done" : ""}`} style={{ fontSize:12 }}>{t.text}</span>
-                                  </div>
-                                ))}
-                                {hiddenCount > 0 && (
-                                  <div style={{ fontSize:11, color:"var(--text3)", paddingTop:2 }}>+{hiddenCount} more — tap to expand</div>
-                                )}
-                              </div>
-                            );
-                          })()}
-                          {isExp && (() => {
-                            const todayTaskIds = slot.todayTasks;
-                            const hasPicked = Array.isArray(todayTaskIds) && todayTaskIds.length > 0;
-                            const isPicking = pickerState?.blockId === slot.id;
-
-                            // SESSION MODE
-                            if (isSessionMode) {
-                              const projSessions = (data.sessionLog || []).filter(s => s.projectId === proj.id);
-                              return (
-                                <div className="tl-tasks" onClick={e => e.stopPropagation()}>
-                                  {projSessions.length > 0 && (
-                                    <div style={{ fontSize:11, color:"var(--text3)", marginBottom:10 }}>{projSessions.length} session{projSessions.length !== 1 ? "s" : ""} logged on this project</div>
-                                  )}
-                                  <div style={{ display:"flex", gap:8 }} onClick={e => e.stopPropagation()}>
-                                    <button
-                                      className="tl-start-btn"
-                                      style={ isRunning ? { background:"rgba(224,85,85,.12)", color:"var(--red)", borderColor:"rgba(224,85,85,.3)" } : {} }
-                                      onClick={e => { e.stopPropagation(); isRunning ? setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }) : startBlock(slot.id); }}
-                                    >{isRunning ? "Stop ■" : "Start →"}</button>
-                                    <button
-                                      className="tl-start-btn"
-                                      style={{ background:"rgba(69,193,122,.12)", color:"var(--green)", borderColor:"rgba(69,193,122,.3)" }}
-                                      onClick={e => {
-                                        e.stopPropagation();
-                                        logSession(proj.id, slot.durationMin, null);
-                                        setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; });
-                                        markManualDone(slot.id, proj.id, null);
-                                      }}
-                                    >I did this ✓</button>
-                                  </div>
-                                </div>
-                              );
-                            }
-
-                            // PICKER MODE
-                            if (isPicking) {
-                              const ps = pickerState;
-                              const confirmPick = () => {
-                                let finalIds = [...ps.selected];
-                                if (ps.newText.trim()) {
-                                  const newId = addTaskToProject(proj.id, ps.newText.trim());
-                                  finalIds.push(newId);
-                                }
-                                saveDWTodayTasks(slot.slotIndex, finalIds);
-                                setPickerState(null);
-                              };
-                              return (
-                                <div className="picker-wrap" onClick={e => e.stopPropagation()}>
-                                  <div className="picker-heading">What are you working on today?</div>
-                                  {proj.tasks.filter(t => !t.done).map(t => {
-                                    const checked = ps.selected.has(t.id);
-                                    return (
-                                      <div key={t.id} className="picker-task" onClick={() => {
-                                        setPickerState(prev => {
-                                          const s = new Set(prev.selected);
-                                          checked ? s.delete(t.id) : s.add(t.id);
-                                          return { ...prev, selected: s };
-                                        });
-                                      }}>
-                                        <div className={`picker-box ${checked ? "checked" : ""}`} />
-                                        <span className="picker-task-txt">{t.text}</span>
-                                      </div>
-                                    );
-                                  })}
-                                  <div className="picker-add">
-                                    <input className="picker-input" placeholder="Add a new task…"
-                                      value={ps.newText}
-                                      onChange={e => setPickerState(prev => ({ ...prev, newText: e.target.value }))}
-                                      onKeyDown={e => { if (e.key === "Enter" && ps.newText.trim()) confirmPick(); }}
-                                    />
-                                  </div>
-                                  <button className="picker-confirm"
-                                    disabled={ps.selected.size === 0 && !ps.newText.trim()}
-                                    onClick={confirmPick}>
-                                    {ps.selected.size + (ps.newText.trim() ? 1 : 0) > 0
-                                      ? `Focus on ${ps.selected.size + (ps.newText.trim() ? 1 : 0)} task${ps.selected.size + (ps.newText.trim() ? 1 : 0) > 1 ? "s" : ""} today`
-                                      : "Select at least one task"}
-                                  </button>
-                                </div>
-                              );
-                            }
-
-                            // NO TASKS PICKED YET
-                            if (!hasPicked) {
-                              return (
-                                <div className="tl-tasks" onClick={e => e.stopPropagation()}>
-                                  <div style={{ padding:"4px 0 10px", textAlign:"center" }}>
-                                    <div style={{ fontSize:12, color:"var(--text3)", marginBottom:10 }}>What are you working on today?</div>
-                                    <button onClick={() => setPickerState({ blockId: slot.id, projectId: proj.id, selected: new Set(), newText: "" })}
-                                      style={{ background:"var(--bg3)", border:"1px solid var(--border)", borderRadius:8, padding:"7px 16px", fontSize:12, fontWeight:600, color:"var(--text2)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
-                                      Pick tasks
-                                    </button>
-                                  </div>
-                                  <div style={{ display:"flex", gap:8, paddingTop:4 }} onClick={e => e.stopPropagation()}>
-                                    <button className="tl-start-btn" style={ isRunning ? { background:"rgba(224,85,85,.12)", color:"var(--red)", borderColor:"rgba(224,85,85,.3)" } : {} } onClick={e => { e.stopPropagation(); isRunning ? setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }) : startBlock(slot.id); }}>{isRunning ? "Stop ■" : "Start →"}</button>
-                                    <button className="tl-start-btn" style={{ background:"rgba(69,193,122,.12)", color:"var(--green)", borderColor:"rgba(69,193,122,.3)" }}
-                                      onClick={e => { e.stopPropagation(); setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }); markManualDone(slot.id, proj.id, slot.todayTasks); }}>I did this ✓</button>
-                                  </div>
-                                </div>
-                              );
-                            }
-
-                            // TASKS PICKED — show today's tasks
-                            const todayTaskObjs = todayTaskIds.map(id => proj.tasks.find(t => t.id === id)).filter(Boolean);
-                            return (
-                              <div className="tl-tasks" onClick={e => e.stopPropagation()}>
-                                {todayTaskObjs.map(t => (
-                                  <div key={t.id} className="tl-task-row" onClick={e => e.stopPropagation()}>
-                                    <div className={`tl-check ${t.done ? "done" : ""}`} onClick={e => { e.stopPropagation(); toggleTask(proj.id, t.id); }}>
-                                      {t.done && <span style={{fontSize:9,color:"#fff",fontWeight:700}}>✓</span>}
-                                    </div>
-                                    {editingTaskId?.taskId === t.id ? (
-                                      <input
-                                        autoFocus
-                                        style={{ flex:1, background:"var(--bg3)", border:"1px solid var(--border)", borderRadius:6, padding:"3px 8px", fontSize:13, color:"var(--text)", fontFamily:"'DM Sans',sans-serif", outline:"none" }}
-                                        value={editingTaskId.text}
-                                        onChange={e => setEditingTaskId(prev => ({ ...prev, text: e.target.value }))}
-                                        onBlur={() => updateTaskText(proj.id, t.id, editingTaskId.text)}
-                                        onKeyDown={e => { if (e.key === "Enter") updateTaskText(proj.id, t.id, editingTaskId.text); if (e.key === "Escape") setEditingTaskId(null); }}
-                                        onClick={e => e.stopPropagation()}
-                                      />
-                                    ) : (
-                                      <span className={`tl-task-txt ${t.done ? "done" : ""}`}
-                                        onClick={e => { e.stopPropagation(); if (!t.done) setEditingTaskId({ taskId: t.id, projectId: proj.id, text: t.text }); }}>
-                                        {t.text}
-                                      </span>
-                                    )}
-                                  </div>
-                                ))}
-                                <div style={{ paddingTop:8, borderTop:"1px solid var(--border2)", marginTop:4 }} onClick={e => e.stopPropagation()}>
-                                  <button onClick={() => setPickerState({ blockId: slot.id, projectId: proj.id, selected: new Set(todayTaskIds), newText: "" })}
-                                    style={{ background:"none", border:"none", fontSize:11, color:"var(--text3)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", padding:0 }}>
-                                    ✎ Change today's tasks
-                                  </button>
-                                </div>
-                                <div style={{ display:"flex", gap:8, marginTop:10 }} onClick={e => e.stopPropagation()}>
-                                  <button className="tl-start-btn" style={ isRunning ? { background:"rgba(224,85,85,.12)", color:"var(--red)", borderColor:"rgba(224,85,85,.3)" } : {} } onClick={e => { e.stopPropagation(); isRunning ? setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }) : startBlock(slot.id); }}>{isRunning ? "Stop ■" : "Start →"}</button>
-                                  <button className="tl-start-btn" style={{ background:"rgba(69,193,122,.12)", color:"var(--green)", borderColor:"rgba(69,193,122,.3)" }}
-                                    onClick={e => { e.stopPropagation(); setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }); markManualDone(slot.id, proj.id, slot.todayTasks); }}>I did this ✓</button>
-                                </div>
-                              </div>
-                            );
-                          })()}
+                          <span style={{ fontSize:10, fontWeight:700, letterSpacing:".08em", textTransform:"uppercase", color: domainColor||"var(--accent)", opacity:.9 }}>Now · {isSessionMode ? "Session" : "Deep Work"}</span>
+                          {isRunning && (
+                            <span style={{ marginLeft:"auto", fontSize:14, fontWeight:700, color: cdDone ? "var(--green)" : "var(--accent)", fontVariantNumeric:"tabular-nums" }}>{cdDone ? "✓" : cdStr}</span>
+                          )}
                         </div>
-                        {/* Inline management panel — replaces floating dropdown */}
-                        <div className={`blk-mgmt-panel${blockMenuOpen === slot.id ? " open" : ""}`} onClick={e => e.stopPropagation()}>
-                          <div className="blk-mgmt-inner">
-                            {blockMenuMode === "project" ? (
-                              <>
-                                <button className="blk-mgmt-row" onClick={() => setBlockMenuMode(null)}>
-                                  <div className="blk-mgmt-row-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg></div>
-                                  <span className="blk-mgmt-row-txt" style={{ fontSize:11, fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", color:"var(--text3)" }}>Change project</span>
-                                </button>
-                                <div className="blk-mgmt-divider" />
-                                <div className="blk-mgmt-proj-list">
-                                {data.projects.filter(p => p.status === "active" && p.id !== slot.projectId).map(p => {
-                                  const d2 = data.domains?.find(d => d.id === p.domainId);
+                        <div style={{ fontSize:24, fontWeight:800, color: isCompleted ? "var(--text2)" : "var(--text)", letterSpacing:"-.02em", lineHeight:1.1, marginBottom:4 }}>{proj.name}</div>
+                        <div style={{ fontSize:13, color:"var(--text3)" }}>{domain?.name} · {slot.durationMin} min{data.todayPrefs?.hideTimes ? "" : ` · ${fmtTime(slot.startHour, slot.startMin)}`}</div>
+                      </div>
+
+                      {/* Hero body */}
+                      <div style={{ padding:"14px 18px 16px" }}>
+                        {isCompleted ? (
+                          <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                            <div style={{ width:28, height:28, borderRadius:"50%", background:"rgba(69,193,122,.15)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                            </div>
+                            <span style={{ fontSize:15, color:"var(--green)", fontWeight:700 }}>{isSessionMode ? "Session logged" : "Block complete"}</span>
+                            <button onClick={() => unmarkManualDone(slot.id, proj.id, slot.todayTasks)}
+                              style={{ marginLeft:"auto", background:"none", border:"1px solid var(--border)", borderRadius:8, fontSize:12, color:"var(--text3)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", padding:"5px 12px" }}>
+                              ← Undo
+                            </button>
+                          </div>
+                        ) : isSessionMode ? (
+                          <div style={{ display:"flex", gap:10 }}>
+                            <button className="tl-start-btn" style={{ flex:1, justifyContent:"center", ...(isRunning ? { background:"rgba(224,85,85,.12)", color:"var(--red)", borderColor:"rgba(224,85,85,.3)" } : {}) }}
+                              onClick={e => { e.stopPropagation(); isRunning ? setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }) : startBlock(slot.id); }}>
+                              {isRunning ? "Stop ■" : "Start →"}
+                            </button>
+                            <button className="tl-start-btn" style={{ flex:1, justifyContent:"center", background:"rgba(69,193,122,.12)", color:"var(--green)", borderColor:"rgba(69,193,122,.3)" }}
+                              onClick={e => { e.stopPropagation(); logSession(proj.id, slot.durationMin, null); setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }); markManualDone(slot.id, proj.id, null); }}>
+                              I did this ✓
+                            </button>
+                          </div>
+                        ) : isPicking ? (
+                          (() => {
+                            const ps = pickerState;
+                            const confirmPick = () => {
+                              let finalIds = [...ps.selected];
+                              if (ps.newText.trim()) {
+                                const newId = addTaskToProject(proj.id, ps.newText.trim());
+                                finalIds.push(newId);
+                              }
+                              saveDWTodayTasks(slot.slotIndex, finalIds);
+                              setPickerState(null);
+                            };
+                            return (
+                              <div onClick={e => e.stopPropagation()}>
+                                <div style={{ fontSize:12, fontWeight:700, color:"var(--text3)", letterSpacing:".05em", textTransform:"uppercase", marginBottom:8 }}>Pick today's tasks</div>
+                                {proj.tasks.filter(t => !t.done).map(t => {
+                                  const checked = ps.selected.has(t.id);
                                   return (
-                                    <button key={p.id} className="blk-mgmt-row sub-item" onClick={() => {
-                                      saveDWSlot(slot.id, slot.slotIndex, p.id, slot.startHour, slot.startMin, slot.durationMin, null);
-                                      setBlockMenuOpen(null); setBlockMenuMode(null);
-                                    }}>
-                                      <span style={{ width:8, height:8, borderRadius:"50%", background: d2?.color || "var(--text3)", flexShrink:0, display:"inline-block" }} />
-                                      <span className="blk-mgmt-row-txt">{p.name}</span>
-                                    </button>
+                                    <div key={t.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"7px 2px", cursor:"pointer" }}
+                                      onClick={() => setPickerState(prev => { const s = new Set(prev.selected); checked ? s.delete(t.id) : s.add(t.id); return { ...prev, selected: s }; })}>
+                                      <div style={{ width:18, height:18, borderRadius:5, border: checked ? "none" : "1.5px solid var(--border)", background: checked ? "var(--accent)" : "transparent", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, transition:"all .15s" }}>
+                                        {checked && <span style={{ fontSize:10, color:"#000", fontWeight:800 }}>✓</span>}
+                                      </div>
+                                      <span style={{ fontSize:14, color: checked ? "var(--text)" : "var(--text2)" }}>{t.text}</span>
+                                    </div>
                                   );
                                 })}
+                                <div style={{ display:"flex", gap:8, marginTop:10 }}>
+                                  <button className="dw-confirm-btn" style={{ flex:1 }} onClick={confirmPick}>✓ Confirm</button>
+                                  <button className="dw-back" onClick={() => setPickerState(null)}>✕</button>
                                 </div>
-                              </>
-                            ) : (
-                              <>
-                                <button className="blk-mgmt-row" onClick={() => setBlockMenuMode("project")}>
-                                  <div className="blk-mgmt-row-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg></div>
-                                  <span className="blk-mgmt-row-txt">Change project</span>
-                                </button>
-                                <div className="blk-mgmt-divider" />
-                                <button className="blk-mgmt-row" onClick={() => { rescheduleDWSlot(slot.slotIndex, slot.startHour, slot.startMin); setBlockMenuOpen(null); setBlockMenuMode(null); setExpandedId(null); }}>
-                                  <div className="blk-mgmt-row-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
-                                  <span className="blk-mgmt-row-txt">Push to tomorrow</span>
-                                </button>
-                                <div className="blk-mgmt-divider" />
-                                <button className="blk-mgmt-row danger" onClick={() => { clearDWSlot(slot.slotIndex); setBlockMenuOpen(null); setBlockMenuMode(null); setExpandedId(null); }}>
-                                  <div className="blk-mgmt-row-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></div>
-                                  <span className="blk-mgmt-row-txt">Clear slot</span>
-                                </button>
-                              </>
-                            )}
+                              </div>
+                            );
+                          })()
+                        ) : hasTodayTasks ? (
+                          <>
+                            {relevantTasks.map((t, i) => (
+                              <div key={t.id} className="tl-task-row" style={{ padding:"7px 0", borderBottom: i < relevantTasks.length-1 ? "1px solid var(--border2)" : "none" }} onClick={e => e.stopPropagation()}>
+                                <div className={`tl-check ${t.done ? "done" : ""}`} style={{ width:20, height:20, flexShrink:0 }} onClick={e => { e.stopPropagation(); toggleTask(proj.id, t.id); }}>
+                                  {t.done && <span style={{fontSize:10,color:"#fff",fontWeight:700}}>✓</span>}
+                                </div>
+                                <span className={`tl-task-txt ${t.done ? "done" : ""}`} style={{ fontSize:14 }}>{t.text}</span>
+                              </div>
+                            ))}
+                            <div style={{ display:"flex", gap:8, marginTop:12 }}>
+                              <button className="tl-start-btn" style={{ ...(isRunning ? { background:"rgba(224,85,85,.12)", color:"var(--red)", borderColor:"rgba(224,85,85,.3)" } : {}) }}
+                                onClick={e => { e.stopPropagation(); isRunning ? setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }) : startBlock(slot.id); }}>
+                                {isRunning ? "Stop ■" : "Start →"}
+                              </button>
+                              <button className="tl-start-btn" style={{ background:"rgba(69,193,122,.12)", color:"var(--green)", borderColor:"rgba(69,193,122,.3)" }}
+                                onClick={e => { e.stopPropagation(); setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }); markManualDone(slot.id, proj.id, slot.todayTasks); }}>
+                                I did this ✓
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <div style={{ textAlign:"center", padding:"8px 0 4px" }}>
+                            <div style={{ fontSize:13, color:"var(--text3)", marginBottom:10 }}>What are you working on today?</div>
+                            <div style={{ display:"flex", gap:8, justifyContent:"center" }}>
+                              <button className="tl-start-btn" style={{ ...(isRunning ? { background:"rgba(224,85,85,.12)", color:"var(--red)", borderColor:"rgba(224,85,85,.3)" } : {}) }}
+                                onClick={e => { e.stopPropagation(); isRunning ? setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }) : startBlock(slot.id); }}>
+                                {isRunning ? "Stop ■" : "Start →"}
+                              </button>
+                              <button className="tl-start-btn" style={{ background:"rgba(69,193,122,.12)", color:"var(--green)", borderColor:"rgba(69,193,122,.3)" }}
+                                onClick={e => { e.stopPropagation(); setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }); markManualDone(slot.id, proj.id, slot.todayTasks); }}>
+                                I did this ✓
+                              </button>
+                            </div>
                           </div>
-                        </div>
+                        )}
                       </div>
                     </div>
                   );
                 }
 
-                // Empty deep work slot
+                // Empty DW slot as hero
+                const ptKey = slot.id;
+                const selProjId = dwPickerProj[ptKey] || null;
+                const selProj = selProjId ? data.projects.find(p => p.id === selProjId) : null;
+                const curTime = dwPickerTime[ptKey] || { startHour: slot.startHour, startMin: slot.startMin, durationMin: slot.durationMin };
+                const curSelTasks = curTime._tasks !== undefined ? curTime._tasks : [];
+                const toggleTask2 = (tid) => {
+                  setDwPickerTime(s => {
+                    const base = s[ptKey] || { startHour:slot.startHour, startMin:slot.startMin, durationMin:slot.durationMin };
+                    const existing = base._tasks !== undefined ? base._tasks : [];
+                    const next = existing.includes(tid) ? existing.filter(id=>id!==tid) : [...existing, tid];
+                    return { ...s, [ptKey]: { ...base, _tasks: next } };
+                  });
+                };
                 return (
-                  <div key={slot.id} className="tl-item">
-                    <div className="tl-left">
-                      <div className="tl-connector-top" />
-                      <span className="tl-time">{fmt(slot.startHour, slot.startMin)}</span>
-                      <div className="tl-connector" />
-                    </div>
-                    <div style={{ flex:1, minWidth:0, paddingRight:0, marginTop:8, marginBottom:6 }}>
-                      <button className={`dw-empty${isPickerOpen ? " is-open" : ""}`} style={{ borderRadius: isPickerOpen ? "14px 14px 0 0" : 14 }}
-                        onClick={() => {
-                          setDwPickerOpen(isPickerOpen ? null : slot.id);
-                          setDwPickerStep(s => ({ ...s, [slot.id]: "project" }));
-                        }}
-                      >
-                        <div className="dw-plus">+</div>
-                        <div style={{ flex:1, textAlign:"left" }}>
-                          <div className="dw-empty-label">Deep Work Block</div>
-                          <div className="dw-empty-sub">{slot.durationMin} min · tap to assign</div>
-                        </div>
-                        <div className="dw-empty-dur">{slot.durationMin}m</div>
-                      </button>
-
-                      {isPickerOpen && (
-                        <div className="dw-picker-wrap">
-                          {/* UNIFIED picker: project list with inline tasks */}
-                          {(() => {
-                            const selProjId = dwPickerProj[slot.id] || null;
-                            const selProj = selProjId ? data.projects.find(p => p.id === selProjId) : null;
-                            const ptKey = slot.id;
-                            const curTime = dwPickerTime[ptKey] || { startHour: slot.startHour, startMin: slot.startMin, durationMin: slot.durationMin };
-                            const curSelTasks = curTime._tasks !== undefined ? curTime._tasks : (selProj ? (selProj.tasks||[]).filter(t=>!t.done).map(t=>t.id) : []);
-                            const toggleTask = (tid) => {
-                              setDwPickerTime(s => {
-                                const base = s[ptKey] || { startHour:slot.startHour, startMin:slot.startMin, durationMin:slot.durationMin };
-                                const existing = base._tasks !== undefined ? base._tasks : (selProj ? (selProj.tasks||[]).filter(t=>!t.done).map(t=>t.id) : []);
-                                const next = existing.includes(tid) ? existing.filter(id=>id!==tid) : [...existing, tid];
-                                return { ...s, [ptKey]: { ...base, _tasks: next } };
-                              });
-                            };
-                            return (
-                              <>
-                                <div className="dw-picker-sect">Choose a project</div>
-                                <div style={{ display:"flex", flexDirection:"column", gap:6, marginBottom:10 }}>
-                                  {data.projects.filter(p => p.status === "active").map(p => {
-                                    const d2 = data.domains?.find(d => d.id === p.domainId);
-                                    const isSel = selProjId === p.id;
-                                    const incompleteTasks = (p.tasks||[]).filter(t=>!t.done);
-                                    const tasksSel = isSel ? curSelTasks : [];
+                  <div className="work-hero" style={{ border:"1.5px dashed rgba(255,255,255,.18)" }}>
+                    <div style={{ padding:"18px 18px 14px" }}>
+                      <div className="ph-eye" style={{ marginBottom:6 }}>Now · Deep Work</div>
+                      <div style={{ fontSize:20, fontWeight:700, color:"var(--text3)", marginBottom:12 }}>Assign this block</div>
+                      <div style={{ display:"flex", flexDirection:"column", gap:6, marginBottom:10 }}>
+                        {data.projects.filter(p => p.status === "active").map(p => {
+                          const d2 = data.domains?.find(d => d.id === p.domainId);
+                          const isSel = selProjId === p.id;
+                          const incomp = (p.tasks||[]).filter(t=>!t.done);
+                          const tasksSel = isSel ? curSelTasks : [];
+                          return (
+                            <div key={p.id} style={{ borderRadius:10, overflow:"hidden", border: isSel ? `1.5px solid ${d2?.color||"var(--accent)"}` : "1.5px solid var(--border2)", background: isSel ? `${d2?.color||"var(--accent)"}11` : "var(--bg3)", transition:"all .15s" }}>
+                              <div style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 12px", cursor:"pointer" }}
+                                onClick={() => {
+                                  if (isSel) {
+                                    setDwPickerProj(s => { const n={...s}; delete n[ptKey]; return n; });
+                                  } else {
+                                    setDwPickerProj(s => ({ ...s, [ptKey]: p.id }));
+                                    setDwPickerTime(s => ({ ...s, [ptKey]: { startHour:slot.startHour, startMin:slot.startMin, durationMin:slot.durationMin, _tasks: [] } }));
+                                  }
+                                }}
+                              >
+                                <div style={{ width:9, height:9, borderRadius:"50%", background: d2?.color||"var(--text3)", flexShrink:0 }} />
+                                <div style={{ flex:1, minWidth:0 }}>
+                                  <div style={{ fontSize:13, fontWeight:600, color: isSel ? "var(--text)" : "var(--text2)" }}>{p.name}</div>
+                                  <div style={{ fontSize:11, color:"var(--text3)" }}>{d2?.name}{incomp.length>0?` · ${incomp.length} task${incomp.length!==1?"s":""}`:""}</div>
+                                </div>
+                                <div style={{ width:18, height:18, borderRadius:"50%", border: isSel ? "none" : "1.5px solid var(--border)", background: isSel ? (d2?.color||"var(--accent)") : "transparent", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, transition:"all .15s" }}>
+                                  {isSel && <span style={{ fontSize:9, color:"#000", fontWeight:800 }}>✓</span>}
+                                </div>
+                              </div>
+                              {isSel && incomp.length > 0 && (
+                                <div style={{ borderTop:"1px solid var(--border2)", padding:"6px 12px 10px" }}>
+                                  {incomp.map(t => {
+                                    const tSel = tasksSel.includes(t.id);
                                     return (
-                                      <div key={p.id} style={{ borderRadius:10, overflow:"hidden", border: isSel ? `1.5px solid ${d2?.color||"var(--accent)"}` : "1.5px solid var(--border2)", background: isSel ? `${d2?.color||"var(--accent)"}11` : "var(--bg3)", transition:"all .15s" }}>
-                                        <div style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 12px", cursor:"pointer" }}
-                                          onClick={() => {
-                                            if (isSel) {
-                                              setDwPickerProj(s => { const n={...s}; delete n[ptKey]; return n; });
-                                            } else {
-                                              const defTasks = incompleteTasks.map(t=>t.id);
-                                              setDwPickerProj(s => ({ ...s, [ptKey]: p.id }));
-                                              setDwPickerTime(s => ({ ...s, [ptKey]: { startHour:slot.startHour, startMin:slot.startMin, durationMin:slot.durationMin, _tasks: defTasks } }));
-                                            }
-                                          }}
-                                        >
-                                          <div style={{ width:9, height:9, borderRadius:"50%", background: d2?.color||"var(--text3)", flexShrink:0 }} />
-                                          <div style={{ flex:1, minWidth:0 }}>
-                                            <div style={{ fontSize:13, fontWeight:600, color: isSel ? "var(--text)" : "var(--text2)" }}>{p.name}</div>
-                                            <div style={{ fontSize:11, color:"var(--text3)" }}>{d2?.name}{incompleteTasks.length > 0 ? ` · ${incompleteTasks.length} task${incompleteTasks.length!==1?"s":""}` : ""}</div>
-                                          </div>
-                                          <div style={{ width:18, height:18, borderRadius:"50%", border: isSel ? "none" : "1.5px solid var(--border)", background: isSel ? (d2?.color||"var(--accent)") : "transparent", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, transition:"all .15s" }}>
-                                            {isSel && <span style={{ fontSize:9, color:"#000", fontWeight:800 }}>✓</span>}
-                                          </div>
+                                      <div key={t.id} onClick={() => toggleTask2(t.id)} style={{ display:"flex", alignItems:"center", gap:10, padding:"6px 2px", cursor:"pointer" }}>
+                                        <div style={{ width:16, height:16, borderRadius:4, border: tSel ? "none" : "1.5px solid var(--border)", background: tSel ? "var(--accent)" : "transparent", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, transition:"all .12s" }}>
+                                          {tSel && <span style={{ fontSize:8, color:"#000", fontWeight:800 }}>✓</span>}
                                         </div>
-                                        {isSel && incompleteTasks.length > 0 && (
-                                          <div style={{ borderTop:"1px solid var(--border2)", padding:"6px 12px 10px" }}>
-                                            <div style={{ fontSize:10, fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", color:"var(--text3)", marginBottom:6 }}>Focus tasks</div>
-                                            {incompleteTasks.map(t => {
-                                              const tSel = tasksSel.includes(t.id);
-                                              return (
-                                                <div key={t.id} onClick={() => toggleTask(t.id)} style={{ display:"flex", alignItems:"center", gap:10, padding:"6px 2px", cursor:"pointer" }}>
-                                                  <div style={{ width:16, height:16, borderRadius:4, border: tSel ? "none" : "1.5px solid var(--border)", background: tSel ? "var(--accent)" : "transparent", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, transition:"all .12s" }}>
-                                                    {tSel && <span style={{ fontSize:8, color:"#000", fontWeight:800 }}>✓</span>}
-                                                  </div>
-                                                  <span style={{ fontSize:13, color: tSel ? "var(--text)" : "var(--text2)" }}>{t.text}</span>
-                                                </div>
-                                              );
-                                            })}
-                                          </div>
-                                        )}
+                                        <span style={{ fontSize:13, color: tSel ? "var(--text)" : "var(--text2)" }}>{t.text}</span>
                                       </div>
                                     );
                                   })}
                                 </div>
-                                {data.todayPrefs?.hideTimes ? (
-                                  <div onClick={() => setData(d => ({ ...d, todayPrefs: { ...(d.todayPrefs||{}), hideTimes: false } }))}
-                                    style={{ display:"flex", alignItems:"center", gap:8, padding:"10px 12px", borderRadius:10, background:"var(--bg3)", border:"1.5px dashed var(--border)", cursor:"pointer", marginBottom:10, opacity:0.6 }}>
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round"/><line x1="1" y1="1" x2="23" y2="23" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round"/></svg>
-                                    <span style={{ fontSize:13, color:"var(--text2)" }}>Times hidden — tap to enable</span>
-                                  </div>
-                                ) : (
-                                  <div className="dw-time-row" style={{ marginBottom:10 }}>
-                                    <select className="dw-time-sel" value={`${curTime.startHour}:${curTime.startMin}`}
-                                      onChange={e => { const [h,m] = e.target.value.split(":").map(Number); setDwPickerTime(s => ({ ...s, [ptKey]: { ...(s[ptKey]||{}), startHour:h, startMin:m } })); }}>
-                                      {timeOptions.map(({h,m}) => <option key={`${h}:${m}`} value={`${h}:${m}`}>{fmt(h,m)}</option>)}
-                                    </select>
-                                    <select className="dw-time-sel" value={curTime.durationMin||slot.durationMin}
-                                      onChange={e => setDwPickerTime(s => ({ ...s, [ptKey]: { ...(s[ptKey]||{}), durationMin: Number(e.target.value) } }))}>
-                                      {[30,45,60,90,120].map(d => <option key={d} value={d}>{d} min</option>)}
-                                    </select>
-                                  </div>
-                                )}
-                                <button className="dw-confirm-btn"
-                                  disabled={!selProjId}
-                                  style={{ opacity: selProjId ? 1 : 0.4 }}
-                                  onClick={() => {
-                                    if (!selProjId) return;
-                                    const t = dwPickerTime[ptKey] || { startHour:slot.startHour, startMin:slot.startMin, durationMin:slot.durationMin };
-                                    const tasks = (t._tasks && t._tasks.length > 0) ? t._tasks : null;
-                                    saveDWSlot(slot.id, slot.slotIndex, selProjId, t.startHour, t.startMin, t.durationMin, tasks);
-                                    setDwPickerOpen(null);
-                                    setDwPickerStep(s => ({ ...s, [ptKey]: "project" }));
-                                    setDwPickerProj(s => { const n={...s}; delete n[ptKey]; return n; });
-                                    setDwPickerTime(s => { const n={...s}; delete n[ptKey]; return n; });
-                                  }}
-                                >✓ Confirm</button>
-                              </>
-                            );
-                          })()}
-                        </div>
-                      )}
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <button className="dw-confirm-btn" disabled={!selProjId} style={{ opacity: selProjId ? 1 : 0.4 }}
+                        onClick={() => {
+                          if (!selProjId) return;
+                          const t = dwPickerTime[ptKey] || { startHour:slot.startHour, startMin:slot.startMin, durationMin:slot.durationMin };
+                          const tasks = (t._tasks && t._tasks.length > 0) ? t._tasks : null;
+                          saveDWSlot(slot.id, slot.slotIndex, selProjId, t.startHour, t.startMin, t.durationMin, tasks);
+                          setDwPickerProj(s => { const n={...s}; delete n[ptKey]; return n; });
+                          setDwPickerTime(s => { const n={...s}; delete n[ptKey]; return n; });
+                        }}>✓ Assign</button>
                     </div>
                   </div>
                 );
               }
-
-              // Routine block
               if (item.type === "routine") {
                 const rb = item.data;
-                const comp = (rb.completions || {})[viewDateKey] || {};
+                const comp = (rb.completions || {})[dateKey] || {};
                 const doneCt = rb.tasks.filter(t => comp[t.id]).length;
                 const allDone = rb.tasks.length > 0 && doneCt === rb.tasks.length;
                 const toggleRtTask = (taskId) => {
@@ -2278,314 +2304,153 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                   }));
                 };
                 return (
-                  <div
-                    key={item.id}
-                    className={["tl-item", dragId===rb.id?"dragging":"", dragOverId===rb.id?"drag-over":""].filter(Boolean).join(" ")}
-                    draggable={!isPast}
-                    onDragStart={e => handleDragStart(e, rb.id)}
-                    onDragOver={e => handleDragOver(e, rb.id)}
-                    onDrop={e => handleDrop(e, rb.id)}
-                    onDragEnd={() => { setDragId(null); setDragOverId(null); }}
-                  >
-                    <div className="tl-left">
-                      <div className="tl-connector-top" />
-                      <div className="tl-time" style={{
-                        background: allDone ? "rgba(255,255,255,.06)" : isNow ? "rgba(232,160,48,.2)" : "rgba(255,255,255,.1)",
-                        color: allDone ? "rgba(255,255,255,.25)" : isNow ? "var(--accent)" : "rgba(255,255,255,.55)",
-                      }}>{fmtTime(rb.startHour, rb.startMin)}</div>
-                      <div className="tl-connector" />
+                  <div className="work-hero" style={{ border: allDone ? "1px solid rgba(69,193,122,.3)" : "1px solid var(--teal)40" }}>
+                    <div style={{ padding:"18px 18px 6px", borderBottom:"1px solid var(--border2)" }}>
+                      <div className="ph-eye" style={{ color:"var(--teal)", marginBottom:6 }}>Now · Routine</div>
+                      <div style={{ fontSize:24, fontWeight:800, color: allDone ? "var(--text2)" : "var(--text)", letterSpacing:"-.02em" }}>{rb.title}</div>
+                      <div style={{ fontSize:13, color:"var(--text3)", marginTop:4 }}>{rb.durationMin} min · {doneCt}/{rb.tasks.length} done</div>
                     </div>
-                    <div style={{ flex:1, minWidth:0, margin:"6px 0 4px" }}>
-                      <div className={["tl-card routine-pill", allDone ? "done-card" : "", isNow ? "now-card" : ""].filter(Boolean).join(" ")}>
-                        <div style={{ display:"flex", alignItems:"center", gap:10, padding:"9px 14px" }} onClick={() => setExpandedId(isExp ? null : item.id)}>
-                          <div style={{ flex:1, minWidth:0 }}>
-                            <div style={{ fontSize:13, fontWeight:600, color:"var(--text)", display:"flex", alignItems:"center", gap:6 }}>
-                              {rb.title}
-                            </div>
+                    <div style={{ padding:"10px 18px 16px" }}>
+                      {rb.tasks.map(t => (
+                        <div key={t.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"8px 0", borderBottom:"1px solid var(--border2)", cursor:"pointer" }} onClick={() => toggleRtTask(t.id)}>
+                          <div className={`tl-check ${comp[t.id] ? "done" : ""}`} style={{ width:20, height:20, flexShrink:0 }}>
+                            {comp[t.id] && <span style={{fontSize:10,color:"#fff",fontWeight:700}}>✓</span>}
                           </div>
-                          {isNow && <span className="tl-now-pill">Now</span>}
-                          <span style={{ fontSize:11, color:"var(--text3)", fontWeight:500 }}>{doneCt}/{rb.tasks.length}</span>
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style={{ flexShrink:0, color:"var(--text3)", opacity:.45, transform: isExp ? "rotate(90deg)" : "rotate(0deg)", transition:"transform .2s" }}><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                          <span className={`tl-task-txt ${comp[t.id] ? "done" : ""}`} style={{ fontSize:14 }}>{t.text}</span>
                         </div>
-                        {isExp && (
-                          <div style={{ padding:"4px 14px 10px", borderTop:"1px solid var(--border2)" }} onClick={e => e.stopPropagation()}>
-                            {rb.tasks.map(t => (
-                              <div key={t.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"6px 0", cursor:"pointer" }} onClick={() => toggleRtTask(t.id)}>
-                                <div className={`tl-check ${comp[t.id] ? "done" : ""}`} style={{ width:16, height:16, flexShrink:0 }}>
-                                  {comp[t.id] && <span style={{fontSize:8,color:"#fff",fontWeight:700}}>✓</span>}
-                                </div>
-                                <span className={`tl-task-txt ${comp[t.id] ? "done" : ""}`} style={{ fontSize:13 }}>{t.text}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                      ))}
                     </div>
                   </div>
                 );
               }
               return null;
-            })}
+            })()}
 
-            {/* End connector cap */}
-            {timeline.length > 0 && (
-              <div className="tl-item">
-                <div className="tl-left">
-                  <div style={{ width:1, height:12, background:"var(--border2)", opacity:.3 }} />
-                </div>
-                <div style={{ flex:1 }} />
-              </div>
-            )}
-          </div>
-
-          {/* LOOSE TASKS BLOCK */}
-          {!viewingTomorrow && (() => {
-            const allLoose = data.looseTasks || [];
-            const incomplete = allLoose.filter(t => !t.done);
-            const isExp = looseBlockExp;
-            const isPicking = loosePickerOpen;
-            const doneCount = pickedLooseTasks.filter(t => t.done).length;
-            const totalCount = pickedLooseTasks.length;
-
-            return (
-              <div className="lt-block-wrap">
-                <div className="lt-block">
-                  <div className="lt-block-head" onClick={() => { setLooseBlockExp(v => !v); setLoosePickerOpen(false); }}>
-                    {/* Icon instead of time */}
-                    <div style={{ width:32, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                        <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2M9 12h6M9 16h4" stroke="var(--text3)" strokeWidth="1.5" strokeLinecap="round"/>
-                      </svg>
+            {/* ── NO CURRENT BLOCK: show loose tasks ── */}
+            {!currentItem && (() => {
+              const loose = (data.looseTasks||[]).filter(t => !t.done);
+              return (
+                <div className="work-hero" style={{ border:"1px solid var(--border)" }}>
+                  <div style={{ padding:"18px 18px 10px", borderBottom:"1px solid var(--border2)" }}>
+                    <div className="ph-eye" style={{ marginBottom:6 }}>No block right now</div>
+                    <div style={{ fontSize:22, fontWeight:800, color:"var(--text)", letterSpacing:"-.02em" }}>
+                      {nextItem ? `Next up at ${fmtTime(nextItem.data.startHour, nextItem.data.startMin)}` : "No more blocks today"}
                     </div>
-                    <div className="lt-stripe" />
-                    <div className="lt-info">
-                      <div className="lt-title">Loose Tasks</div>
-                      <div className="lt-meta">
-                        {totalCount === 0 ? "No tasks picked for today" : `${doneCount}/${totalCount} done`}
-                      </div>
-                    </div>
-                    {totalCount > 0 && doneCount === totalCount && (
-                      <div className="tl-check-icon full" style={{ marginRight:4 }}><span style={{fontSize:10,color:"#fff",fontWeight:700}}>✓</span></div>
-                    )}
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style={{ flexShrink:0, color:"var(--text3)", opacity:.4, marginLeft:4, transform: isExp ? "rotate(90deg)" : "rotate(0deg)", transition:"transform .2s" }}><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                   </div>
-
-                  {isExp && (
-                    <>
-                      {/* Picked tasks list */}
-                      {pickedLooseTasks.length > 0 && (
-                        <div className="lt-body">
-                          {pickedLooseTasks.map(task => {
-                            const domain = (data.domains||[]).find(d => d.id === task.domainId);
-                            return (
-                              <div key={task.id} className="lt-task-row">
-                                <div
-                                  className={`lt-check ${task.done ? "done" : ""}`}
-                                  onClick={() => toggleLooseTask(task.id)}
-                                >
-                                  {task.done && <span style={{fontSize:9,color:"#fff",fontWeight:700}}>✓</span>}
-                                </div>
-                                <div className="lt-dot" style={{ background: task.domainColor || domain?.color || "var(--text3)" }} />
-                                <div style={{ flex:1, minWidth:0 }}>
-                                  <div className={`lt-task-text ${task.done ? "done" : ""}`}>{task.text}</div>
-                                  {task.projectName && <div style={{ fontSize:10, color:"var(--text3)" }}>{task.projectName}</div>}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-
-                      {/* Quick-add input */}
-                      {!isPicking && (
-                        <div style={{ padding: pickedLooseTasks.length > 0 ? "8px 14px" : "10px 14px 8px", borderTop: pickedLooseTasks.length > 0 ? "1px solid var(--border2)" : "none" }} onClick={e => e.stopPropagation()}>
-                          <div style={{ display:"flex", alignItems:"center", gap:8, background:"var(--bg3)", borderRadius:10, padding:"8px 12px" }}>
-                            <span style={{ fontSize:16, color:"var(--text3)", lineHeight:1, flexShrink:0 }}>+</span>
-                            <input
-                              style={{ flex:1, background:"none", border:"none", outline:"none", color:"var(--text)", fontSize:13, fontFamily:"'DM Sans',sans-serif", padding:0 }}
-                              placeholder="Add a task for right now…"
-                              value={looseQuickDraft}
-                              onChange={e => setLooseQuickDraft(e.target.value)}
-                              onKeyDown={e => { if (e.key === "Enter") { addLooseQuickTask(looseQuickDraft); } if (e.key === "Escape") setLooseQuickDraft(""); }}
-                            />
-                            {looseQuickDraft.trim() && (
-                              <button
-                                onClick={() => addLooseQuickTask(looseQuickDraft)}
-                                style={{ background:"var(--accent)", color:"#000", border:"none", borderRadius:6, padding:"4px 10px", fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"'DM Sans',sans-serif", flexShrink:0 }}
-                              >Add</button>
-                            )}
+                  <div style={{ padding:"10px 18px 14px" }}>
+                    {loose.length === 0 ? (
+                      <div style={{ fontSize:13, color:"var(--text3)", textAlign:"center", padding:"8px 0" }}>No loose tasks</div>
+                    ) : (
+                      loose.map(t => {
+                        const dom = data.domains?.find(d => d.id === t.domainId);
+                        return (
+                          <div key={t.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"8px 0", borderBottom:"1px solid var(--border2)", cursor:"pointer" }}
+                            onClick={() => setData(d => ({ ...d, looseTasks: (d.looseTasks||[]).map(lt => lt.id===t.id ? { ...lt, done:true, doneAt: new Date().toISOString() } : lt) }))}>
+                            <div style={{ width:8, height:8, borderRadius:"50%", background:dom?.color||"var(--text3)", flexShrink:0 }} />
+                            <span style={{ fontSize:14, color:"var(--text)" }}>{t.text}</span>
                           </div>
-                        </div>
-                      )}
-
-                      {/* Pick tasks button / picker */}
-                      {!isPicking ? (
-                        <div style={{ padding:"10px 14px", borderTop: pickedLooseTasks.length > 0 ? "1px solid var(--border2)" : "none" }}>
-                          <button
-                            onClick={e => { e.stopPropagation(); setLoosePickerOpen(true); }}
-                            style={{ background:"none", border:"none", color:"var(--accent)", fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:"'DM Sans',sans-serif", display:"flex", alignItems:"center", gap:5 }}
-                          >
-                            <span style={{ fontSize:15 }}>✎</span> {pickedLooseTasks.length > 0 ? "Change today's tasks" : "Pick tasks for today"}
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="lt-picker" onClick={e => e.stopPropagation()}>
-                          <div className="lt-picker-title">Pick tasks for today</div>
-                          {(() => {
-                            // All incomplete tasks across loose + all projects, grouped by domain
-                            const groups = (data.domains||[]).map(domain => {
-                              const projTasks = (data.projects||[])
-                                .filter(p => p.domainId === domain.id)
-                                .flatMap(p => p.tasks.filter(t => !t.done).map(t => ({ ...t, domainColor: domain.color, projName: p.name, projId: p.id, _type:"project", domainId: domain.id })));
-                              const loose = (data.looseTasks||[])
-                                .filter(t => t.domainId === domain.id && !t.done)
-                                .map(t => ({ ...t, domainColor: domain.color, _type:"loose" }));
-                              return { domain, tasks: [...projTasks, ...loose] };
-                            }).filter(g => g.tasks.length > 0);
-
-                            if (groups.length === 0) return (
-                              <div className="lt-empty">No incomplete tasks found.</div>
-                            );
-
-                            return groups.map(({ domain, tasks }) => (
-                              <div key={domain.id}>
-                                <div style={{ fontSize:10, fontWeight:700, letterSpacing:".07em", textTransform:"uppercase", color: domain.color, padding:"6px 0 4px", opacity:.8 }}>{domain.name}</div>
-                                {tasks.map(task => {
-                                  const isPicked = todayLoosePicks.includes(task.id);
-                                  return (
-                                    <div key={task.id} className="lt-pick-row" onClick={() => {
-                                      const next = isPicked
-                                        ? todayLoosePicks.filter(id => id !== task.id)
-                                        : [...todayLoosePicks, task.id];
-                                      saveLoosPicks(next);
-                                    }}>
-                                      <div className={`lt-pick-check ${isPicked ? "sel" : ""}`}>
-                                        {isPicked && <span style={{fontSize:9,color:"#000",fontWeight:700}}>✓</span>}
-                                      </div>
-                                      <div className="lt-dot" style={{ background: domain.color }} />
-                                      <div style={{ flex:1, minWidth:0 }}>
-                                        <div style={{ fontSize:13, color:"var(--text)" }}>{task.text}</div>
-                                        {task._type === "project" && <div style={{ fontSize:10, color:"var(--text3)" }}>{task.projName}</div>}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            ));
-                          })()}
-                          <button
-                            onClick={() => setLoosePickerOpen(false)}
-                            style={{ marginTop:10, width:"100%", padding:"9px", background:"var(--accent)", color:"#000", border:"none", borderRadius:10, fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}
-                          >
-                            Done
-                          </button>
-                        </div>
-                      )}
-                    </>
-                  )}
+                        );
+                      })
+                    )}
+                    <div style={{ marginTop:10, display:"flex", alignItems:"center", gap:8, background:"var(--bg3)", borderRadius:10, padding:"8px 12px" }}>
+                      <span style={{ fontSize:16, color:"var(--text3)", lineHeight:1 }}>+</span>
+                      <input
+                        style={{ flex:1, background:"none", border:"none", outline:"none", color:"var(--text)", fontSize:13, fontFamily:"'DM Sans',sans-serif", padding:0 }}
+                        placeholder="Add a quick task…"
+                        value={looseQuickDraft}
+                        onChange={e => setLooseQuickDraft(e.target.value)}
+                        onKeyDown={e => { if (e.key === "Enter") addLooseQuickTask(looseQuickDraft); if (e.key === "Escape") setLooseQuickDraft(""); }}
+                      />
+                    </div>
+                  </div>
                 </div>
-              </div>
-            );
-          })()}
+              );
+            })()}
 
-          {/* TOMORROW LINK / BACK */}
-          {!viewingTomorrow && (
-            <button
-              onClick={() => setViewingTomorrow(true)}
-              style={{
-                display:"flex", alignItems:"center", justifyContent:"space-between",
-                width:"100%", background: tomorrowActive ? "rgba(232,160,48,.07)" : "none",
-                border:"none", borderTop: tomorrowActive ? "1px solid rgba(232,160,48,.2)" : "1px solid transparent",
-                cursor:"pointer", padding:"10px 16px 18px", fontFamily:"'DM Sans',sans-serif",
-                transition:"background .35s, border-color .35s",
-              }}
-            >
-              <span style={{ fontSize:13, color: tomorrowActive ? "var(--accent)" : "var(--text3)", fontWeight:700, transition:"color .35s", letterSpacing:".02em" }}>Tomorrow</span>
-              <span style={{ display:"flex", alignItems:"center", gap:4, fontSize:13, color: tomorrowActive ? "var(--accent)" : "var(--text3)", fontWeight:600, transition:"color .35s" }}>
-                {days[tomorrow.getDay()]}, {months[tomorrow.getMonth()]} {tomorrow.getDate()}
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              </span>
-            </button>
-          )}
-
-          {/* END OF DAY */}
-          {!viewingTomorrow && (data.todayPrefs?.showShutdown !== false) && (() => {
-            // Compute day stats using the same sources the timeline uses
-            const todayStr = new Date().toDateString();
-            const todayISO = toISODate();
-
-            // DW blocks done = manual completions today (covers both regular blocks and DW slots)
-            const dwBlocksDone = manualCompleted.size;
-
-            // Tasks done today across all project blocks
-            let tasksDone = 0, tasksTotal = 0;
-            const countTasksForBlock = (projectId, todayTaskIds) => {
-              const proj = data.projects.find(p => p.id === projectId);
-              if (!proj) return;
-              const tids = Array.isArray(todayTaskIds) && todayTaskIds.length > 0
-                ? todayTaskIds : [];
-              tids.forEach(id => {
-                const t = proj.tasks.find(t => t.id === id);
-                if (t) { tasksTotal++; if (t.done) tasksDone++; }
-              });
-            };
-            (data.blocks || []).forEach(b => { if (b.projectId) countTasksForBlock(b.projectId, b.todayTasks); });
-            ((data.deepWorkSlots || {})[todayISO] || []).forEach(s => { if (s?.projectId) countTasksForBlock(s.projectId, s.todayTasks); });
-            return (
-              <>
-                <div className="sh"><span className="sh-label">End of Day</span></div>
-                {shutdownDone && (() => {
-                    const routinesDone = data.routineBlocks?.filter(rb => { const comp = (rb.completions||{})[todayStr]||{}; return rb.tasks.length > 0 && rb.tasks.every(t => comp[t.id]); }).length || 0;
-                    const totalRoutines = data.routineBlocks?.filter(rb => rb.tasks.length > 0).length || 0;
-                    const totalBlocks = (data.blocks||[]).filter(b=>b.dayOffset===0).length + ((data.deepWorkSlots||{})[todayISO]||[]).filter(s=>s?.projectId).length;
-                    const taskPct = tasksTotal > 0 ? Math.round((tasksDone/tasksTotal)*100) : 0;
-                    const statRows = [
-                      { label:"Deep Work", value:dwBlocksDone, total:Math.max(totalBlocks,dwBlocksDone), color:"var(--accent)" },
-                      { label:"Tasks", value:tasksDone, total:Math.max(tasksTotal,tasksDone,1), color:"var(--green)" },
-                      { label:"Routines", value:routinesDone, total:Math.max(totalRoutines,routinesDone,1), color:"#4BAABB" },
-                    ];
+            {/* ── NEXT UP strip ── */}
+            {(() => {
+              const upcoming = timeline.filter(item => item.mins > nowMins && item.id !== currentItem?.id).slice(0,2);
+              if (upcoming.length === 0) return null;
+              return (
+                <div className="work-next-strip">
+                  <div style={{ fontSize:11, fontWeight:700, letterSpacing:".08em", textTransform:"uppercase", color:"var(--text3)", padding:"0 2px 4px" }}>Up next</div>
+                  {upcoming.map(item => {
+                    const proj = item.type==="deepwork" && item.data.projectId ? getProject(item.data.projectId) : null;
+                    const dom = proj ? getDomain(proj.domainId) : null;
                     return (
+                      <div key={item.id} className="work-next-card">
+                        <div style={{ width:8, height:8, borderRadius:"50%", background:dom?.color||"var(--text3)", flexShrink:0 }} />
+                        <div style={{ flex:1 }}>
+                          <div style={{ fontSize:13, fontWeight:600, color:"var(--text2)" }}>{proj?.name || (item.type==="routine" ? item.data.title : "Deep Work")}</div>
+                          <div style={{ fontSize:11, color:"var(--text3)" }}>{fmtTime(item.data.startHour, item.data.startMin)} · {item.data.durationMin} min</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+
+            {/* ── TOMORROW + SHUTDOWN ── */}
+            {(() => {
+              const todayISO = toISODate();
+              const dwBlocksDone = manualCompleted.size;
+              let tasksDone = 0, tasksTotal = 0;
+              const countTasksForBlock = (projectId, todayTaskIds) => {
+                const proj = data.projects.find(p => p.id === projectId);
+                if (!proj) return;
+                const tids = Array.isArray(todayTaskIds) && todayTaskIds.length > 0 ? todayTaskIds : [];
+                tids.forEach(id => { const t = proj.tasks.find(t => t.id === id); if (t) { tasksTotal++; if (t.done) tasksDone++; } });
+              };
+              (data.blocks||[]).forEach(b => { if (b.projectId) countTasksForBlock(b.projectId, b.todayTasks); });
+              ((data.deepWorkSlots||{})[todayISO]||[]).forEach(s => { if (s?.projectId) countTasksForBlock(s.projectId, s.todayTasks); });
+              const todayStr = new Date().toDateString();
+              return (
+                <>
+                  {!viewingTomorrow && (
+                    <button
+                      onClick={() => setViewingTomorrow(true)}
+                      style={{ display:"flex", alignItems:"center", justifyContent:"space-between", width:"100%", background: tomorrowActive ? "rgba(232,160,48,.07)" : "none", border:"none", borderTop: tomorrowActive ? "1px solid rgba(232,160,48,.2)" : "1px solid transparent", cursor:"pointer", padding:"10px 16px 18px", fontFamily:"'DM Sans',sans-serif", transition:"background .35s, border-color .35s" }}
+                    >
+                      <span style={{ fontSize:13, color: tomorrowActive ? "var(--accent)" : "var(--text3)", fontWeight:700, transition:"color .35s", letterSpacing:".02em" }}>Tomorrow</span>
+                      <span style={{ display:"flex", alignItems:"center", gap:4, fontSize:13, color: tomorrowActive ? "var(--accent)" : "var(--text3)", fontWeight:600, transition:"color .35s" }}>
+                        {days[tomorrow.getDay()]}, {months[tomorrow.getMonth()]} {tomorrow.getDate()}
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      </span>
+                    </button>
+                  )}
+                  {(data.todayPrefs?.showShutdown !== false) && (
+                    shutdownDone ? (
                       <div style={{ margin:"0 16px 10px", background:"var(--bg2)", borderRadius:16, padding:"16px 18px", border:"1px solid rgba(69,193,122,0.2)" }}>
-                        <div style={{ fontSize:12, fontWeight:700, color:"var(--green)", marginBottom:14, display:"flex", alignItems:"center", gap:7, letterSpacing:".04em", textTransform:"uppercase" }}>
+                        <div style={{ fontSize:12, fontWeight:700, color:"var(--green)", display:"flex", alignItems:"center", gap:7, letterSpacing:".04em", textTransform:"uppercase" }}>
                           <div style={{ width:16, height:16, borderRadius:"50%", background:"rgba(69,193,122,0.2)", border:"1.5px solid var(--green)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
                             <span style={{ fontSize:8, color:"var(--green)", fontWeight:900 }}>✓</span>
                           </div>
                           Shutdown Complete
                         </div>
-                        {statRows.map(({label,value,total,color}) => (
-                          <div key={label} style={{ marginBottom:10 }}>
-                            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:5 }}>
-                              <span style={{ fontSize:11, color:"var(--text3)", fontWeight:600, letterSpacing:".05em", textTransform:"uppercase" }}>{label}</span>
-                              <span style={{ fontSize:14, fontWeight:800, color, lineHeight:1 }}>{value}<span style={{ fontSize:10, fontWeight:500, color:"var(--text3)", marginLeft:2 }}>/{total}</span></span>
-                            </div>
-                            <div style={{ height:4, background:"var(--bg4)", borderRadius:3, overflow:"hidden" }}>
-                              <div style={{ height:"100%", width:`${total > 0 ? Math.round((value/total)*100) : 0}%`, background:color, borderRadius:3, opacity:0.8, transition:"width .6s cubic-bezier(.4,0,.2,1)" }} />
-                            </div>
-                          </div>
-                        ))}
                       </div>
-                    );
-                  })()}
-                {!shutdownDone && (
-                  <div className="shutdown-row" onClick={openShutdown}>
-                    <span className="sd-ico">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" strokeWidth="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
-                    </span>
-                    <span className="sd-txt">Shutdown Ritual</span>
-                    <span className="sd-arr">›</span>
-                  </div>
-                )}
-              </>
-            );
-          })()}
-          <div className="spacer" />
-        </div>
+                    ) : (
+                      <div className="shutdown-row" onClick={openShutdown}>
+                        <span className="sd-ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" strokeWidth="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg></span>
+                        <span className="sd-txt">Shutdown Ritual</span>
+                        <span className="sd-arr">›</span>
+                      </div>
+                    )
+                  )}
+                </>
+              );
+            })()}
+
+            <div className="spacer" />
+          </div>
+        </>
       )}
 
       {showTodaySettings && <TodaySettingsSheet data={data} setData={setData} onClose={() => setShowTodaySettings(false)} />}
     </div>
   );
 }
+
 
 // ─── LOOSE TASKS SECTION ─────────────────────────────────────────────────────
 function LooseTasksSection({ domainId, domain, data, setData, onAddProject }) {
@@ -3443,11 +3308,11 @@ function PlanScreen({ data, setData, onGoToSeason, lightMode, toggleTheme }) {
         const pickerEl = wkPickerRef.current;
         const scrollEl = wkScrollRef.current;
         if (!pickerEl || !scrollEl) return;
-        const pickerBottom = pickerEl.offsetTop + pickerEl.offsetHeight;
-        const scrollBottom = scrollEl.scrollTop + scrollEl.clientHeight;
-        if (pickerBottom > scrollBottom - 20) {
-          scrollEl.scrollTo({ top: pickerBottom - scrollEl.clientHeight + 40, behavior: "smooth" });
-        }
+        // Scroll the button (parent of picker) to near top of screen
+        const btnEl = pickerEl.previousElementSibling;
+        const targetEl = btnEl || pickerEl;
+        const elTop = targetEl.getBoundingClientRect().top - scrollEl.getBoundingClientRect().top + scrollEl.scrollTop;
+        scrollEl.scrollTo({ top: Math.max(0, elTop - 80), behavior: "smooth" });
       }, 50);
     }
   }, [wkDwPickerOpen]);
@@ -3736,10 +3601,10 @@ function PlanScreen({ data, setData, onGoToSeason, lightMode, toggleTheme }) {
                           const selProjId = wkDwPickerProj[pickerKey] || null;
                           const selProj = selProjId ? data.projects.find(p => p.id === selProjId) : null;
                           const curTime = wkDwPickerTime[pickerKey] || { startHour: s.startHour, startMin: s.startMin, durationMin: s.durationMin };
-                          const curSelTasks = (wkDwPickerTasks[pickerKey] !== undefined) ? wkDwPickerTasks[pickerKey] : (selProj ? (selProj.tasks||[]).filter(t=>!t.done).map(t=>t.id) : []);
+                          const curSelTasks = (wkDwPickerTasks[pickerKey] !== undefined) ? wkDwPickerTasks[pickerKey] : [];
                           const toggleTask2 = (tid) => {
                             setWkDwPickerTasks(st => {
-                              const existing = st[pickerKey] !== undefined ? st[pickerKey] : (selProj ? (selProj.tasks||[]).filter(t=>!t.done).map(t=>t.id) : []);
+                              const existing = st[pickerKey] !== undefined ? st[pickerKey] : [];
                               const next = existing.includes(tid) ? existing.filter(id=>id!==tid) : [...existing, tid];
                               return { ...st, [pickerKey]: next };
                             });
@@ -3761,9 +3626,8 @@ function PlanScreen({ data, setData, onGoToSeason, lightMode, toggleTheme }) {
                                             setWkDwPickerProj(st => { const n={...st}; delete n[pickerKey]; return n; });
                                             setWkDwPickerTasks(st => { const n={...st}; delete n[pickerKey]; return n; });
                                           } else {
-                                            const defTasks = incompleteTasks.map(t=>t.id);
                                             setWkDwPickerProj(st => ({ ...st, [pickerKey]: p.id }));
-                                            setWkDwPickerTasks(st => ({ ...st, [pickerKey]: defTasks }));
+                                            setWkDwPickerTasks(st => ({ ...st, [pickerKey]: [] }));
                                             setWkDwPickerTime(st => ({ ...st, [pickerKey]: { startHour:s.startHour, startMin:s.startMin, durationMin:s.durationMin } }));
                                           }
                                         }}
