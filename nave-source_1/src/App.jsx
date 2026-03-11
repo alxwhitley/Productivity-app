@@ -402,8 +402,12 @@ const css = `
   .tl-swipe-card{position:relative;z-index:1;transition:transform .3s cubic-bezier(.25,.46,.45,.94);will-change:transform;background:var(--bg2);border-radius:14px;width:100%;}
   .tl-swipe-card.swiping{transition:none;}
   /* Deep Work Slots */
-  .dw-empty{width:100%;background:transparent;border:1.5px dashed rgba(255,255,255,.14);border-radius:14px;padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:12px;transition:border-color .2s,background .2s;font-family:"DM Sans",sans-serif;min-height:44px;}
+  .dw-empty{width:100%;background:transparent;border:1.5px dashed rgba(255,255,255,.14);border-radius:14px;padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:12px;transition:border-color .2s,background .2s,color .2s;font-family:"DM Sans",sans-serif;min-height:44px;}
   .dw-empty:active{background:rgba(255,255,255,.03);}
+  .dw-empty.is-open{background:rgba(232,160,48,.08);border-color:rgba(232,160,48,.5);border-style:solid;}
+  .dw-empty.is-open .dw-empty-label{color:var(--accent);}
+  .dw-empty.is-open .dw-empty-sub{color:rgba(232,160,48,.5);}
+  .dw-empty.is-open .dw-plus{color:var(--accent);}
   .dw-plus{width:22px;height:22px;border-radius:50%;border:1.5px solid rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.35);font-size:14px;font-weight:300;flex-shrink:0;}
   .dw-empty-label{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:rgba(255,255,255,.25);margin-bottom:1px;}
   .dw-empty-sub{font-size:12px;color:rgba(255,255,255,.18);}
@@ -1267,7 +1271,7 @@ function StatusBar() {
 
 
 // ─── TODAY SCREEN ─────────────────────────────────────────────────────────────
-function TodayScreen({ data, setData, openShutdown, focusMode: focusModeprop, setFocusMode: setFocusModeApp, onSignOut, jumpToBlock, onClearJump }) {
+function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onClearJump }) {
   const [showTodaySettings, setShowTodaySettings] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
   const [celebratingId, setCelebratingId] = useState(null);
@@ -1339,8 +1343,7 @@ function TodayScreen({ data, setData, openShutdown, focusMode: focusModeprop, se
   // lateStarted: { [blockId]: { startedAt: ISO string } }
   const [lateStarted, setLateStarted] = useState({});
   const [conflictWarning, setConflictWarning] = useState(null); // blockId with conflict
-  // focusBlockId: which block is in focus mode (null = none)
-  const [focusBlockId, setFocusBlockId] = useState(null);
+
   // pickerState: { blockId, projectId, selected: Set<taskId>, newText }
   const [pickerState, setPickerState] = useState(null);
   const [editingTaskId, setEditingTaskId] = useState(null); // { taskId, projectId, text }
@@ -1359,9 +1362,7 @@ function TodayScreen({ data, setData, openShutdown, focusMode: focusModeprop, se
   const [looseQuickDraft, setLooseQuickDraft] = useState("");
   const { domains, projects, blocks, shutdownDone } = data;
 
-  const [focusModeLocal, setFocusModeLocal] = useState(false);
-  const focusMode = focusModeprop !== undefined ? focusModeprop : focusModeLocal;
-  const setFocusMode = setFocusModeApp || setFocusModeLocal;
+
 
   // Live tick every second (powers clock + countdowns)
   useEffect(() => {
@@ -1548,9 +1549,7 @@ function TodayScreen({ data, setData, openShutdown, focusMode: focusModeprop, se
     }
     setConflictWarning(null);
     setLateStarted(prev => ({ ...prev, [blkId]: { startedAt: new Date().toISOString() } }));
-    // Go straight into focus mode
-    setFocusBlockId(blkId);
-    setFocusMode(true);
+    setExpandedId(blkId);
   };
 
   // Today's loose task picks — can be loose tasks OR project tasks
@@ -1691,6 +1690,26 @@ function TodayScreen({ data, setData, openShutdown, focusMode: focusModeprop, se
 
   // Jump to a specific block when navigating from Projects "Work Now"
   const scrollRef = useRef(null);
+  const [tomorrowActive, setTomorrowActive] = useState(false);
+  const tomorrowTimerRef = useRef(null);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const handleScroll = () => {
+      const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+      if (nearBottom) {
+        if (!tomorrowTimerRef.current) {
+          tomorrowTimerRef.current = setTimeout(() => setTomorrowActive(true), 600);
+        }
+      } else {
+        clearTimeout(tomorrowTimerRef.current);
+        tomorrowTimerRef.current = null;
+        setTomorrowActive(false);
+      }
+    };
+    el.addEventListener("scroll", handleScroll, { passive: true });
+    return () => { el.removeEventListener("scroll", handleScroll); clearTimeout(tomorrowTimerRef.current); };
+  }, []);
   useEffect(() => {
     if (!jumpToBlock) return;
     setExpandedId(jumpToBlock);
@@ -1716,11 +1735,11 @@ function TodayScreen({ data, setData, openShutdown, focusMode: focusModeprop, se
   const name = data.todayPrefs?.name;
 
   return (
-    <div className="screen active" style={{ background: focusMode ? "#111314" : "var(--bg)", transition: "background .4s ease" }}>
+    <div className="screen active">
       <StatusBar />
 
       {/* HEADER */}
-      {!focusMode && (
+      {true && (
         <div className="ph" style={{ paddingBottom: 10, paddingTop: 10 }}>
           {viewingTomorrow && (
             <button onClick={() => setViewingTomorrow(false)} style={{ background:"none", border:"none", cursor:"pointer", padding:"0 0 8px", display:"flex", alignItems:"center", gap:4, color:"var(--text3)", fontFamily:"'DM Sans',sans-serif", fontSize:12, fontWeight:600 }}>
@@ -1751,84 +1770,7 @@ function TodayScreen({ data, setData, openShutdown, focusMode: focusModeprop, se
         </div>
       )}
 
-      {/* Focus mode — full screen for the active block */}
-      {focusMode && (() => {
-        const focusBlk = focusBlockId ? blocks.find(b => b.id === focusBlockId) : null;
-        if (!focusBlk) { setFocusMode(false); setFocusBlockId(null); return null; }
-        const proj = focusBlk.projectId ? getProject(focusBlk.projectId) : null;
-        const domain = proj ? getDomain(proj.domainId) : null;
-        const lateInfo = lateStarted[focusBlk.id];
-        // Countdown from actual start time
-        const startMs = lateInfo ? new Date(lateInfo.startedAt).getTime() : Date.now();
-        const totalSec = focusBlk.durationMin * 60;
-        const remSec = Math.max(0, totalSec - Math.floor((Date.now() - startMs) / 1000));
-        const rm = Math.floor(remSec / 60), rs = remSec % 60;
-        const focusCountdown = `${rm}:${rs.toString().padStart(2,"0")}`;
-        const pct = Math.round(((totalSec - remSec) / totalSec) * 100);
-        // Today tasks in focus mode
-        const ftids = focusBlk.todayTasks;
-        const focusTasks = Array.isArray(ftids) && ftids.length > 0
-          ? ftids.map(id => proj?.tasks.find(t => t.id === id)).filter(Boolean)
-          : (proj?.tasks || []);
-        const markDoneAndExit = () => {
-          const proj = focusBlk.projectId ? getProject(focusBlk.projectId) : null;
-          markManualDone(focusBlk.id, proj?.id, focusBlk.todayTasks);
-          setLateStarted(prev => { const n={...prev}; delete n[focusBlk.id]; return n; });
-          setFocusMode(false); setFocusBlockId(null);
-        };
-        const stopAndExit = () => {
-          setLateStarted(prev => { const n={...prev}; delete n[focusBlk.id]; return n; });
-          setFocusMode(false); setFocusBlockId(null);
-        };
-        return (
-          <div style={{ padding:"24px 16px 0", display:"flex", flexDirection:"column", height:"100%", background:"#111314" }}>
-            {/* Header row */}
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:24 }}>
-              <div>
-                <div style={{ fontSize:11, fontWeight:700, letterSpacing:".1em", textTransform:"uppercase", color: domain?.color || "var(--accent)", marginBottom:6 }}>● IN SESSION</div>
-                <div style={{ fontSize:24, fontWeight:700, color:"var(--text)", letterSpacing:"-.02em" }}>{proj?.name || focusBlk.label}</div>
-                <div style={{ fontSize:12, color:"var(--text3)", marginTop:3 }}>{domain?.name}{domain ? " · " : ""}{focusBlk.durationMin} min</div>
-              </div>
-              {/* Big countdown */}
-              <div style={{ textAlign:"right" }}>
-                <div style={{ fontSize:36, fontWeight:700, color:"var(--accent)", fontVariantNumeric:"tabular-nums", lineHeight:1 }}>{focusCountdown}</div>
-                <div style={{ fontSize:10, color:"var(--text3)", marginTop:4 }}>{pct}% done</div>
-              </div>
-            </div>
-            {/* Progress bar */}
-            <div style={{ height:2, background:"var(--bg3)", borderRadius:2, marginBottom:20, overflow:"hidden" }}>
-              <div style={{ height:"100%", width:`${pct}%`, background:"var(--accent)", borderRadius:2, transition:"width 1s linear" }} />
-            </div>
-            {/* Tasks */}
-            {focusTasks.length > 0 && (
-              <div style={{ flex:1, overflowY:"auto" }}>
-                {focusTasks.map(t => (
-                  <div key={t.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 0", borderBottom:"1px solid var(--border2)", cursor:"pointer" }} onClick={() => toggleTask(proj.id, t.id)}>
-                    <div className={`tl-check ${t.done ? "done" : ""}`} style={{ flexShrink:0 }}>
-                      {t.done && <span style={{fontSize:9,color:"#fff",fontWeight:700}}>✓</span>}
-                    </div>
-                    <span style={{ fontSize:15, color: t.done ? "var(--text3)" : "var(--text)", textDecoration: t.done ? "line-through" : "none" }}>{t.text}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            {/* Buttons */}
-            <div style={{ display:"flex", gap:10, marginTop:"auto", paddingTop:16, paddingBottom:20 }}>
-              <button onClick={stopAndExit}
-                style={{ flex:1, background:"var(--bg3)", border:"1px solid var(--border)", borderRadius:12, padding:"13px", color:"var(--red)", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
-                Stop
-              </button>
-              <button onClick={markDoneAndExit}
-                style={{ flex:2, background:"var(--accent)", border:"none", borderRadius:12, padding:"13px", color:"#000", fontSize:14, fontWeight:800, cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
-                Done ✓
-              </button>
-            </div>
-          </div>
-        );
-      })()}
-
-      {!focusMode && (
-        <div className="scroll" onClick={() => setEditingTime(null)}>
+      <div className="scroll" onClick={() => setEditingTime(null)}>
           {/* TIMELINE */}
           {timeline.length === 0 && (
             <div style={{ margin:"16px", padding:"20px", background:"var(--bg2)", borderRadius:14, textAlign:"center" }}>
@@ -1879,6 +1821,14 @@ function TodayScreen({ data, setData, openShutdown, focusMode: focusModeprop, se
                   const cardShadow = domainColor ? `0 0 18px ${domainColor}22` : undefined;
 
                   const isNowSlot = nowMins >= (slot.startHour*60+slot.startMin) && nowMins < (slot.startHour*60+slot.startMin+slot.durationMin);
+                  const lateInfo = lateStarted[slot.id];
+                  const isRunning = !!lateInfo;
+                  const cdStartMs = lateInfo ? new Date(lateInfo.startedAt).getTime() : 0;
+                  const cdTotalSec = slot.durationMin * 60;
+                  const cdRemSec = isRunning ? Math.max(0, cdTotalSec - Math.floor((Date.now() - cdStartMs) / 1000)) : cdTotalSec;
+                  const cdM = Math.floor(cdRemSec / 60), cdS = cdRemSec % 60;
+                  const cdStr = `${cdM}:${cdS.toString().padStart(2,"0")}`;
+                  const cdDone = isRunning && cdRemSec === 0;
 
                   return (
                     <div key={slot.id} className="tl-item" style={{ opacity: isPastSlot && !isCompleted ? 0.5 : 1 }}>
@@ -1937,7 +1887,14 @@ function TodayScreen({ data, setData, openShutdown, focusMode: focusModeprop, se
                               <div className="tl-name">{proj.name}</div>
                               <div className="tl-meta" style={{ display:"flex", alignItems:"center", gap:5 }}>{isSessionMode && <WaveIcon size={11} color={domainColor || "var(--blue)"} />}{domain?.name} · {slot.durationMin} min{!isSessionMode && relevantTasks.length > 0 ? ` · ${relevantDone}/${relevantTasks.length} today` : ""}{isSessionMode && sessionNote ? <span style={{ fontStyle:"italic", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:140 }}> · {sessionNote}</span> : ""}</div>
                             </div>
-                            {isNowSlot && !isExp && <span className="tl-now-pill">Now</span>}
+                            {isNowSlot && !isExp && !isRunning && <span className="tl-now-pill">Now</span>}
+                            {/* Countdown timer badge — visible when running */}
+                            {isRunning && (
+                              <div style={{ flexShrink:0, display:"flex", flexDirection:"column", alignItems:"flex-end", gap:1 }}>
+                                <div style={{ fontSize:14, fontWeight:700, color: cdDone ? "var(--green)" : "var(--accent)", fontVariantNumeric:"tabular-nums", lineHeight:1 }}>{cdDone ? "✓" : cdStr}</div>
+                                <div style={{ fontSize:9, color:"var(--text3)", letterSpacing:".04em" }}>remaining</div>
+                              </div>
+                            )}
                             {/* Gear icon when expanded, chevron when collapsed */}
                             {isExp
                               ? <button onClick={e => { e.stopPropagation(); setBlockMenuOpen(blockMenuOpen === slot.id ? null : slot.id); setBlockMenuMode(null); }}
@@ -1982,51 +1939,31 @@ function TodayScreen({ data, setData, openShutdown, focusMode: focusModeprop, se
                             const hasPicked = Array.isArray(todayTaskIds) && todayTaskIds.length > 0;
                             const isPicking = pickerState?.blockId === slot.id;
 
-                            // SESSION MODE — focus note input
+                            // SESSION MODE
                             if (isSessionMode) {
-                              const [noteDraft, setNoteDraft] = [slot.sessionNote || "", (v) => saveDWSessionNote(slot.slotIndex, v)];
-                              const hasNote = !!(slot.sessionNote && slot.sessionNote.trim());
                               const projSessions = (data.sessionLog || []).filter(s => s.projectId === proj.id);
                               return (
                                 <div className="tl-tasks" onClick={e => e.stopPropagation()}>
-                                  <div style={{ marginBottom:10 }}>
-                                    <div style={{ fontSize:11, fontWeight:700, color:"var(--text3)", letterSpacing:".05em", textTransform:"uppercase", marginBottom:6, display:"flex", alignItems:"center", gap:5 }}>
-                                      <WaveIcon size={11} color="var(--blue)" /> Session Focus
-                                    </div>
-                                    <textarea
-                                      className="session-focus-input"
-                                      placeholder="What will you push on this session?"
-                                      rows={2}
-                                      value={slot.sessionNote || ""}
-                                      onChange={e => saveDWSessionNote(slot.slotIndex, e.target.value)}
-                                      onClick={e => e.stopPropagation()}
-                                      onFocus={e => e.stopPropagation()}
-                                      onMouseDown={e => e.stopPropagation()}
-                                      onTouchStart={e => e.stopPropagation()}
-                                      onKeyDown={e => e.stopPropagation()}
-                                    />
-                                    {projSessions.length > 0 && (
-                                      <div style={{ fontSize:11, color:"var(--text3)", marginTop:4 }}>{projSessions.length} session{projSessions.length !== 1 ? "s" : ""} logged on this project</div>
-                                    )}
-                                  </div>
+                                  {projSessions.length > 0 && (
+                                    <div style={{ fontSize:11, color:"var(--text3)", marginBottom:10 }}>{projSessions.length} session{projSessions.length !== 1 ? "s" : ""} logged on this project</div>
+                                  )}
                                   <div style={{ display:"flex", gap:8 }} onClick={e => e.stopPropagation()}>
                                     <button
                                       className="tl-start-btn"
-                                      style={{ opacity: hasNote ? 1 : 0.4, cursor: hasNote ? "pointer" : "default" }}
-                                      onClick={e => { e.stopPropagation(); if (!hasNote) return; setFocusBlockId(slot.id); setFocusMode(true); }}
-                                    >Start →</button>
+                                      style={ isRunning ? { background:"rgba(224,85,85,.12)", color:"var(--red)", borderColor:"rgba(224,85,85,.3)" } : {} }
+                                      onClick={e => { e.stopPropagation(); isRunning ? setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }) : startBlock(slot.id); }}
+                                    >{isRunning ? "Stop ■" : "Start →"}</button>
                                     <button
                                       className="tl-start-btn"
-                                      style={{ background:"rgba(69,193,122,.12)", color:"var(--green)", borderColor:"rgba(69,193,122,.3)", opacity: hasNote ? 1 : 0.4, cursor: hasNote ? "pointer" : "default" }}
+                                      style={{ background:"rgba(69,193,122,.12)", color:"var(--green)", borderColor:"rgba(69,193,122,.3)" }}
                                       onClick={e => {
                                         e.stopPropagation();
-                                        if (!hasNote) return;
-                                        logSession(proj.id, slot.durationMin, slot.sessionNote);
+                                        logSession(proj.id, slot.durationMin, null);
+                                        setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; });
                                         markManualDone(slot.id, proj.id, null);
                                       }}
                                     >I did this ✓</button>
                                   </div>
-                                  {!hasNote && <div style={{ fontSize:11, color:"var(--text3)", marginTop:6, textAlign:"center" }}>Enter your session focus to start</div>}
                                 </div>
                               );
                             }
@@ -2091,9 +2028,9 @@ function TodayScreen({ data, setData, openShutdown, focusMode: focusModeprop, se
                                     </button>
                                   </div>
                                   <div style={{ display:"flex", gap:8, paddingTop:4 }} onClick={e => e.stopPropagation()}>
-                                    <button className="tl-start-btn" onClick={e => { e.stopPropagation(); setFocusBlockId(slot.id); setFocusMode(true); }}>Start →</button>
+                                    <button className="tl-start-btn" style={ isRunning ? { background:"rgba(224,85,85,.12)", color:"var(--red)", borderColor:"rgba(224,85,85,.3)" } : {} } onClick={e => { e.stopPropagation(); isRunning ? setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }) : startBlock(slot.id); }}>{isRunning ? "Stop ■" : "Start →"}</button>
                                     <button className="tl-start-btn" style={{ background:"rgba(69,193,122,.12)", color:"var(--green)", borderColor:"rgba(69,193,122,.3)" }}
-                                      onClick={e => { e.stopPropagation(); markManualDone(slot.id, proj.id, slot.todayTasks); }}>I did this ✓</button>
+                                      onClick={e => { e.stopPropagation(); setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }); markManualDone(slot.id, proj.id, slot.todayTasks); }}>I did this ✓</button>
                                   </div>
                                 </div>
                               );
@@ -2133,9 +2070,9 @@ function TodayScreen({ data, setData, openShutdown, focusMode: focusModeprop, se
                                   </button>
                                 </div>
                                 <div style={{ display:"flex", gap:8, marginTop:10 }} onClick={e => e.stopPropagation()}>
-                                  <button className="tl-start-btn" onClick={e => { e.stopPropagation(); setFocusBlockId(slot.id); setFocusMode(true); }}>Start →</button>
+                                  <button className="tl-start-btn" style={ isRunning ? { background:"rgba(224,85,85,.12)", color:"var(--red)", borderColor:"rgba(224,85,85,.3)" } : {} } onClick={e => { e.stopPropagation(); isRunning ? setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }) : startBlock(slot.id); }}>{isRunning ? "Stop ■" : "Start →"}</button>
                                   <button className="tl-start-btn" style={{ background:"rgba(69,193,122,.12)", color:"var(--green)", borderColor:"rgba(69,193,122,.3)" }}
-                                    onClick={e => { e.stopPropagation(); markManualDone(slot.id, proj.id, slot.todayTasks); }}>I did this ✓</button>
+                                    onClick={e => { e.stopPropagation(); setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }); markManualDone(slot.id, proj.id, slot.todayTasks); }}>I did this ✓</button>
                                 </div>
                               </div>
                             );
@@ -2200,7 +2137,7 @@ function TodayScreen({ data, setData, openShutdown, focusMode: focusModeprop, se
                       <div className="tl-connector" />
                     </div>
                     <div style={{ flex:1, minWidth:0, paddingRight:0, marginTop:8, marginBottom:6 }}>
-                      <button className="dw-empty" style={{ borderRadius: isPickerOpen ? "14px 14px 0 0" : 14 }}
+                      <button className={`dw-empty${isPickerOpen ? " is-open" : ""}`} style={{ borderRadius: isPickerOpen ? "14px 14px 0 0" : 14 }}
                         onClick={() => {
                           setDwPickerOpen(isPickerOpen ? null : slot.id);
                           setDwPickerStep(s => ({ ...s, [slot.id]: "project" }));
@@ -2216,66 +2153,107 @@ function TodayScreen({ data, setData, openShutdown, focusMode: focusModeprop, se
 
                       {isPickerOpen && (
                         <div className="dw-picker-wrap">
-                          {pickerStep === "project" && (
-                            <>
-                              <div className="dw-picker-sect">Choose a project</div>
-                              <div className="dw-proj-grid">
-                              {data.projects.filter(p => p.status === "active").map(p => {
-                                const d2 = data.domains?.find(d => d.id === p.domainId);
-                                return (
-                                  <div key={p.id} className="dw-proj-row"
-                                    onClick={() => {
-                                      setDwPickerProj(s => ({ ...s, [slot.id]: p.id }));
-                                      setDwPickerTime(s => ({ ...s, [slot.id]: { startHour: slot.startHour, startMin: slot.startMin, durationMin: slot.durationMin } }));
-                                      setDwPickerStep(s => ({ ...s, [slot.id]: "confirm" }));
-                                    }}
-                                  >
-                                    <div className="dw-proj-dot" style={{ background: d2?.color || "var(--text3)" }} />
-                                    <div style={{ flex:1, minWidth:0 }}>
-                                      <div className="dw-proj-name">{p.name}</div>
-                                      <div className="dw-proj-domain">{d2?.name}</div>
-                                    </div>
+                          {/* UNIFIED picker: project list with inline tasks */}
+                          {(() => {
+                            const selProjId = dwPickerProj[slot.id] || null;
+                            const selProj = selProjId ? data.projects.find(p => p.id === selProjId) : null;
+                            const ptKey = slot.id;
+                            const curTime = dwPickerTime[ptKey] || { startHour: slot.startHour, startMin: slot.startMin, durationMin: slot.durationMin };
+                            const curSelTasks = curTime._tasks !== undefined ? curTime._tasks : (selProj ? (selProj.tasks||[]).filter(t=>!t.done).map(t=>t.id) : []);
+                            const toggleTask = (tid) => {
+                              setDwPickerTime(s => {
+                                const base = s[ptKey] || { startHour:slot.startHour, startMin:slot.startMin, durationMin:slot.durationMin };
+                                const existing = base._tasks !== undefined ? base._tasks : (selProj ? (selProj.tasks||[]).filter(t=>!t.done).map(t=>t.id) : []);
+                                const next = existing.includes(tid) ? existing.filter(id=>id!==tid) : [...existing, tid];
+                                return { ...s, [ptKey]: { ...base, _tasks: next } };
+                              });
+                            };
+                            return (
+                              <>
+                                <div className="dw-picker-sect">Choose a project</div>
+                                <div style={{ display:"flex", flexDirection:"column", gap:6, marginBottom:10 }}>
+                                  {data.projects.filter(p => p.status === "active").map(p => {
+                                    const d2 = data.domains?.find(d => d.id === p.domainId);
+                                    const isSel = selProjId === p.id;
+                                    const incompleteTasks = (p.tasks||[]).filter(t=>!t.done);
+                                    const tasksSel = isSel ? curSelTasks : [];
+                                    return (
+                                      <div key={p.id} style={{ borderRadius:10, overflow:"hidden", border: isSel ? `1.5px solid ${d2?.color||"var(--accent)"}` : "1.5px solid var(--border2)", background: isSel ? `${d2?.color||"var(--accent)"}11` : "var(--bg3)", transition:"all .15s" }}>
+                                        <div style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 12px", cursor:"pointer" }}
+                                          onClick={() => {
+                                            if (isSel) {
+                                              setDwPickerProj(s => { const n={...s}; delete n[ptKey]; return n; });
+                                            } else {
+                                              const defTasks = incompleteTasks.map(t=>t.id);
+                                              setDwPickerProj(s => ({ ...s, [ptKey]: p.id }));
+                                              setDwPickerTime(s => ({ ...s, [ptKey]: { startHour:slot.startHour, startMin:slot.startMin, durationMin:slot.durationMin, _tasks: defTasks } }));
+                                            }
+                                          }}
+                                        >
+                                          <div style={{ width:9, height:9, borderRadius:"50%", background: d2?.color||"var(--text3)", flexShrink:0 }} />
+                                          <div style={{ flex:1, minWidth:0 }}>
+                                            <div style={{ fontSize:13, fontWeight:600, color: isSel ? "var(--text)" : "var(--text2)" }}>{p.name}</div>
+                                            <div style={{ fontSize:11, color:"var(--text3)" }}>{d2?.name}{incompleteTasks.length > 0 ? ` · ${incompleteTasks.length} task${incompleteTasks.length!==1?"s":""}` : ""}</div>
+                                          </div>
+                                          <div style={{ width:18, height:18, borderRadius:"50%", border: isSel ? "none" : "1.5px solid var(--border)", background: isSel ? (d2?.color||"var(--accent)") : "transparent", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, transition:"all .15s" }}>
+                                            {isSel && <span style={{ fontSize:9, color:"#000", fontWeight:800 }}>✓</span>}
+                                          </div>
+                                        </div>
+                                        {isSel && incompleteTasks.length > 0 && (
+                                          <div style={{ borderTop:"1px solid var(--border2)", padding:"6px 12px 10px" }}>
+                                            <div style={{ fontSize:10, fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", color:"var(--text3)", marginBottom:6 }}>Focus tasks</div>
+                                            {incompleteTasks.map(t => {
+                                              const tSel = tasksSel.includes(t.id);
+                                              return (
+                                                <div key={t.id} onClick={() => toggleTask(t.id)} style={{ display:"flex", alignItems:"center", gap:10, padding:"6px 2px", cursor:"pointer" }}>
+                                                  <div style={{ width:16, height:16, borderRadius:4, border: tSel ? "none" : "1.5px solid var(--border)", background: tSel ? "var(--accent)" : "transparent", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, transition:"all .12s" }}>
+                                                    {tSel && <span style={{ fontSize:8, color:"#000", fontWeight:800 }}>✓</span>}
+                                                  </div>
+                                                  <span style={{ fontSize:13, color: tSel ? "var(--text)" : "var(--text2)" }}>{t.text}</span>
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                                {data.todayPrefs?.hideTimes ? (
+                                  <div onClick={() => setData(d => ({ ...d, todayPrefs: { ...(d.todayPrefs||{}), hideTimes: false } }))}
+                                    style={{ display:"flex", alignItems:"center", gap:8, padding:"10px 12px", borderRadius:10, background:"var(--bg3)", border:"1.5px dashed var(--border)", cursor:"pointer", marginBottom:10, opacity:0.6 }}>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round"/><line x1="1" y1="1" x2="23" y2="23" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round"/></svg>
+                                    <span style={{ fontSize:13, color:"var(--text2)" }}>Times hidden — tap to enable</span>
                                   </div>
-                                );
-                              })}
-                              </div>
-                            </>
-                          )}
-                          {pickerStep === "confirm" && pickerProj && (
-                            <div className="dw-confirm-wrap">
-                              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:12 }}>
-                                <div style={{ width:10, height:10, borderRadius:"50%", background: data.domains?.find(d => d.id === pickerProj.domainId)?.color || "var(--text3)", flexShrink:0 }} />
-                                <div style={{ fontSize:14, fontWeight:600, color:"var(--text)" }}>{pickerProj.name}</div>
-                              </div>
-                              {data.todayPrefs?.hideTimes ? (
-                                <div onClick={() => setData(d => ({ ...d, todayPrefs: { ...(d.todayPrefs||{}), hideTimes: false } }))}
-                                  style={{ display:"flex", alignItems:"center", gap:8, padding:"10px 12px", borderRadius:10, background:"var(--bg3)", border:"1.5px dashed var(--border)", cursor:"pointer", marginBottom:10, opacity:0.6 }}>
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round"/><line x1="1" y1="1" x2="23" y2="23" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round"/></svg>
-                                  <span style={{ fontSize:13, color:"var(--text2)" }}>Times hidden — tap to enable</span>
-                                </div>
-                              ) : (
-                                <div className="dw-time-row">
-                                  <select className="dw-time-sel" value={`${pickerTime.startHour}:${pickerTime.startMin}`}
-                                    onChange={e => { const [h,m] = e.target.value.split(":").map(Number); setDwPickerTime(s => ({ ...s, [slot.id]: { ...s[slot.id], startHour:h, startMin:m } })); }}>
-                                    {timeOptions.map(({h,m}) => <option key={`${h}:${m}`} value={`${h}:${m}`}>{fmt(h,m)}</option>)}
-                                  </select>
-                                  <select className="dw-time-sel" value={pickerTime.durationMin}
-                                    onChange={e => setDwPickerTime(s => ({ ...s, [slot.id]: { ...s[slot.id], durationMin: Number(e.target.value) } }))}>
-                                    {[30,45,60,90,120].map(d => <option key={d} value={d}>{d} min</option>)}
-                                  </select>
-                                </div>
-                              )}
-                              <button className="dw-confirm-btn"
-                                onClick={() => {
-                                  saveDWSlot(slot.id, slot.slotIndex, pickerProj.id, pickerTime.startHour, pickerTime.startMin, pickerTime.durationMin, null);
-                                  setDwPickerOpen(null);
-                                  setDwPickerStep(s => ({ ...s, [slot.id]: "project" }));
-                                  setDwPickerProj(s => { const n={...s}; delete n[slot.id]; return n; });
-                                }}
-                              >✓ Confirm</button>
-                              <button className="dw-back" onClick={() => setDwPickerStep(s => ({ ...s, [slot.id]: "project" }))}>← Back</button>
-                            </div>
-                          )}
+                                ) : (
+                                  <div className="dw-time-row" style={{ marginBottom:10 }}>
+                                    <select className="dw-time-sel" value={`${curTime.startHour}:${curTime.startMin}`}
+                                      onChange={e => { const [h,m] = e.target.value.split(":").map(Number); setDwPickerTime(s => ({ ...s, [ptKey]: { ...(s[ptKey]||{}), startHour:h, startMin:m } })); }}>
+                                      {timeOptions.map(({h,m}) => <option key={`${h}:${m}`} value={`${h}:${m}`}>{fmt(h,m)}</option>)}
+                                    </select>
+                                    <select className="dw-time-sel" value={curTime.durationMin||slot.durationMin}
+                                      onChange={e => setDwPickerTime(s => ({ ...s, [ptKey]: { ...(s[ptKey]||{}), durationMin: Number(e.target.value) } }))}>
+                                      {[30,45,60,90,120].map(d => <option key={d} value={d}>{d} min</option>)}
+                                    </select>
+                                  </div>
+                                )}
+                                <button className="dw-confirm-btn"
+                                  disabled={!selProjId}
+                                  style={{ opacity: selProjId ? 1 : 0.4 }}
+                                  onClick={() => {
+                                    if (!selProjId) return;
+                                    const t = dwPickerTime[ptKey] || { startHour:slot.startHour, startMin:slot.startMin, durationMin:slot.durationMin };
+                                    const tasks = (t._tasks && t._tasks.length > 0) ? t._tasks : null;
+                                    saveDWSlot(slot.id, slot.slotIndex, selProjId, t.startHour, t.startMin, t.durationMin, tasks);
+                                    setDwPickerOpen(null);
+                                    setDwPickerStep(s => ({ ...s, [ptKey]: "project" }));
+                                    setDwPickerProj(s => { const n={...s}; delete n[ptKey]; return n; });
+                                    setDwPickerTime(s => { const n={...s}; delete n[ptKey]; return n; });
+                                  }}
+                                >✓ Confirm</button>
+                              </>
+                            );
+                          })()}
                         </div>
                       )}
                     </div>
@@ -2514,10 +2492,16 @@ function TodayScreen({ data, setData, openShutdown, focusMode: focusModeprop, se
           {!viewingTomorrow && (
             <button
               onClick={() => setViewingTomorrow(true)}
-              style={{ display:"flex", alignItems:"center", justifyContent:"space-between", width:"100%", background:"none", border:"none", cursor:"pointer", padding:"4px 16px 18px", fontFamily:"'DM Sans',sans-serif" }}
+              style={{
+                display:"flex", alignItems:"center", justifyContent:"space-between",
+                width:"100%", background: tomorrowActive ? "rgba(232,160,48,.07)" : "none",
+                border:"none", borderTop: tomorrowActive ? "1px solid rgba(232,160,48,.2)" : "1px solid transparent",
+                cursor:"pointer", padding:"10px 16px 18px", fontFamily:"'DM Sans',sans-serif",
+                transition:"background .35s, border-color .35s",
+              }}
             >
-              <span style={{ fontSize:13, color:"var(--text3)", fontWeight:600 }}>Tomorrow</span>
-              <span style={{ display:"flex", alignItems:"center", gap:4, fontSize:13, color:"var(--text3)", fontWeight:600 }}>
+              <span style={{ fontSize:13, color: tomorrowActive ? "var(--accent)" : "var(--text3)", fontWeight:700, transition:"color .35s", letterSpacing:".02em" }}>Tomorrow</span>
+              <span style={{ display:"flex", alignItems:"center", gap:4, fontSize:13, color: tomorrowActive ? "var(--accent)" : "var(--text3)", fontWeight:600, transition:"color .35s" }}>
                 {days[tomorrow.getDay()]}, {months[tomorrow.getMonth()]} {tomorrow.getDate()}
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
               </span>
@@ -2597,7 +2581,7 @@ function TodayScreen({ data, setData, openShutdown, focusMode: focusModeprop, se
           <div className="spacer" />
         </div>
       )}
-      {focusMode && <div className="spacer" />}
+
       {showTodaySettings && <TodaySettingsSheet data={data} setData={setData} onClose={() => setShowTodaySettings(false)} />}
     </div>
   );
@@ -3732,7 +3716,7 @@ function PlanScreen({ data, setData, onGoToSeason, lightMode, toggleTheme }) {
                 const fmt2 = (h, m) => { const hh = h > 12 ? h-12 : h===0?12:h; const mm = m===0?"":`:${String(m).padStart(2,"0")}`; return `${hh}${mm}${h>=12?"pm":"am"}`; };
                 return (
                   <div key={`ghost_${row.dateStr}_${s.slotIndex}`} style={{ padding: "6px 12px 2px" }}>
-                    <button className="dw-empty" style={{ borderRadius: isPickerOpen2 ? "14px 14px 0 0" : 14 }}
+                    <button className={`dw-empty${isPickerOpen2 ? " is-open" : ""}`} style={{ borderRadius: isPickerOpen2 ? "14px 14px 0 0" : 14 }}
                       onClick={() => {
                         setWkDwPickerOpen(isPickerOpen2 ? null : pickerKey);
                         setWkDwPickerStep(st => ({ ...st, [pickerKey]: "project" }));
@@ -3747,103 +3731,110 @@ function PlanScreen({ data, setData, onGoToSeason, lightMode, toggleTheme }) {
                     </button>
                     {isPickerOpen2 && (
                       <div className="dw-picker-wrap" ref={wkPickerRef}>
-                        {pickerStep2 === "project" && (
-                          <>
-                            <div className="dw-picker-sect">Choose a project</div>
-                            <div className="dw-proj-grid">
-                            {data.projects.filter(p => p.status === "active").map(p => {
-                              const d2 = data.domains?.find(d => d.id === p.domainId);
-                              return (
-                                <div key={p.id} className="dw-proj-row"
-                                  onClick={() => {
-                                    setWkDwPickerProj(st => ({ ...st, [pickerKey]: p.id }));
-                                    setWkDwPickerTime(st => ({ ...st, [pickerKey]: { startHour: s.startHour, startMin: s.startMin, durationMin: s.durationMin } }));
-                                    setWkDwPickerStep(st => ({ ...st, [pickerKey]: "confirm" }));
-                                  }}
-                                >
-                                  <div className="dw-proj-dot" style={{ background: d2?.color || "var(--text3)" }} />
-                                  <div style={{ flex:1, minWidth:0 }}>
-                                    <div className="dw-proj-name">{p.name}</div>
-                                    <div className="dw-proj-domain">{d2?.name}</div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                            </div>
-                          </>
-                        )}
-                        {pickerStep2 === "confirm" && pickerProj2 && (() => {
-                          const projTasks = (pickerProj2.tasks || []).filter(t => !t.done);
-                          const selectedTasks = wkDwPickerTasks[pickerKey] || [];
-                          const toggleTask2 = (taskId) => {
+                        {/* UNIFIED picker: project list with inline tasks */}
+                        {(() => {
+                          const selProjId = wkDwPickerProj[pickerKey] || null;
+                          const selProj = selProjId ? data.projects.find(p => p.id === selProjId) : null;
+                          const curTime = wkDwPickerTime[pickerKey] || { startHour: s.startHour, startMin: s.startMin, durationMin: s.durationMin };
+                          const curSelTasks = (wkDwPickerTasks[pickerKey] !== undefined) ? wkDwPickerTasks[pickerKey] : (selProj ? (selProj.tasks||[]).filter(t=>!t.done).map(t=>t.id) : []);
+                          const toggleTask2 = (tid) => {
                             setWkDwPickerTasks(st => {
-                              const cur = st[pickerKey] || [];
-                              const next = cur.includes(taskId) ? cur.filter(id => id !== taskId) : [...cur, taskId];
+                              const existing = st[pickerKey] !== undefined ? st[pickerKey] : (selProj ? (selProj.tasks||[]).filter(t=>!t.done).map(t=>t.id) : []);
+                              const next = existing.includes(tid) ? existing.filter(id=>id!==tid) : [...existing, tid];
                               return { ...st, [pickerKey]: next };
                             });
                           };
                           return (
-                          <div className="dw-confirm-wrap">
-                            <div style={{ fontSize:13, fontWeight:600, color:"var(--text)", marginBottom:10 }}>{pickerProj2.name}</div>
-                            {data.todayPrefs?.hideTimes ? (
-                              <div onClick={() => setData(d => ({ ...d, todayPrefs: { ...(d.todayPrefs||{}), hideTimes: false } }))}
-                                style={{ display:"flex", alignItems:"center", gap:8, padding:"10px 12px", borderRadius:10, background:"var(--bg3)", border:"1.5px dashed var(--border)", cursor:"pointer", marginBottom:10, opacity:0.6 }}>
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round"/><line x1="1" y1="1" x2="23" y2="23" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round"/></svg>
-                                <span style={{ fontSize:13, color:"var(--text2)" }}>Times hidden — tap to enable</span>
-                              </div>
-                            ) : (
-                              <div className="dw-time-row">
-                                <div style={{ flex:1 }}>
-                                  <div className="dw-picker-sect" style={{ padding:"0 0 4px" }}>Start time</div>
-                                  <select className="dw-time-sel"
-                                    value={`${pickerTime2.startHour}:${pickerTime2.startMin}`}
-                                    onChange={e => { const [h,m] = e.target.value.split(":").map(Number); setWkDwPickerTime(st => ({ ...st, [pickerKey]: { ...st[pickerKey], startHour:h, startMin:m } })); }}>
-                                    {timeOptions2.map(({h,m}) => <option key={`${h}${m}`} value={`${h}:${m}`}>{fmt2(h,m)}</option>)}
-                                  </select>
-                                </div>
-                                <div style={{ flex:1 }}>
-                                  <div className="dw-picker-sect" style={{ padding:"0 0 4px" }}>Duration</div>
-                                  <select className="dw-time-sel"
-                                    value={pickerTime2.durationMin}
-                                    onChange={e => setWkDwPickerTime(st => ({ ...st, [pickerKey]: { ...st[pickerKey], durationMin: Number(e.target.value) } }))}>
-                                    {[30,45,60,75,90,105,120].map(d => <option key={d} value={d}>{d} min</option>)}
-                                  </select>
-                                </div>
-                              </div>
-                            )}
-                            {projTasks.length > 0 && (
-                              <div style={{ marginBottom:10 }}>
-                                <div className="dw-picker-sect" style={{ padding:"0 0 6px" }}>Focus tasks <span style={{ color:"var(--text3)", fontWeight:400, textTransform:"none", letterSpacing:0 }}>(optional)</span></div>
-                                {projTasks.map(t => {
-                                  const isSel = selectedTasks.includes(t.id);
+                            <>
+                              <div className="dw-picker-sect">Choose a project</div>
+                              <div style={{ display:"flex", flexDirection:"column", gap:6, marginBottom:10 }}>
+                                {data.projects.filter(p => p.status === "active").map(p => {
+                                  const d2 = data.domains?.find(d => d.id === p.domainId);
+                                  const isSel = selProjId === p.id;
+                                  const incompleteTasks = (p.tasks||[]).filter(t=>!t.done);
+                                  const tasksSel = isSel ? curSelTasks : [];
                                   return (
-                                    <div key={t.id} onClick={() => toggleTask2(t.id)}
-                                      style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 4px", cursor:"pointer", borderRadius:8 }}>
-                                      <div style={{
-                                        width:18, height:18, borderRadius:5,
-                                        border: isSel ? "none" : "1.5px solid var(--border)",
-                                        background: isSel ? "var(--accent)" : "transparent",
-                                        display:"flex", alignItems:"center", justifyContent:"center",
-                                        flexShrink:0, transition:"all .15s"
-                                      }}>
-                                        {isSel && <span style={{ fontSize:10, color:"#000", fontWeight:800 }}>✓</span>}
+                                    <div key={p.id} style={{ borderRadius:10, overflow:"hidden", border: isSel ? `1.5px solid ${d2?.color||"var(--accent)"}` : "1.5px solid var(--border2)", background: isSel ? `${d2?.color||"var(--accent)"}11` : "var(--bg3)", transition:"all .15s" }}>
+                                      <div style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 12px", cursor:"pointer" }}
+                                        onClick={() => {
+                                          if (isSel) {
+                                            setWkDwPickerProj(st => { const n={...st}; delete n[pickerKey]; return n; });
+                                            setWkDwPickerTasks(st => { const n={...st}; delete n[pickerKey]; return n; });
+                                          } else {
+                                            const defTasks = incompleteTasks.map(t=>t.id);
+                                            setWkDwPickerProj(st => ({ ...st, [pickerKey]: p.id }));
+                                            setWkDwPickerTasks(st => ({ ...st, [pickerKey]: defTasks }));
+                                            setWkDwPickerTime(st => ({ ...st, [pickerKey]: { startHour:s.startHour, startMin:s.startMin, durationMin:s.durationMin } }));
+                                          }
+                                        }}
+                                      >
+                                        <div style={{ width:9, height:9, borderRadius:"50%", background: d2?.color||"var(--text3)", flexShrink:0 }} />
+                                        <div style={{ flex:1, minWidth:0 }}>
+                                          <div style={{ fontSize:13, fontWeight:600, color: isSel ? "var(--text)" : "var(--text2)" }}>{p.name}</div>
+                                          <div style={{ fontSize:11, color:"var(--text3)" }}>{d2?.name}{incompleteTasks.length > 0 ? ` · ${incompleteTasks.length} task${incompleteTasks.length!==1?"s":""}` : ""}</div>
+                                        </div>
+                                        <div style={{ width:18, height:18, borderRadius:"50%", border: isSel ? "none" : "1.5px solid var(--border)", background: isSel ? (d2?.color||"var(--accent)") : "transparent", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, transition:"all .15s" }}>
+                                          {isSel && <span style={{ fontSize:9, color:"#000", fontWeight:800 }}>✓</span>}
+                                        </div>
                                       </div>
-                                      <span style={{ fontSize:13, color: isSel ? "var(--text)" : "var(--text2)" }}>{t.text}</span>
+                                      {isSel && incompleteTasks.length > 0 && (
+                                        <div style={{ borderTop:"1px solid var(--border2)", padding:"6px 12px 10px" }}>
+                                          <div style={{ fontSize:10, fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", color:"var(--text3)", marginBottom:6 }}>Focus tasks</div>
+                                          {incompleteTasks.map(t => {
+                                            const tSel = tasksSel.includes(t.id);
+                                            return (
+                                              <div key={t.id} onClick={() => toggleTask2(t.id)} style={{ display:"flex", alignItems:"center", gap:10, padding:"6px 2px", cursor:"pointer" }}>
+                                                <div style={{ width:16, height:16, borderRadius:4, border: tSel ? "none" : "1.5px solid var(--border)", background: tSel ? "var(--accent)" : "transparent", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, transition:"all .12s" }}>
+                                                  {tSel && <span style={{ fontSize:8, color:"#000", fontWeight:800 }}>✓</span>}
+                                                </div>
+                                                <span style={{ fontSize:13, color: tSel ? "var(--text)" : "var(--text2)" }}>{t.text}</span>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
                                     </div>
                                   );
                                 })}
                               </div>
-                            )}
-                            <button className="dw-confirm-btn" onClick={() => {
-                              const tasks = selectedTasks.length > 0 ? selectedTasks : null;
-                              saveDWSlotForDate(row.dateStr, s.slotIndex, pickerProj2.id, pickerTime2.startHour, pickerTime2.startMin, pickerTime2.durationMin, tasks);
-                              setWkDwPickerOpen(null);
-                              setWkDwPickerStep(st => { const n={...st}; delete n[pickerKey]; return n; });
-                              setWkDwPickerProj(st => { const n={...st}; delete n[pickerKey]; return n; });
-                              setWkDwPickerTasks(st => { const n={...st}; delete n[pickerKey]; return n; });
-                            }}>✓ Confirm</button>
-                            <button className="dw-back" onClick={() => { setWkDwPickerStep(st => ({ ...st, [pickerKey]: "project" })); setWkDwPickerTasks(st => { const n={...st}; delete n[pickerKey]; return n; }); }}>← Back</button>
-                          </div>
+                              {data.todayPrefs?.hideTimes ? (
+                                <div onClick={() => setData(d => ({ ...d, todayPrefs: { ...(d.todayPrefs||{}), hideTimes: false } }))}
+                                  style={{ display:"flex", alignItems:"center", gap:8, padding:"10px 12px", borderRadius:10, background:"var(--bg3)", border:"1.5px dashed var(--border)", cursor:"pointer", marginBottom:10, opacity:0.6 }}>
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round"/><line x1="1" y1="1" x2="23" y2="23" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round"/></svg>
+                                  <span style={{ fontSize:13, color:"var(--text2)" }}>Times hidden — tap to enable</span>
+                                </div>
+                              ) : (
+                                <div className="dw-time-row" style={{ marginBottom:10 }}>
+                                  <div style={{ flex:1 }}>
+                                    <div className="dw-picker-sect" style={{ padding:"0 0 4px" }}>Start time</div>
+                                    <select className="dw-time-sel" value={`${curTime.startHour}:${curTime.startMin}`}
+                                      onChange={e => { const [h,m] = e.target.value.split(":").map(Number); setWkDwPickerTime(st => ({ ...st, [pickerKey]: { ...st[pickerKey], startHour:h, startMin:m } })); }}>
+                                      {timeOptions2.map(({h,m}) => <option key={`${h}${m}`} value={`${h}:${m}`}>{fmt2(h,m)}</option>)}
+                                    </select>
+                                  </div>
+                                  <div style={{ flex:1 }}>
+                                    <div className="dw-picker-sect" style={{ padding:"0 0 4px" }}>Duration</div>
+                                    <select className="dw-time-sel" value={curTime.durationMin}
+                                      onChange={e => setWkDwPickerTime(st => ({ ...st, [pickerKey]: { ...st[pickerKey], durationMin: Number(e.target.value) } }))}>
+                                      {[30,45,60,75,90,105,120].map(d => <option key={d} value={d}>{d} min</option>)}
+                                    </select>
+                                  </div>
+                                </div>
+                              )}
+                              <button className="dw-confirm-btn"
+                                disabled={!selProjId}
+                                style={{ opacity: selProjId ? 1 : 0.4 }}
+                                onClick={() => {
+                                  if (!selProjId) return;
+                                  const tasks = curSelTasks.length > 0 ? curSelTasks : null;
+                                  saveDWSlotForDate(row.dateStr, s.slotIndex, selProjId, curTime.startHour, curTime.startMin, curTime.durationMin, tasks);
+                                  setWkDwPickerOpen(null);
+                                  setWkDwPickerStep(st => { const n={...st}; delete n[pickerKey]; return n; });
+                                  setWkDwPickerProj(st => { const n={...st}; delete n[pickerKey]; return n; });
+                                  setWkDwPickerTasks(st => { const n={...st}; delete n[pickerKey]; return n; });
+                                }}
+                              >✓ Confirm</button>
+                            </>
                           );
                         })()}
                       </div>
@@ -4578,53 +4569,50 @@ function ShutdownSheet({ onClose, onComplete, alreadyDone, data, onCategorizeLoo
             </div>
           )}
 
-          {/* COMPLETED TODAY */}
+          {/* COMPLETED SINCE LAST SHUTDOWN */}
           {(() => {
-            const today = new Date().toDateString();
-            const completedToday = [];
+            // Show tasks completed since the last shutdown (or beginning of today if never shut down)
+            const lastShutdown = data.shutdownDate ? new Date(data.shutdownDate + "T00:00:00") : null;
+            const isAfterShutdown = (dateVal) => {
+              if (!dateVal) return false;
+              const d = new Date(dateVal);
+              if (lastShutdown) return d > lastShutdown;
+              // No prior shutdown — show anything completed today
+              return d.toDateString() === new Date().toDateString();
+            };
+            const completed = [];
             projects.forEach(proj => {
               const dom = domains.find(d => d.id === proj.domainId);
               proj.tasks.forEach(t => {
-                if (t.done && t.doneAt && new Date(t.doneAt).toDateString() === today) {
-                  completedToday.push({ text: t.text, projName: proj.name, color: dom?.color });
+                if (t.done && isAfterShutdown(t.doneAt)) {
+                  completed.push({ text: t.text, projName: proj.name, color: dom?.color });
                 }
               });
             });
-            // Also include loose tasks completed today
-            const looseDone = (data.looseTasks || []).filter(t =>
-              t.done && t.doneAt && new Date(t.doneAt).toDateString() === today
-            );
-            looseDone.forEach(t => {
+            (data.looseTasks || []).filter(t => t.done && isAfterShutdown(t.doneAt)).forEach(t => {
               const dom = domains.find(d => d.id === t.domainId);
-              completedToday.push({ text: t.text, projName: dom?.name || "Loose", color: dom?.color });
-            });
-            // Routine block tasks completed today
-            (data.routineBlocks || []).forEach(rb => {
-              const comp = (rb.completions || {})[today] || {};
-              rb.tasks.forEach(t => {
-                if (comp[t.id]) completedToday.push({ text: t.text, projName: rb.title, color: "var(--text3)" });
-              });
+              completed.push({ text: t.text, projName: dom?.name || "Loose tasks", color: dom?.color });
             });
 
-            if (!completedToday.length) return null;
+            if (!completed.length) return null;
             return (
               <div style={{ margin:"16px 0 8px" }}>
                 <div style={{ height:1, background:"var(--border2)", marginBottom:16 }} />
                 <div style={{ fontSize:11, fontWeight:700, letterSpacing:".09em", textTransform:"uppercase", color:"var(--text3)", marginBottom:4 }}>
-                  Tasks Completed Today
+                  Completed This Session
                 </div>
                 <div style={{ fontSize:22, fontWeight:700, color:"var(--text)", marginBottom:12 }}>
-                  {completedToday.length} task{completedToday.length !== 1 ? "s" : ""} done
+                  {completed.length} task{completed.length !== 1 ? "s" : ""} done
                 </div>
                 <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
-                  {completedToday.map((t, i) => (
+                  {completed.map((t, i) => (
                     <div key={i} style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 12px", background:"var(--bg3)", borderRadius:10 }}>
                       <div style={{ width:3, alignSelf:"stretch", borderRadius:2, background: t.color || "var(--border)", flexShrink:0 }} />
                       <div style={{ flex:1 }}>
                         <div style={{ fontSize:13, color:"var(--text)", textDecoration:"line-through", opacity:.7 }}>{t.text}</div>
                         <div style={{ fontSize:11, color:"var(--text3)", marginTop:1 }}>{t.projName}</div>
                       </div>
-                      <span style={{ fontSize:14 }}>✓</span>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                     </div>
                   ))}
                 </div>
@@ -5315,7 +5303,7 @@ export default function App() {
   const [data, setData] = useData(userId);
   const [tab, setTab] = useState("today");
   const [sheet, setSheet] = useState(null);
-  const [focusMode, setFocusMode] = useState(false);
+
   const [captureOpen, setCaptureOpen] = useState(false);
   const [jumpToBlock, setJumpToBlock] = useState(null); // blockId to auto-expand when switching to Today
   const [lightMode, setLightMode] = useState(() => {
@@ -5371,7 +5359,7 @@ export default function App() {
           {!data.onboardingDone && (
             <OnboardingFlow onDone={() => setData(d => ({ ...d, onboardingDone: true }))} />
           )}
-          {tab==="today"    && <TodayScreen    data={data} setData={setData} openShutdown={()=>setSheet("shutdown")} focusMode={focusMode} setFocusMode={setFocusMode} onSignOut={() => supabase.auth.signOut()} jumpToBlock={jumpToBlock} onClearJump={() => setJumpToBlock(null)} />}
+          {tab==="today"    && <TodayScreen    data={data} setData={setData} openShutdown={()=>setSheet("shutdown")} onSignOut={() => supabase.auth.signOut()} jumpToBlock={jumpToBlock} onClearJump={() => setJumpToBlock(null)} />}
           {tab==="projects" && <ProjectsScreen data={data} setData={setData} openCategorize={()=>setSheet("categorize")} />}
           {tab==="plan"     && <PlanScreen     data={data} setData={setData} onGoToSeason={()=>setTab("season")} lightMode={lightMode} toggleTheme={toggleTheme} />}
           {tab==="season"  && <SeasonScreen   data={data} setData={setData} />}
@@ -5381,14 +5369,14 @@ export default function App() {
 
           {sheet==="categorize"&& <CategorizeSheet  data={data} onClose={closeSheet} onCategorize={handleCategorize} onDismiss={handleDismissInbox} onDoToday={handleDoToday} />}
 
-          {!focusMode && captureOpen && (
+          {captureOpen && (
             <QuickReminders
               onClose={() => setCaptureOpen(false)}
               onAdd={handleQuickAdd}
             />
           )}
 
-          <div className="nav" style={{ display: focusMode ? "none" : undefined }}>
+          <div className="nav">
             {/* Today + Projects */}
             {NAV_ITEMS.slice(0,2).map(n => (
               <div key={n.id} className={`nav-btn ${tab===n.id?"on":""}`} onClick={()=>setTab(n.id)}>
