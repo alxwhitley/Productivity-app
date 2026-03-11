@@ -406,11 +406,15 @@ const css = `
   .tl-item.drag-over{border-top:2px solid var(--accent);}
 
   .tl-card{width:100%;background:var(--bg2);border-radius:14px;overflow:hidden;transition:opacity .2s,border-color .2s,box-shadow .2s;}
-  .tl-card.done-card{opacity:.42;filter:saturate(0.15);}
+  .tl-card.done-card{opacity:.32;filter:saturate(0.1);}
   .tl-card.missed-card{border:1px solid var(--domain-color,rgba(255,255,255,.1));box-shadow:0 0 14px var(--domain-color,transparent);}
-  .tl-card.now-card{border:1px solid rgba(232,160,48,.25);box-shadow:0 0 24px rgba(232,160,48,.09);}
+  .tl-card.now-card{border:2px solid var(--domain-color,rgba(232,160,48,.5));box-shadow:0 0 32px var(--domain-color,rgba(232,160,48,.15)),0 0 0 0 var(--domain-color,rgba(232,160,48,.1));transform:scale(1.012);transform-origin:center top;background:var(--bg2);}
   .tl-card.active-card{border:1px solid rgba(232,160,48,.25);box-shadow:0 0 24px rgba(232,160,48,.09);}
   .tl-card.upcoming-card{border:1px solid var(--domain-color,rgba(255,255,255,.08));box-shadow:0 0 14px var(--domain-color,transparent);}
+  /* Routine pill card */
+  .tl-card.routine-pill{background:var(--bg3);border-radius:22px;border:1px solid var(--border2);}
+  .tl-card.routine-pill.now-card{border:1.5px solid rgba(232,160,48,.4);box-shadow:0 0 12px rgba(232,160,48,.1);transform:none;}
+  .tl-card.routine-pill.done-card{opacity:.3;filter:saturate(0);}
   .tl-check-icon.missed{width:20px;height:20px;border-radius:50%;border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
   .tl-card-head{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;}
   .tl-stripe{width:3px;border-radius:2px;align-self:stretch;min-height:28px;flex-shrink:0;}
@@ -451,9 +455,9 @@ const css = `
   .lt-empty{font-size:12px;color:var(--text3);padding:12px 14px;font-style:italic;}
   /* TIME PICKER POPOVER */
   .time-pick-wrap{position:relative;display:inline-block;}
-  .tl-time-btn{font-size:11px;color:var(--text3);font-variant-numeric:tabular-nums;white-space:nowrap;padding-top:14px;font-weight:500;cursor:pointer;background:none;border:none;font-family:'DM Sans',sans-serif;text-align:center;transition:color .15s;-webkit-tap-highlight-color:transparent;}
-  .tl-time-btn:hover,.tl-time-btn.open{color:var(--accent);}
-  .tl-time-btn.open{text-decoration:underline;text-underline-offset:2px;}
+  .tl-time-btn{font-size:10px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;padding:3px 8px;margin-top:14px;cursor:pointer;background:var(--time-pill-bg,var(--bg3));color:var(--time-pill-color,var(--text3));border:none;border-radius:20px;font-family:'DM Sans',sans-serif;text-align:center;transition:all .15s;-webkit-tap-highlight-color:transparent;letter-spacing:.02em;}
+  .tl-time-btn:hover,.tl-time-btn.open{filter:brightness(1.2);}
+  .tl-time{font-size:10px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;padding:3px 8px;margin-top:14px;background:var(--bg3);color:var(--text3);border-radius:20px;text-align:center;letter-spacing:.02em;}
   .time-popover{position:absolute;left:50%;transform:translateX(-50%);top:calc(100% + 4px);background:var(--bg2);border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:50;overflow:hidden;width:96px;}
   .time-popover-inner{max-height:200px;overflow-y:auto;overscroll-behavior:contain;}
   .time-slot{padding:9px 12px;font-size:12px;font-variant-numeric:tabular-nums;color:var(--text2);cursor:pointer;text-align:center;transition:background .1s;}
@@ -1506,13 +1510,17 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                   >
                     <div className="tl-left">
                       {isLateActive ? (
-                        <div className="tl-time" style={{ color:"var(--accent)", paddingTop:14 }}>
+                        <div className="tl-time" style={{ background:`${domain?.color || "var(--accent)"}22`, color: domain?.color || "var(--accent)" }}>
                           {fmtTime(new Date(lateInfo.startedAt).getHours(), new Date(lateInfo.startedAt).getMinutes())}
                         </div>
                       ) : (
                         <div className="time-pick-wrap">
                           <button
                             className={`tl-time-btn${editingTime === blk.id ? " open" : ""}`}
+                            style={{
+                              "--time-pill-bg": isCompleted ? "var(--bg3)" : (isNow || isLateActive) ? `${domain?.color || "var(--accent)"}33` : isPast ? "var(--bg3)" : domain?.color ? `${domain.color}22` : "var(--bg3)",
+                              "--time-pill-color": isCompleted ? "var(--text3)" : (isNow || isLateActive) ? (domain?.color || "var(--accent)") : isPast ? "var(--text3)" : domain?.color || "var(--text3)",
+                            }}
                             onClick={e => { e.stopPropagation(); setEditingTime(editingTime === blk.id ? null : blk.id); }}
                             title="Tap to reschedule"
                           >
@@ -1605,9 +1613,6 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                             <span style={{fontSize:10,color:"#fff",fontWeight:700}}>✓</span>
                           </div>
                         )}
-                        {isMissedAndNotStarted && !isExp && (
-                          <div className="tl-check-icon missed" onClick={e => { e.stopPropagation(); markManualDone(blk.id, proj?.id, blk.todayTasks); }} style={{ cursor:"pointer" }} />
-                        )}
                         {/* Dur pill collapsed / gear icon expanded */}
                         {!isExp
                           ? <div className="tl-dur">{blk.durationMin}m</div>
@@ -1617,6 +1622,26 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                             </button>
                         }
                       </div>
+                      {/* Inline tasks — shown on card face without expand */}
+                      {!isExp && !isCompleted && (() => {
+                        const tids = blk.todayTasks;
+                        if (!Array.isArray(tids) || tids.length === 0) return null;
+                        const todayObjs = tids.map(id => proj?.tasks.find(t => t.id === id)).filter(Boolean);
+                        if (todayObjs.length === 0) return null;
+                        return (
+                          <div style={{ padding:"0 14px 10px", borderTop:"1px solid var(--border2)" }} onClick={e => e.stopPropagation()}>
+                            {todayObjs.map(t => (
+                              <div key={t.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"5px 0", cursor:"pointer" }}
+                                onClick={() => toggleTask(proj.id, t.id)}>
+                                <div className={`tl-check ${t.done ? "done" : ""}`} style={{ width:16, height:16, flexShrink:0 }}>
+                                  {t.done && <span style={{fontSize:8,color:"#fff",fontWeight:700}}>✓</span>}
+                                </div>
+                                <span className={`tl-task-txt ${t.done ? "done" : ""}`} style={{ fontSize:12 }}>{t.text}</span>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
                       {isExp && proj && (() => {
                         const todayTaskIds = blk.todayTasks;
                         const hasPicked = Array.isArray(todayTaskIds) && todayTaskIds.length > 0;
@@ -1818,12 +1843,18 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                   const cardBorder = domainColor ? `1px solid ${domainColor}60` : undefined;
                   const cardShadow = domainColor ? `0 0 18px ${domainColor}22` : undefined;
 
+                  const isNowSlot = nowMins >= (slot.startHour*60+slot.startMin) && nowMins < (slot.startHour*60+slot.startMin+slot.durationMin);
+
                   return (
                     <div key={slot.id} className="tl-item" style={{ opacity: isPastSlot && !isCompleted ? 0.5 : 1 }}>
                       <div className="tl-left">
                         <div className="time-pick-wrap">
                           <button
                             className={`tl-time-btn${editingTime === slot.id ? " open" : ""}`}
+                            style={{
+                              "--time-pill-bg": isCompleted ? "var(--bg3)" : isNowSlot ? `${domainColor || "var(--accent)"}33` : isPastSlot ? "var(--bg3)" : domainColor ? `${domainColor}22` : "var(--bg3)",
+                              "--time-pill-color": isCompleted ? "var(--text3)" : isNowSlot ? (domainColor || "var(--accent)") : isPastSlot ? "var(--text3)" : domainColor || "var(--text3)",
+                            }}
                             onClick={e => { e.stopPropagation(); setEditingTime(editingTime === slot.id ? null : slot.id); }}
                             title="Tap to reschedule"
                           >
@@ -1850,9 +1881,9 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                         <div className="tl-connector" />
                       </div>
                       <div style={{ flex:1, minWidth:0, margin:"8px 0 6px" }}>
-                        <div className={`tl-card${isExp ? " active-card" : ""}`}
+                        <div className={`tl-card${isNowSlot ? " now-card" : ""}${isExp ? " active-card" : ""}`}
                           data-blockid={slot.id}
-                          style={{ border: cardBorder, boxShadow: cardShadow }}
+                          style={{ border: cardBorder, boxShadow: cardShadow, "--domain-color": domainColor + "50" }}
                           onClick={() => { if (blockMenuOpen === slot.id) { setBlockMenuOpen(null); setBlockMenuMode(null); return; } setExpandedId(isExp ? null : slot.id); if (isExp) { setBlockMenuOpen(null); setBlockMenuMode(null); } }}
                         >
                           <div className="tl-card-head" style={{ padding:"15px 14px" }}>
@@ -1862,8 +1893,9 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                               <div className="tl-name">{proj.name}</div>
                               <div className="tl-meta">{domain?.name} · {slot.durationMin} min{relevantTasks.length > 0 ? ` · ${relevantDone}/${relevantTasks.length} today` : ""}</div>
                             </div>
+                            {isNowSlot && !isExp && <span className="tl-now-pill">Now</span>}
                             {isCompleted && (
-                              <div style={{ width:20, height:20, borderRadius:"50%", background:"var(--green)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:9, color:"#fff", flexShrink:0 }}>✓</div>
+                              <div className="tl-check-icon full"><span style={{fontSize:10,color:"#fff",fontWeight:700}}>✓</span></div>
                             )}
                             {/* Dur pill collapsed / gear expanded */}
                             {!isExp
@@ -1874,6 +1906,20 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                                 </button>
                             }
                           </div>
+                          {/* Inline tasks on card face */}
+                          {!isExp && !isCompleted && relevantTasks.length > 0 && (
+                            <div style={{ padding:"0 14px 10px", borderTop:"1px solid var(--border2)" }} onClick={e => e.stopPropagation()}>
+                              {relevantTasks.map(t => (
+                                <div key={t.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"5px 0", cursor:"pointer" }}
+                                  onClick={() => { setData(d => ({ ...d, projects: d.projects.map(p => p.id === proj.id ? { ...p, tasks: p.tasks.map(tk => tk.id === t.id ? { ...tk, done: !tk.done } : tk) } : p) })); }}>
+                                  <div className={`tl-check ${t.done ? "done" : ""}`} style={{ width:16, height:16, flexShrink:0 }}>
+                                    {t.done && <span style={{fontSize:8,color:"#fff",fontWeight:700}}>✓</span>}
+                                  </div>
+                                  <span className={`tl-task-txt ${t.done ? "done" : ""}`} style={{ fontSize:12 }}>{t.text}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                           {isExp && (() => {
                             const todayTaskIds = slot.todayTasks;
                             const hasPicked = Array.isArray(todayTaskIds) && todayTaskIds.length > 0;
@@ -2118,6 +2164,7 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                 const rb = item.data;
                 const comp = (rb.completions || {})[dateKey] || {};
                 const doneCt = rb.tasks.filter(t => comp[t.id]).length;
+                const allDone = rb.tasks.length > 0 && doneCt === rb.tasks.length;
                 const toggleRtTask = (taskId) => {
                   setData(d => ({
                     ...d,
@@ -2139,39 +2186,39 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                     onDragEnd={() => { setDragId(null); setDragOverId(null); }}
                   >
                     <div className="tl-left">
-                      <div className="tl-time">{fmtTime(rb.startHour, rb.startMin)}</div>
+                      <div className="tl-time" style={{
+                        background: allDone ? "var(--bg3)" : isNow ? "rgba(255,255,255,.1)" : isPast ? "var(--bg3)" : "var(--bg3)",
+                        color: allDone ? "var(--text3)" : isNow ? "var(--text2)" : "var(--text3)",
+                      }}>{fmtTime(rb.startHour, rb.startMin)}</div>
                       <div className={`tl-dot ${isNow ? "now" : isPast ? "done" : ""}`} />
                       <div className="tl-connector" />
                     </div>
-                    <div className={[
-                      "tl-card",
-                      isPast && !isExp ? "past" : "",
-                      isNow ? "now-card" : "",
-                      isExp && !isNow ? "active-card" : "",
-                      !isNow && !isPast && !isExp ? "upcoming-card" : "",
-                    ].filter(Boolean).join(" ")} style={{ "--domain-color": "rgba(255,255,255,.15)" }}>
-                      <div className="tl-card-head" onClick={() => setExpandedId(isExp ? null : item.id)}>
-                        <div className="tl-stripe" style={{ background:"var(--text3)", opacity: isExp || isNow ? .7 : .4 }} />
-                        <div className="tl-info">
-                          <div className="tl-name">{rb.title}</div>
-                          <div className="tl-meta">Routine · {rb.durationMin} min · {doneCt}/{rb.tasks.length} done</div>
-                        </div>
-                        {isNow && <span className="tl-now-pill">Now</span>}
-                        {!isNow && <span className="tl-dur">{rb.durationMin}m</span>}
-                        <span style={{ fontSize:13, color:"var(--text3)", marginLeft:4, transform: isExp ? "rotate(90deg)" : "none", transition:"transform .2s", display:"inline-block" }}>›</span>
-                      </div>
-                      {isExp && (
-                        <div className="tl-tasks">
-                          {rb.tasks.map(t => (
-                            <div key={t.id} className="tl-task-row">
-                              <div className={`tl-check ${comp[t.id] ? "done" : ""}`} onClick={() => toggleRtTask(t.id)}>
-                                {comp[t.id] && <span style={{fontSize:9,color:"#fff",fontWeight:700}}>✓</span>}
-                              </div>
-                              <span className={`tl-task-txt ${comp[t.id] ? "done" : ""}`}>{t.text}</span>
+                    <div style={{ flex:1, minWidth:0, margin:"6px 0 4px" }}>
+                      <div className={["tl-card routine-pill", allDone ? "done-card" : "", isNow ? "now-card" : ""].filter(Boolean).join(" ")}>
+                        <div style={{ display:"flex", alignItems:"center", gap:10, padding:"9px 14px" }} onClick={() => setExpandedId(isExp ? null : item.id)}>
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ fontSize:13, fontWeight:600, color: allDone ? "var(--text3)" : "var(--text)", display:"flex", alignItems:"center", gap:6 }}>
+                              {rb.title}
+                              {allDone && <span style={{ fontSize:10, color:"var(--green)", fontWeight:700 }}>✓</span>}
                             </div>
-                          ))}
+                          </div>
+                          {isNow && <span className="tl-now-pill">Now</span>}
+                          <span style={{ fontSize:11, color:"var(--text3)", fontWeight:500 }}>{doneCt}/{rb.tasks.length}</span>
+                          <span style={{ fontSize:12, color:"var(--text3)", transform: isExp ? "rotate(90deg)" : "none", transition:"transform .2s", display:"inline-block" }}>›</span>
                         </div>
-                      )}
+                        {isExp && (
+                          <div style={{ padding:"4px 14px 10px", borderTop:"1px solid var(--border2)" }} onClick={e => e.stopPropagation()}>
+                            {rb.tasks.map(t => (
+                              <div key={t.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"6px 0", cursor:"pointer" }} onClick={() => toggleRtTask(t.id)}>
+                                <div className={`tl-check ${comp[t.id] ? "done" : ""}`} style={{ width:16, height:16, flexShrink:0 }}>
+                                  {comp[t.id] && <span style={{fontSize:8,color:"#fff",fontWeight:700}}>✓</span>}
+                                </div>
+                                <span className={`tl-task-txt ${comp[t.id] ? "done" : ""}`} style={{ fontSize:13 }}>{t.text}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
@@ -2326,16 +2373,70 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
           })()}
 
           {/* END OF DAY */}
-          {(data.todayPrefs?.showShutdown !== false) && (
-            <>
-              <div className="sh"><span className="sh-label">End of Day</span></div>
-              <div className="shutdown-row" style={{ opacity: isAfter4 || shutdownDone ? 1 : 0.45 }} onClick={openShutdown}>
-                <span className="sd-ico">{shutdownDone ? "✅" : "🔒"}</span>
-                <span className="sd-txt">{shutdownDone ? "Shutdown Complete" : "Shutdown Ritual"}</span>
-                {!shutdownDone && <span className="sd-arr">›</span>}
-              </div>
-            </>
-          )}
+          {(data.todayPrefs?.showShutdown !== false) && (() => {
+            // Compute day stats
+            const todayStr = new Date().toDateString();
+            let dwBlocksDone = 0, dwBlocksTotal = 0, tasksDone = 0, tasksTotal = 0;
+            // Count deep work blocks
+            const todayDW = (data.deepWorkSlots || {})[new Date().toISOString().slice(0,10)] || [];
+            data.deepBlockDefaults?.forEach((def, i) => {
+              const saved = todayDW[i];
+              if (saved?.projectId) {
+                dwBlocksTotal++;
+                const proj = data.projects.find(p => p.id === saved.projectId);
+                const tids = saved.todayTasks;
+                if (Array.isArray(tids) && tids.length > 0) {
+                  const todayObjs = tids.map(id => proj?.tasks.find(t => t.id === id)).filter(Boolean);
+                  if (todayObjs.length > 0 && todayObjs.every(t => t.done)) dwBlocksDone++;
+                }
+              }
+            });
+            data.blocks?.forEach(b => {
+              if (b.projectId) {
+                const proj = data.projects.find(p => p.id === b.projectId);
+                if (proj) {
+                  const tids = b.todayTasks;
+                  if (Array.isArray(tids) && tids.length > 0) {
+                    tids.forEach(id => {
+                      const t = proj.tasks.find(t => t.id === id);
+                      if (t) { tasksTotal++; if (t.done) tasksDone++; }
+                    });
+                  }
+                }
+              }
+            });
+            return (
+              <>
+                <div className="sh"><span className="sh-label">End of Day</span></div>
+                {shutdownDone && (
+                  <div style={{ margin:"0 16px 10px", background:"var(--bg2)", borderRadius:16, padding:"16px", border:"1px solid var(--border2)" }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:"var(--text)", marginBottom:12 }}>✅ Shutdown Complete</div>
+                    <div style={{ display:"flex", gap:8 }}>
+                      <div style={{ flex:1, background:"var(--bg3)", borderRadius:10, padding:"10px 12px", textAlign:"center" }}>
+                        <div style={{ fontSize:22, fontWeight:800, color:"var(--accent)", lineHeight:1 }}>{dwBlocksDone}</div>
+                        <div style={{ fontSize:10, color:"var(--text3)", marginTop:3, fontWeight:600, letterSpacing:".05em", textTransform:"uppercase" }}>DW Blocks</div>
+                      </div>
+                      <div style={{ flex:1, background:"var(--bg3)", borderRadius:10, padding:"10px 12px", textAlign:"center" }}>
+                        <div style={{ fontSize:22, fontWeight:800, color:"var(--green)", lineHeight:1 }}>{tasksDone}</div>
+                        <div style={{ fontSize:10, color:"var(--text3)", marginTop:3, fontWeight:600, letterSpacing:".05em", textTransform:"uppercase" }}>Tasks Done</div>
+                      </div>
+                      <div style={{ flex:1, background:"var(--bg3)", borderRadius:10, padding:"10px 12px", textAlign:"center" }}>
+                        <div style={{ fontSize:22, fontWeight:800, color:"var(--text2)", lineHeight:1 }}>{data.routineBlocks?.filter(rb => { const comp = (rb.completions||{})[todayStr]||{}; return rb.tasks.every(t => comp[t.id]); }).length || 0}</div>
+                        <div style={{ fontSize:10, color:"var(--text3)", marginTop:3, fontWeight:600, letterSpacing:".05em", textTransform:"uppercase" }}>Routines</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {!shutdownDone && (
+                  <div className="shutdown-row" style={{ opacity: isAfter4 ? 1 : 0.45 }} onClick={openShutdown}>
+                    <span className="sd-ico">🔒</span>
+                    <span className="sd-txt">Shutdown Ritual</span>
+                    <span className="sd-arr">›</span>
+                  </div>
+                )}
+              </>
+            );
+          })()}
           <div className="spacer" />
         </div>
       )}
