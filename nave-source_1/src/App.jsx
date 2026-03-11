@@ -1765,529 +1765,63 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
   const name = data.todayPrefs?.name;
 
   return (
-    <div className={`screen active ${workMode ? "today-work-mode" : "today-plan-mode"}`} style={{ transition:"background .6s ease" }}>
+    <div className="screen active" style={{ display:"flex", flexDirection:"column", overflow:"hidden" }}>
       <StatusBar />
 
-      {/* ══════════════ PLAN MODE ══════════════ */}
-      {!workMode && (
-        <>
-          {/* Header */}
-          <div className="ph" style={{ paddingBottom:10, paddingTop:10 }}>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
-              <div>
-                <div className="ph-eye" style={{ color:"var(--accent)" }}>
-                  {days[today.getDay()]}, {months[today.getMonth()]} {today.getDate()}
-                </div>
-                <div className="ph-title">Plan Your Day</div>
-              </div>
-              <button className="tab-gear" onClick={() => setShowTodaySettings(true)} onContextMenu={e => { e.preventDefault(); if(onSignOut) onSignOut(); }}><GearIcon size={20} /></button>
-            </div>
-            {data.weekIntention ? (
-              <div style={{ marginTop:8, fontSize:13, color:"var(--text2)", fontStyle:"italic", lineHeight:1.5, borderLeft:"2px solid rgba(232,160,48,.4)", paddingLeft:10 }}>
-                "{data.weekIntention}"
-              </div>
-            ) : (
-              <div style={{ marginTop:6, fontSize:12, color:"var(--text3)" }}>Set a week intention in the Plan tab ↗</div>
-            )}
-          </div>
-
-          <div className="scroll" ref={scrollRef}>
-            {/* Block sequence */}
-            {timeline.length === 0 ? (
-              <div style={{ margin:"16px", padding:"20px", background:"var(--bg2)", borderRadius:14, textAlign:"center" }}>
-                <div style={{ fontSize:13, color:"var(--text3)" }}>No blocks today. Add some in the Week tab.</div>
-              </div>
-            ) : (
-              <>
-                <div style={{ margin:"0 16px 6px" }}>
-                  <div style={{ fontSize:11, fontWeight:700, letterSpacing:".08em", textTransform:"uppercase", color:"var(--text3)" }}>Today's blocks</div>
-                </div>
-                {timeline.map((item) => {
-                  if (item.type === "deepwork") {
-                    const slot = item.data;
-                    const proj = slot.projectId ? getProject(slot.projectId) : null;
-                    const domain = proj ? getDomain(proj.domainId) : null;
-                    const domainColor = domain?.color;
-                    const isSessionMode = proj?.mode === "sessions";
-                    const incompleteTasks = proj ? (proj.tasks||[]).filter(t=>!t.done) : [];
-                    const isExpPlan = expandedId === slot.id;
-                    return (
-                      <div key={slot.id} style={{ margin:"0 16px 8px" }}>
-                        <div className={`plan-block-row${proj ? " assigned" : ""}`}
-                          style={{ "--domain-color": domainColor ? domainColor+"60" : undefined }}
-                          onClick={() => setExpandedId(isExpPlan ? null : slot.id)}
-                        >
-                          <div style={{ width:36, height:36, borderRadius:10, background: domainColor ? domainColor+"22" : "var(--bg3)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, border: domainColor ? `1px solid ${domainColor}40` : "1px solid var(--border)" }}>
-                            {proj ? (
-                              isSessionMode
-                                ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M20 12a8 8 0 1 1-2-5.3" stroke={domainColor||"var(--accent)"} strokeWidth="2.2" strokeLinecap="round"/><path d="M20 7v5h-5" stroke={domainColor||"var(--accent)"} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                                : <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke={domainColor||"var(--accent)"} strokeWidth="2"/><path d="M9 12l2 2 4-4" stroke={domainColor||"var(--accent)"} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                            ) : (
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="var(--text3)" strokeWidth="1.5" strokeDasharray="3 2"/></svg>
-                            )}
-                          </div>
-                          <div style={{ flex:1, minWidth:0 }}>
-                            <div style={{ fontSize:13, fontWeight:700, color: proj ? "var(--text)" : "var(--text3)" }}>{proj ? proj.name : "Unassigned"}</div>
-                            <div style={{ fontSize:11, color:"var(--text3)", marginTop:1 }}>
-                              {data.todayPrefs?.hideTimes ? "" : `${fmtTime(slot.startHour, slot.startMin)} · `}{slot.durationMin} min{domain ? ` · ${domain.name}` : ""}
-                              {!isSessionMode && incompleteTasks.length > 0 ? ` · ${incompleteTasks.length} task${incompleteTasks.length!==1?"s":""}` : ""}
-                            </div>
-                          </div>
-                          {!proj && (
-                            <div style={{ fontSize:12, color:"rgba(232,160,48,.7)", fontWeight:600 }}>Assign →</div>
-                          )}
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style={{ flexShrink:0, color:"var(--text3)", opacity:.4, transform: isExpPlan ? "rotate(90deg)" : "none", transition:"transform .2s" }}><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                        </div>
-
-                        {/* Expanded: task checklist or assign picker */}
-                        {isExpPlan && (
-                          <div style={{ margin:"0 0 4px", background:"var(--bg2)", borderRadius:"0 0 14px 14px", border:"1px solid var(--border)", borderTop:"none", padding:"10px 14px 12px" }}>
-                            {!proj ? (
-                              /* Assign picker */
-                              (() => {
-                                const ptKey = slot.id;
-                                const selProjId = dwPickerProj[ptKey] || null;
-                                const selProj = selProjId ? data.projects.find(p => p.id === selProjId) : null;
-                                const curTime = dwPickerTime[ptKey] || { startHour: slot.startHour, startMin: slot.startMin, durationMin: slot.durationMin };
-                                const curSelTasks = curTime._tasks !== undefined ? curTime._tasks : [];
-                                const toggleTask = (tid) => {
-                                  setDwPickerTime(s => {
-                                    const base = s[ptKey] || { startHour:slot.startHour, startMin:slot.startMin, durationMin:slot.durationMin };
-                                    const existing = base._tasks !== undefined ? base._tasks : [];
-                                    const next = existing.includes(tid) ? existing.filter(id=>id!==tid) : [...existing, tid];
-                                    return { ...s, [ptKey]: { ...base, _tasks: next } };
-                                  });
-                                };
-                                return (
-                                  <>
-                                    <div style={{ fontSize:11, fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", color:"var(--text3)", marginBottom:8 }}>Assign project</div>
-                                    <div style={{ display:"flex", flexDirection:"column", gap:6, marginBottom:10 }}>
-                                      {data.projects.filter(p => p.status === "active").map(p => {
-                                        const d2 = data.domains?.find(d => d.id === p.domainId);
-                                        const isSel = selProjId === p.id;
-                                        const incomp = (p.tasks||[]).filter(t=>!t.done);
-                                        const tasksSel = isSel ? curSelTasks : [];
-                                        return (
-                                          <div key={p.id} style={{ borderRadius:10, overflow:"hidden", border: isSel ? `1.5px solid ${d2?.color||"var(--accent)"}` : "1.5px solid var(--border2)", background: isSel ? `${d2?.color||"var(--accent)"}11` : "var(--bg3)", transition:"all .15s" }}>
-                                            <div style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 12px", cursor:"pointer" }}
-                                              onClick={() => {
-                                                if (isSel) {
-                                                  setDwPickerProj(s => { const n={...s}; delete n[ptKey]; return n; });
-                                                } else {
-                                                  setDwPickerProj(s => ({ ...s, [ptKey]: p.id }));
-                                                  setDwPickerTime(s => ({ ...s, [ptKey]: { startHour:slot.startHour, startMin:slot.startMin, durationMin:slot.durationMin, _tasks: [] } }));
-                                                }
-                                              }}
-                                            >
-                                              <div style={{ width:9, height:9, borderRadius:"50%", background: d2?.color||"var(--text3)", flexShrink:0 }} />
-                                              <div style={{ flex:1, minWidth:0 }}>
-                                                <div style={{ fontSize:13, fontWeight:600, color: isSel ? "var(--text)" : "var(--text2)" }}>{p.name}</div>
-                                                <div style={{ fontSize:11, color:"var(--text3)" }}>{d2?.name}{incomp.length>0?` · ${incomp.length} task${incomp.length!==1?"s":""}`:""}</div>
-                                              </div>
-                                              <div style={{ width:18, height:18, borderRadius:"50%", border: isSel ? "none" : "1.5px solid var(--border)", background: isSel ? (d2?.color||"var(--accent)") : "transparent", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, transition:"all .15s" }}>
-                                                {isSel && <span style={{ fontSize:9, color:"#000", fontWeight:800 }}>✓</span>}
-                                              </div>
-                                            </div>
-                                            {isSel && incomp.length > 0 && (
-                                              <div style={{ borderTop:"1px solid var(--border2)", padding:"6px 12px 10px" }}>
-                                                <div style={{ fontSize:10, fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", color:"var(--text3)", marginBottom:6 }}>Focus tasks</div>
-                                                {incomp.map(t => {
-                                                  const tSel = tasksSel.includes(t.id);
-                                                  return (
-                                                    <div key={t.id} onClick={() => toggleTask(t.id)} style={{ display:"flex", alignItems:"center", gap:10, padding:"6px 2px", cursor:"pointer" }}>
-                                                      <div style={{ width:16, height:16, borderRadius:4, border: tSel ? "none" : "1.5px solid var(--border)", background: tSel ? "var(--accent)" : "transparent", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, transition:"all .12s" }}>
-                                                        {tSel && <span style={{ fontSize:8, color:"#000", fontWeight:800 }}>✓</span>}
-                                                      </div>
-                                                      <span style={{ fontSize:13, color: tSel ? "var(--text)" : "var(--text2)" }}>{t.text}</span>
-                                                    </div>
-                                                  );
-                                                })}
-                                              </div>
-                                            )}
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                    <button className="dw-confirm-btn"
-                                      disabled={!selProjId} style={{ opacity: selProjId ? 1 : 0.4 }}
-                                      onClick={() => {
-                                        if (!selProjId) return;
-                                        const t = dwPickerTime[ptKey] || { startHour:slot.startHour, startMin:slot.startMin, durationMin:slot.durationMin };
-                                        const tasks = (t._tasks && t._tasks.length > 0) ? t._tasks : null;
-                                        saveDWSlot(slot.id, slot.slotIndex, selProjId, t.startHour, t.startMin, t.durationMin, tasks);
-                                        setExpandedId(null);
-                                        setDwPickerProj(s => { const n={...s}; delete n[ptKey]; return n; });
-                                        setDwPickerTime(s => { const n={...s}; delete n[ptKey]; return n; });
-                                      }}
-                                    >✓ Assign</button>
-                                  </>
-                                );
-                              })()
-                            ) : (
-                              /* Tasks for assigned block */
-                              <>
-                                {incompleteTasks.length === 0 ? (
-                                  <div style={{ fontSize:12, color:"var(--text3)", textAlign:"center", padding:"4px 0 8px" }}>No open tasks</div>
-                                ) : (
-                                  incompleteTasks.slice(0,5).map(t => (
-                                    <div key={t.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"6px 2px" }}>
-                                      <div style={{ width:15, height:15, borderRadius:4, border:"1.5px solid var(--border)", flexShrink:0 }} />
-                                      <span style={{ fontSize:13, color:"var(--text2)" }}>{t.text}</span>
-                                    </div>
-                                  ))
-                                )}
-                                <button style={{ background:"none", border:"none", fontSize:11, color:"rgba(232,160,48,.7)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", padding:"6px 0 0", fontWeight:600 }}
-                                  onClick={() => { mutateDWSlot(toISODate(), slot.slotIndex, null); setExpandedId(null); }}>
-                                  ✕ Unassign
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  }
-                  if (item.type === "routine") {
-                    const rb = item.data;
-                    return (
-                      <div key={rb.id} className="plan-block-row" style={{ margin:"0 16px 8px" }}>
-                        <div style={{ width:36, height:36, borderRadius:10, background:"var(--bg3)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, border:"1px solid var(--border)" }}>
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 2v10l4 4" stroke="var(--teal)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><circle cx="12" cy="12" r="10" stroke="var(--teal)" strokeWidth="2"/></svg>
-                        </div>
-                        <div style={{ flex:1, minWidth:0 }}>
-                          <div style={{ fontSize:13, fontWeight:700, color:"var(--text)" }}>{rb.title}</div>
-                          <div style={{ fontSize:11, color:"var(--text3)", marginTop:1 }}>
-                            {data.todayPrefs?.hideTimes ? "" : `${fmtTime(rb.startHour, rb.startMin)} · `}{rb.durationMin} min · Routine
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  }
-                  return null;
-                })}
-              </>
-            )}
-
-            {/* Loose tasks quick view */}
-            {(() => {
-              const loose = (data.looseTasks||[]).filter(t => !t.done);
-              if (loose.length === 0) return null;
-              return (
-                <div style={{ margin:"8px 16px 0" }}>
-                  <div style={{ fontSize:11, fontWeight:700, letterSpacing:".08em", textTransform:"uppercase", color:"var(--text3)", marginBottom:6 }}>Loose tasks ({loose.length})</div>
-                  {loose.slice(0,3).map(t => {
-                    const dom = data.domains?.find(d => d.id === t.domainId);
-                    return (
-                      <div key={t.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"7px 0", borderBottom:"1px solid var(--border2)" }}>
-                        <div style={{ width:8, height:8, borderRadius:"50%", background: dom?.color||"var(--text3)", flexShrink:0 }} />
-                        <span style={{ fontSize:13, color:"var(--text2)" }}>{t.text}</span>
-                      </div>
-                    );
-                  })}
-                  {loose.length > 3 && <div style={{ fontSize:11, color:"var(--text3)", paddingTop:6 }}>+{loose.length-3} more</div>}
-                </div>
-              );
-            })()}
-
-            {/* Begin button */}
-            <button className="begin-btn" onClick={() => { setWorkMode(true); setExpandedId(currentItem?.id || null); }}>
-              Begin my day →
-            </button>
-
-            <div className="spacer" />
-          </div>
-        </>
-      )}
-
-      {/* ══════════════ WORK MODE ══════════════ */}
-      {workMode && (
-        <>
-          {/* Header */}
-          <div className="ph" style={{ paddingBottom:10, paddingTop:10 }}>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
-              <div>
-                <div className="ph-eye" style={{ color:"var(--blue)" }}>
-                  {days[today.getDay()]}, {months[today.getMonth()]} {today.getDate()} · {clockH}:{clockM} {clockAmpm}
-                </div>
-                <div className="ph-title" style={{ color:"var(--text)" }}>
-                  {currentItem ? "In Focus" : nextItem ? "Up Next" : "Day Complete"}
-                </div>
-              </div>
-              <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6 }}>
-                <button className="tab-gear" onClick={() => setShowTodaySettings(true)}><GearIcon size={20} /></button>
-                <button className="replan-btn" onClick={() => setWorkMode(false)}>← Re-plan</button>
-              </div>
-            </div>
-          </div>
-
-          <div className="scroll" ref={scrollRef} onClick={() => setEditingTime(null)}>
-
-            {/* Earlier today disclosure */}
-            {(() => {
-              const pastItems = timeline.filter(item => (item.mins + (item.data.durationMin||60)) <= nowMins);
-              if (pastItems.length === 0) return null;
-              return (
-                <>
-                  <div className="earlier-link" onClick={() => setEarlierOpen(v => !v)}>
-                    {earlierOpen ? "▾" : "▸"} Earlier today ({pastItems.length} block{pastItems.length!==1?"s":""})
-                  </div>
-                  {earlierOpen && (
-                    <div style={{ margin:"0 16px 8px", display:"flex", flexDirection:"column", gap:6 }}>
-                      {pastItems.map(item => {
-                        const proj = item.type==="deepwork" && item.data.projectId ? getProject(item.data.projectId) : null;
-                        const dom = proj ? getDomain(proj.domainId) : null;
-                        const isDone = item.type==="deepwork" ? manualCompleted.has(item.id) : false;
-                        return (
-                          <div key={item.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 14px", background:"var(--bg2)", borderRadius:12, opacity:0.55, border:"1px solid var(--border)" }}>
-                            <div style={{ width:8, height:8, borderRadius:"50%", background: dom?.color||"var(--text3)", flexShrink:0 }} />
-                            <div style={{ flex:1 }}>
-                              <div style={{ fontSize:13, fontWeight:600, color:"var(--text)" }}>{proj?.name || (item.type==="routine" ? item.data.title : "Deep Work")}</div>
-                              <div style={{ fontSize:11, color:"var(--text3)" }}>{fmtTime(item.data.startHour, item.data.startMin)} · {item.data.durationMin} min</div>
-                            </div>
-                            {isDone && <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </>
-              );
-            })()}
-
-            {/* ── CURRENT BLOCK HERO ── */}
-            {currentItem && (() => {
-              const item = currentItem;
-              const isExp = true; // always expanded in work mode
-              if (item.type === "deepwork") {
-                const slot = item.data;
-                const proj = slot.projectId ? getProject(slot.projectId) : null;
-                const domain = proj ? getDomain(proj.domainId) : null;
-                const domainColor = domain?.color || null;
-                const isFilled = !!proj;
-                const isPickerOpen = dwPickerOpen === slot.id;
-                const pickerStep = dwPickerStep[slot.id] || "project";
-                const pickerProj = dwPickerProj[slot.id] ? getProject(dwPickerProj[slot.id]) : null;
-                const pickerTime = dwPickerTime[slot.id] || { startHour: slot.startHour, startMin: slot.startMin, durationMin: slot.durationMin };
-                const fmt = (h, m) => { const hh = h > 12 ? h-12 : h===0?12:h; const mm = m===0?"":`:${String(m).padStart(2,"0")}`; return `${hh}${mm}${h>=12?"pm":"am"}`; };
-                const timeOptions = [];
-                for (let h = 5; h <= 21; h++) for (let m of [0, 15, 30, 45]) timeOptions.push({ h, m });
-
-                if (isFilled) {
-                  const isSessionMode = proj?.mode === "sessions";
-                  const sessionNote = slot.sessionNote || null;
-                  const todayTaskIds = slot.todayTasks;
-                  const hasTodayTasks = Array.isArray(todayTaskIds) && todayTaskIds.length > 0;
-                  const relevantTasks = hasTodayTasks ? todayTaskIds.map(id => proj?.tasks.find(t => t.id === id)).filter(Boolean) : [];
-                  const relevantDone = relevantTasks.filter(t => t.done).length;
-                  const allTasksDone = isSessionMode ? manualCompleted.has(slot.id) : (relevantTasks.length > 0 && relevantDone === relevantTasks.length);
-                  const isCompleted = allTasksDone;
-                  const lateInfo = lateStarted[slot.id];
-                  const isRunning = !!lateInfo;
-                  const cdStartMs = lateInfo ? new Date(lateInfo.startedAt).getTime() : 0;
-                  const cdTotalSec = slot.durationMin * 60;
-                  const cdRemSec = isRunning ? Math.max(0, cdTotalSec - Math.floor((Date.now() - cdStartMs) / 1000)) : cdTotalSec;
-                  const cdM = Math.floor(cdRemSec / 60), cdS = cdRemSec % 60;
-                  const cdStr = `${cdM}:${cdS.toString().padStart(2,"0")}`;
-                  const cdDone = isRunning && cdRemSec === 0;
-                  const isPicking = pickerState?.blockId === slot.id;
-
-                  return (
-                    <div className={`work-hero has-domain`} style={{ "--domain-color": domainColor+"60", border: isCompleted ? "1px solid rgba(69,193,122,.3)" : `1px solid ${domainColor||"var(--border)"}60`, boxShadow: isCompleted ? "none" : domainColor ? `0 0 28px ${domainColor}22` : "none" }}>
-                      {/* Hero header */}
-                      <div style={{ padding:"18px 18px 14px", borderBottom:"1px solid var(--border2)" }}>
-                        <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
-                          <div style={{ width:14, height:14, borderRadius:"50%", background:`${domainColor||"var(--accent)"}22`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                            {isSessionMode
-                              ? <svg width="9" height="9" viewBox="0 0 24 24" fill="none"><path d="M20 12a8 8 0 1 1-2-5.3" stroke={domainColor||"var(--accent)"} strokeWidth="2.2" strokeLinecap="round"/><path d="M20 7v5h-5" stroke={domainColor||"var(--accent)"} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                              : <svg width="9" height="9" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke={domainColor||"var(--accent)"} strokeWidth="2"/><path d="M9 12l2 2 4-4" stroke={domainColor||"var(--accent)"} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                            }
-                          </div>
-                          <span style={{ fontSize:10, fontWeight:700, letterSpacing:".08em", textTransform:"uppercase", color: domainColor||"var(--accent)", opacity:.9 }}>Now · {isSessionMode ? "Session" : "Deep Work"}</span>
-                          {isRunning && (
-                            <span style={{ marginLeft:"auto", fontSize:14, fontWeight:700, color: cdDone ? "var(--green)" : "var(--accent)", fontVariantNumeric:"tabular-nums" }}>{cdDone ? "✓" : cdStr}</span>
-                          )}
-                        </div>
-                        <div style={{ fontSize:24, fontWeight:800, color: isCompleted ? "var(--text2)" : "var(--text)", letterSpacing:"-.02em", lineHeight:1.1, marginBottom:4 }}>{proj.name}</div>
-                        <div style={{ fontSize:13, color:"var(--text3)" }}>{domain?.name} · {slot.durationMin} min{data.todayPrefs?.hideTimes ? "" : ` · ${fmtTime(slot.startHour, slot.startMin)}`}</div>
-                      </div>
-
-                      {/* Hero body */}
-                      <div style={{ padding:"14px 18px 16px" }}>
-                        {isCompleted ? (
-                          <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-                            <div style={{ width:28, height:28, borderRadius:"50%", background:"rgba(69,193,122,.15)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                            </div>
-                            <span style={{ fontSize:15, color:"var(--green)", fontWeight:700 }}>{isSessionMode ? "Session logged" : "Block complete"}</span>
-                            <button onClick={() => unmarkManualDone(slot.id, proj.id, slot.todayTasks)}
-                              style={{ marginLeft:"auto", background:"none", border:"1px solid var(--border)", borderRadius:8, fontSize:12, color:"var(--text3)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", padding:"5px 12px" }}>
-                              ← Undo
-                            </button>
-                          </div>
-                        ) : isSessionMode ? (
-                          <div style={{ display:"flex", gap:10 }}>
-                            <button className="tl-start-btn" style={{ flex:1, justifyContent:"center", ...(isRunning ? { background:"rgba(224,85,85,.12)", color:"var(--red)", borderColor:"rgba(224,85,85,.3)" } : {}) }}
-                              onClick={e => { e.stopPropagation(); isRunning ? setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }) : startBlock(slot.id); }}>
-                              {isRunning ? "Stop ■" : "Start →"}
-                            </button>
-                            <button className="tl-start-btn" style={{ flex:1, justifyContent:"center", background:"rgba(69,193,122,.12)", color:"var(--green)", borderColor:"rgba(69,193,122,.3)" }}
-                              onClick={e => { e.stopPropagation(); logSession(proj.id, slot.durationMin, null); setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }); markManualDone(slot.id, proj.id, null); }}>
-                              I did this ✓
-                            </button>
-                          </div>
-                        ) : isPicking ? (
-                          (() => {
-                            const ps = pickerState;
-                            const confirmPick = () => {
-                              let finalIds = [...ps.selected];
-                              if (ps.newText.trim()) {
-                                const newId = addTaskToProject(proj.id, ps.newText.trim());
-                                finalIds.push(newId);
-                              }
-                              saveDWTodayTasks(slot.slotIndex, finalIds);
-                              setPickerState(null);
-                            };
-                            return (
-                              <div onClick={e => e.stopPropagation()}>
-                                <div style={{ fontSize:12, fontWeight:700, color:"var(--text3)", letterSpacing:".05em", textTransform:"uppercase", marginBottom:8 }}>Pick today's tasks</div>
-                                {proj.tasks.filter(t => !t.done).map(t => {
-                                  const checked = ps.selected.has(t.id);
-                                  return (
-                                    <div key={t.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"7px 2px", cursor:"pointer" }}
-                                      onClick={() => setPickerState(prev => { const s = new Set(prev.selected); checked ? s.delete(t.id) : s.add(t.id); return { ...prev, selected: s }; })}>
-                                      <div style={{ width:18, height:18, borderRadius:5, border: checked ? "none" : "1.5px solid var(--border)", background: checked ? "var(--accent)" : "transparent", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, transition:"all .15s" }}>
-                                        {checked && <span style={{ fontSize:10, color:"#000", fontWeight:800 }}>✓</span>}
-                                      </div>
-                                      <span style={{ fontSize:14, color: checked ? "var(--text)" : "var(--text2)" }}>{t.text}</span>
-                                    </div>
-                                  );
-                                })}
-                                <div style={{ display:"flex", gap:8, marginTop:10 }}>
-                                  <button className="dw-confirm-btn" style={{ flex:1 }} onClick={confirmPick}>✓ Confirm</button>
-                                  <button className="dw-back" onClick={() => setPickerState(null)}>✕</button>
-                                </div>
-                              </div>
-                            );
-                          })()
-                        ) : hasTodayTasks ? (
-                          <>
-                            {relevantTasks.map((t, i) => (
-                              <div key={t.id} className="tl-task-row" style={{ padding:"7px 0", borderBottom: i < relevantTasks.length-1 ? "1px solid var(--border2)" : "none" }} onClick={e => e.stopPropagation()}>
-                                <div className={`tl-check ${t.done ? "done" : ""}`} style={{ width:20, height:20, flexShrink:0 }} onClick={e => { e.stopPropagation(); toggleTask(proj.id, t.id); }}>
-                                  {t.done && <span style={{fontSize:10,color:"#fff",fontWeight:700}}>✓</span>}
-                                </div>
-                                <span className={`tl-task-txt ${t.done ? "done" : ""}`} style={{ fontSize:14 }}>{t.text}</span>
-                              </div>
-                            ))}
-                            <div style={{ display:"flex", gap:8, marginTop:12 }}>
-                              <button className="tl-start-btn" style={{ ...(isRunning ? { background:"rgba(224,85,85,.12)", color:"var(--red)", borderColor:"rgba(224,85,85,.3)" } : {}) }}
-                                onClick={e => { e.stopPropagation(); isRunning ? setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }) : startBlock(slot.id); }}>
-                                {isRunning ? "Stop ■" : "Start →"}
-                              </button>
-                              <button className="tl-start-btn" style={{ background:"rgba(69,193,122,.12)", color:"var(--green)", borderColor:"rgba(69,193,122,.3)" }}
-                                onClick={e => { e.stopPropagation(); setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }); markManualDone(slot.id, proj.id, slot.todayTasks); }}>
-                                I did this ✓
-                              </button>
-                            </div>
-                          </>
-                        ) : (
-                          <div style={{ textAlign:"center", padding:"8px 0 4px" }}>
-                            <div style={{ fontSize:13, color:"var(--text3)", marginBottom:10 }}>What are you working on today?</div>
-                            <div style={{ display:"flex", gap:8, justifyContent:"center" }}>
-                              <button className="tl-start-btn" style={{ ...(isRunning ? { background:"rgba(224,85,85,.12)", color:"var(--red)", borderColor:"rgba(224,85,85,.3)" } : {}) }}
-                                onClick={e => { e.stopPropagation(); isRunning ? setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }) : startBlock(slot.id); }}>
-                                {isRunning ? "Stop ■" : "Start →"}
-                              </button>
-                              <button className="tl-start-btn" style={{ background:"rgba(69,193,122,.12)", color:"var(--green)", borderColor:"rgba(69,193,122,.3)" }}
-                                onClick={e => { e.stopPropagation(); setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }); markManualDone(slot.id, proj.id, slot.todayTasks); }}>
-                                I did this ✓
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                }
-
-                // Empty DW slot as hero
-                const ptKey = slot.id;
-                const selProjId = dwPickerProj[ptKey] || null;
-                const selProj = selProjId ? data.projects.find(p => p.id === selProjId) : null;
-                const curTime = dwPickerTime[ptKey] || { startHour: slot.startHour, startMin: slot.startMin, durationMin: slot.durationMin };
-                const curSelTasks = curTime._tasks !== undefined ? curTime._tasks : [];
-                const toggleTask2 = (tid) => {
-                  setDwPickerTime(s => {
-                    const base = s[ptKey] || { startHour:slot.startHour, startMin:slot.startMin, durationMin:slot.durationMin };
-                    const existing = base._tasks !== undefined ? base._tasks : [];
-                    const next = existing.includes(tid) ? existing.filter(id=>id!==tid) : [...existing, tid];
-                    return { ...s, [ptKey]: { ...base, _tasks: next } };
-                  });
-                };
-                return (
-                  <div className="work-hero" style={{ border:"1.5px dashed rgba(255,255,255,.18)" }}>
-                    <div style={{ padding:"18px 18px 14px" }}>
-                      <div className="ph-eye" style={{ marginBottom:6 }}>Now · Deep Work</div>
-                      <div style={{ fontSize:20, fontWeight:700, color:"var(--text3)", marginBottom:12 }}>Assign this block</div>
-                      <div style={{ display:"flex", flexDirection:"column", gap:6, marginBottom:10 }}>
-                        {data.projects.filter(p => p.status === "active").map(p => {
-                          const d2 = data.domains?.find(d => d.id === p.domainId);
-                          const isSel = selProjId === p.id;
-                          const incomp = (p.tasks||[]).filter(t=>!t.done);
-                          const tasksSel = isSel ? curSelTasks : [];
-                          return (
-                            <div key={p.id} style={{ borderRadius:10, overflow:"hidden", border: isSel ? `1.5px solid ${d2?.color||"var(--accent)"}` : "1.5px solid var(--border2)", background: isSel ? `${d2?.color||"var(--accent)"}11` : "var(--bg3)", transition:"all .15s" }}>
-                              <div style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 12px", cursor:"pointer" }}
-                                onClick={() => {
-                                  if (isSel) {
-                                    setDwPickerProj(s => { const n={...s}; delete n[ptKey]; return n; });
-                                  } else {
-                                    setDwPickerProj(s => ({ ...s, [ptKey]: p.id }));
-                                    setDwPickerTime(s => ({ ...s, [ptKey]: { startHour:slot.startHour, startMin:slot.startMin, durationMin:slot.durationMin, _tasks: [] } }));
-                                  }
-                                }}
-                              >
-                                <div style={{ width:9, height:9, borderRadius:"50%", background: d2?.color||"var(--text3)", flexShrink:0 }} />
-                                <div style={{ flex:1, minWidth:0 }}>
-                                  <div style={{ fontSize:13, fontWeight:600, color: isSel ? "var(--text)" : "var(--text2)" }}>{p.name}</div>
-                                  <div style={{ fontSize:11, color:"var(--text3)" }}>{d2?.name}{incomp.length>0?` · ${incomp.length} task${incomp.length!==1?"s":""}`:""}</div>
-                                </div>
-                                <div style={{ width:18, height:18, borderRadius:"50%", border: isSel ? "none" : "1.5px solid var(--border)", background: isSel ? (d2?.color||"var(--accent)") : "transparent", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, transition:"all .15s" }}>
-                                  {isSel && <span style={{ fontSize:9, color:"#000", fontWeight:800 }}>✓</span>}
-                                </div>
-                              </div>
-                              {isSel && incomp.length > 0 && (
-                                <div style={{ borderTop:"1px solid var(--border2)", padding:"6px 12px 10px" }}>
-                                  {incomp.map(t => {
-                                    const tSel = tasksSel.includes(t.id);
-                                    return (
-                                      <div key={t.id} onClick={() => toggleTask2(t.id)} style={{ display:"flex", alignItems:"center", gap:10, padding:"6px 2px", cursor:"pointer" }}>
-                                        <div style={{ width:16, height:16, borderRadius:4, border: tSel ? "none" : "1.5px solid var(--border)", background: tSel ? "var(--accent)" : "transparent", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, transition:"all .12s" }}>
-                                          {tSel && <span style={{ fontSize:8, color:"#000", fontWeight:800 }}>✓</span>}
-                                        </div>
-                                        <span style={{ fontSize:13, color: tSel ? "var(--text)" : "var(--text2)" }}>{t.text}</span>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                      <button className="dw-confirm-btn" disabled={!selProjId} style={{ opacity: selProjId ? 1 : 0.4 }}
-                        onClick={() => {
-                          if (!selProjId) return;
-                          const t = dwPickerTime[ptKey] || { startHour:slot.startHour, startMin:slot.startMin, durationMin:slot.durationMin };
-                          const tasks = (t._tasks && t._tasks.length > 0) ? t._tasks : null;
-                          saveDWSlot(slot.id, slot.slotIndex, selProjId, t.startHour, t.startMin, t.durationMin, tasks);
-                          setDwPickerProj(s => { const n={...s}; delete n[ptKey]; return n; });
-                          setDwPickerTime(s => { const n={...s}; delete n[ptKey]; return n; });
-                        }}>✓ Assign</button>
-                    </div>
-                  </div>
-                );
+      {/* ── HEADER ── */}
+      <div className="ph" style={{ paddingBottom:10, paddingTop:10, flexShrink:0 }}>
+        {viewingTomorrow && (
+          <button onClick={() => setViewingTomorrow(false)} style={{ background:"none", border:"none", cursor:"pointer", padding:"0 0 8px", display:"flex", alignItems:"center", gap:4, color:"var(--text3)", fontFamily:"'DM Sans',sans-serif", fontSize:12, fontWeight:600 }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            Today
+          </button>
+        )}
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+          <div>
+            <div style={{ display:"flex", alignItems:"baseline", gap:6 }}>
+              {!viewingTomorrow
+                ? <><span className="today-clock">{clockH}:{clockM}</span><span className="today-clock-ampm">{clockAmpm}</span></>
+                : <span className="today-clock" style={{ fontSize:28 }}>Tomorrow</span>
               }
+            </div>
+            <div style={{ fontSize:13, color:"var(--text2)", marginTop:2, fontWeight:500 }}>
+              {days[viewDate.getDay()]}, {months[viewDate.getMonth()]} {viewDate.getDate()}
+            </div>
+          </div>
+          <button className="tab-gear" onClick={() => setShowTodaySettings(true)} onContextMenu={e => { e.preventDefault(); if(onSignOut) onSignOut(); }}><GearIcon size={20} /></button>
+        </div>
+        <div style={{ fontSize:12, color:"var(--text3)", marginTop:6 }}>
+          {viewingTomorrow
+            ? `${timeline.length} block${timeline.length !== 1 ? "s" : ""} planned`
+            : `${greeting}${name ? `, ${name}` : ""}.${currentItem ? ` You're in a block.` : nextItem ? ` Next up at ${fmtTime(nextItem.data.startHour, nextItem.data.startMin)}.` : " No more blocks today."}`
+          }
+        </div>
+      </div>
+
+      {/* ── CARD STACK — fills remaining screen height ── */}
+      {(() => {
+        const dwItems = timeline.filter(i => i.type === "deepwork");
+        const rtItems = timeline.filter(i => i.type === "routine");
+        const allCards = [...timeline]; // routines + dw slots sorted by time
+
+        if (allCards.length === 0) {
+          return (
+            <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
+              <div style={{ fontSize:13, color:"var(--text3)", textAlign:"center" }}>No blocks today.<br/>Add some in the Week tab.</div>
+            </div>
+          );
+        }
+
+        // Determine flex values: current gets 2.2, others get 1
+        return (
+          <div style={{ flex:1, display:"flex", flexDirection:"column", gap:8, padding:"0 12px 12px", overflow:"hidden", minHeight:0 }}>
+            {allCards.map((item) => {
+              const isPast = !viewingTomorrow && (item.mins + (item.data.durationMin || 60)) <= nowMins;
+              const isNow  = !viewingTomorrow && currentItem?.id === item.id;
+              const isExp  = expandedId === item.id;
+              const flexVal = isNow ? 2.2 : 1;
+
+              // ── ROUTINE CARD ──
               if (item.type === "routine") {
                 const rb = item.data;
                 const comp = (rb.completions || {})[dateKey] || {};
@@ -2304,152 +1838,441 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                   }));
                 };
                 return (
-                  <div className="work-hero" style={{ border: allDone ? "1px solid rgba(69,193,122,.3)" : "1px solid var(--teal)40" }}>
-                    <div style={{ padding:"18px 18px 6px", borderBottom:"1px solid var(--border2)" }}>
-                      <div className="ph-eye" style={{ color:"var(--teal)", marginBottom:6 }}>Now · Routine</div>
-                      <div style={{ fontSize:24, fontWeight:800, color: allDone ? "var(--text2)" : "var(--text)", letterSpacing:"-.02em" }}>{rb.title}</div>
-                      <div style={{ fontSize:13, color:"var(--text3)", marginTop:4 }}>{rb.durationMin} min · {doneCt}/{rb.tasks.length} done</div>
+                  <div key={rb.id} style={{ flex:flexVal, minHeight:0, borderRadius:18, background:"var(--bg2)", border: isNow ? "1.5px solid rgba(75,170,187,.5)" : allDone ? "1px solid rgba(69,193,122,.25)" : "1px solid var(--border)", overflow:"hidden", display:"flex", flexDirection:"column", opacity: isPast && !allDone ? 0.45 : 1, transition:"flex .35s cubic-bezier(.4,0,.2,1), opacity .2s", cursor:"pointer" }}
+                    onClick={() => setExpandedId(isExp ? null : rb.id)}
+                  >
+                    {/* Collapsed header */}
+                    <div style={{ padding: isExp ? "14px 16px 10px" : "0 16px", flex: isExp ? "none" : 1, display:"flex", alignItems:"center", gap:12, minHeight:0 }}>
+                      <div style={{ width:10, height:10, borderRadius:"50%", background:"var(--teal)", flexShrink:0, opacity: allDone ? 0.4 : 1 }} />
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontSize: isNow ? 17 : 14, fontWeight:700, color: allDone ? "var(--text3)" : "var(--text)", letterSpacing:"-.01em", lineHeight:1.2 }}>{rb.title}</div>
+                        {!isExp && <div style={{ fontSize:11, color:"var(--text3)", marginTop:2 }}>{data.todayPrefs?.hideTimes ? "" : `${fmtTime(rb.startHour, rb.startMin)} · `}{rb.durationMin} min · {doneCt}/{rb.tasks.length} done</div>}
+                      </div>
+                      {allDone && <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style={{ flexShrink:0, color:"var(--text3)", opacity:.4, transform: isExp ? "rotate(90deg)" : "none", transition:"transform .2s" }}><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                     </div>
-                    <div style={{ padding:"10px 18px 16px" }}>
-                      {rb.tasks.map(t => (
-                        <div key={t.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"8px 0", borderBottom:"1px solid var(--border2)", cursor:"pointer" }} onClick={() => toggleRtTask(t.id)}>
-                          <div className={`tl-check ${comp[t.id] ? "done" : ""}`} style={{ width:20, height:20, flexShrink:0 }}>
-                            {comp[t.id] && <span style={{fontSize:10,color:"#fff",fontWeight:700}}>✓</span>}
+                    {isExp && (
+                      <div style={{ flex:1, overflowY:"auto", padding:"0 16px 14px" }}>
+                        {rb.tasks.map((t, i) => (
+                          <div key={t.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"9px 0", borderBottom: i < rb.tasks.length-1 ? "1px solid var(--border2)" : "none", cursor:"pointer" }}
+                            onClick={e => { e.stopPropagation(); toggleRtTask(t.id); }}>
+                            <div className={`tl-check ${comp[t.id] ? "done" : ""}`} style={{ width:20, height:20, flexShrink:0 }}>
+                              {comp[t.id] && <span style={{fontSize:10,color:"#fff",fontWeight:700}}>✓</span>}
+                            </div>
+                            <span className={`tl-task-txt ${comp[t.id] ? "done" : ""}`} style={{ fontSize:14 }}>{t.text}</span>
                           </div>
-                          <span className={`tl-task-txt ${comp[t.id] ? "done" : ""}`} style={{ fontSize:14 }}>{t.text}</span>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               }
-              return null;
-            })()}
 
-            {/* ── NO CURRENT BLOCK: show loose tasks ── */}
-            {!currentItem && (() => {
-              const loose = (data.looseTasks||[]).filter(t => !t.done);
-              return (
-                <div className="work-hero" style={{ border:"1px solid var(--border)" }}>
-                  <div style={{ padding:"18px 18px 10px", borderBottom:"1px solid var(--border2)" }}>
-                    <div className="ph-eye" style={{ marginBottom:6 }}>No block right now</div>
-                    <div style={{ fontSize:22, fontWeight:800, color:"var(--text)", letterSpacing:"-.02em" }}>
-                      {nextItem ? `Next up at ${fmtTime(nextItem.data.startHour, nextItem.data.startMin)}` : "No more blocks today"}
-                    </div>
-                  </div>
-                  <div style={{ padding:"10px 18px 14px" }}>
-                    {loose.length === 0 ? (
-                      <div style={{ fontSize:13, color:"var(--text3)", textAlign:"center", padding:"8px 0" }}>No loose tasks</div>
-                    ) : (
-                      loose.map(t => {
-                        const dom = data.domains?.find(d => d.id === t.domainId);
-                        return (
-                          <div key={t.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"8px 0", borderBottom:"1px solid var(--border2)", cursor:"pointer" }}
-                            onClick={() => setData(d => ({ ...d, looseTasks: (d.looseTasks||[]).map(lt => lt.id===t.id ? { ...lt, done:true, doneAt: new Date().toISOString() } : lt) }))}>
-                            <div style={{ width:8, height:8, borderRadius:"50%", background:dom?.color||"var(--text3)", flexShrink:0 }} />
-                            <span style={{ fontSize:14, color:"var(--text)" }}>{t.text}</span>
+              // ── DEEP WORK CARD ──
+              if (item.type === "deepwork") {
+                const slot = item.data;
+                const proj = slot.projectId ? getProject(slot.projectId) : null;
+                const domain = proj ? getDomain(proj.domainId) : null;
+                const domainColor = domain?.color || null;
+                const isFilled = !!proj;
+                const isPickerOpen = dwPickerOpen === slot.id;
+                const pickerTime = dwPickerTime[slot.id] || { startHour: slot.startHour, startMin: slot.startMin, durationMin: slot.durationMin };
+
+                // Completion state
+                const isSessionMode = proj?.mode === "sessions";
+                const todayTaskIds = slot.todayTasks;
+                const hasTodayTasks = Array.isArray(todayTaskIds) && todayTaskIds.length > 0;
+                const relevantTasks = hasTodayTasks ? todayTaskIds.map(id => proj?.tasks.find(t => t.id === id)).filter(Boolean) : [];
+                const relevantDone = relevantTasks.filter(t => t.done).length;
+                const allTasksDone = isSessionMode ? manualCompleted.has(slot.id) : (relevantTasks.length > 0 && relevantDone === relevantTasks.length);
+                const isCompleted = allTasksDone;
+
+                const lateInfo = lateStarted[slot.id];
+                const isRunning = !!lateInfo;
+                const cdStartMs = lateInfo ? new Date(lateInfo.startedAt).getTime() : 0;
+                const cdTotalSec = slot.durationMin * 60;
+                const cdRemSec = isRunning ? Math.max(0, cdTotalSec - Math.floor((Date.now() - cdStartMs) / 1000)) : cdTotalSec;
+                const cdM = Math.floor(cdRemSec / 60), cdS = cdRemSec % 60;
+                const cdStr = `${cdM}:${cdS.toString().padStart(2,"0")}`;
+                const cdDone = isRunning && cdRemSec === 0;
+
+                const isPicking = pickerState?.blockId === slot.id;
+
+                const cardBg = "var(--bg2)";
+                const cardBorder = isCompleted
+                  ? "1px solid rgba(69,193,122,.25)"
+                  : isNow && domainColor
+                    ? `2px solid ${domainColor}90`
+                    : domainColor
+                      ? `1px solid ${domainColor}50`
+                      : "1px solid var(--border)";
+                const cardShadow = isNow && domainColor ? `0 0 32px ${domainColor}20` : "none";
+
+                if (!isFilled) {
+                  // ── UNASSIGNED CARD ──
+                  const ptKey = slot.id;
+                  const selProjId = dwPickerProj[ptKey] || null;
+                  const selProj = selProjId ? data.projects.find(p => p.id === selProjId) : null;
+                  const curTime = dwPickerTime[ptKey] || { startHour: slot.startHour, startMin: slot.startMin, durationMin: slot.durationMin };
+                  const curSelTasks = curTime._tasks !== undefined ? curTime._tasks : [];
+                  const togglePT = (tid) => setDwPickerTime(s => {
+                    const base = s[ptKey] || { startHour:slot.startHour, startMin:slot.startMin, durationMin:slot.durationMin };
+                    const ex = base._tasks||[];
+                    return { ...s, [ptKey]: { ...base, _tasks: ex.includes(tid) ? ex.filter(x=>x!==tid) : [...ex, tid] } };
+                  });
+
+                  return (
+                    <div key={slot.id} data-blockid={slot.id} style={{ flex:flexVal, minHeight:0, borderRadius:18, background:"var(--bg2)", border:"1.5px dashed rgba(255,255,255,.15)", overflow:"hidden", display:"flex", flexDirection:"column", opacity: isPast ? 0.4 : 1, transition:"flex .35s cubic-bezier(.4,0,.2,1)", cursor:"pointer" }}
+                      onClick={() => setExpandedId(isExp ? null : slot.id)}
+                    >
+                      {!isExp ? (
+                        <div style={{ flex:1, display:"flex", alignItems:"center", gap:14, padding:"0 18px" }}>
+                          <div style={{ width:32, height:32, borderRadius:"50%", border:"1.5px dashed rgba(255,255,255,.2)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="var(--text3)" strokeWidth="2" strokeLinecap="round"/></svg>
                           </div>
-                        );
-                      })
-                    )}
-                    <div style={{ marginTop:10, display:"flex", alignItems:"center", gap:8, background:"var(--bg3)", borderRadius:10, padding:"8px 12px" }}>
-                      <span style={{ fontSize:16, color:"var(--text3)", lineHeight:1 }}>+</span>
-                      <input
-                        style={{ flex:1, background:"none", border:"none", outline:"none", color:"var(--text)", fontSize:13, fontFamily:"'DM Sans',sans-serif", padding:0 }}
-                        placeholder="Add a quick task…"
-                        value={looseQuickDraft}
-                        onChange={e => setLooseQuickDraft(e.target.value)}
-                        onKeyDown={e => { if (e.key === "Enter") addLooseQuickTask(looseQuickDraft); if (e.key === "Escape") setLooseQuickDraft(""); }}
-                      />
+                          <div>
+                            <div style={{ fontSize:14, fontWeight:600, color:"var(--text3)" }}>Unassigned Block</div>
+                            <div style={{ fontSize:11, color:"var(--text3)", opacity:.7, marginTop:2 }}>{data.todayPrefs?.hideTimes ? "" : `${fmtTime(slot.startHour, slot.startMin)} · `}{slot.durationMin} min · Tap to assign</div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ flex:1, overflowY:"auto", padding:"14px 16px" }} onClick={e => e.stopPropagation()}>
+                          <div style={{ fontSize:11, fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", color:"var(--text3)", marginBottom:10 }}>Assign project</div>
+                          <div style={{ display:"flex", flexDirection:"column", gap:6, marginBottom:10 }}>
+                            {data.projects.filter(p => p.status === "active").map(p => {
+                              const d2 = data.domains?.find(d => d.id === p.domainId);
+                              const isSel = selProjId === p.id;
+                              const incomp = (p.tasks||[]).filter(t=>!t.done);
+                              const tasksSel = isSel ? curSelTasks : [];
+                              return (
+                                <div key={p.id} style={{ borderRadius:10, overflow:"hidden", border: isSel ? `1.5px solid ${d2?.color||"var(--accent)"}` : "1.5px solid var(--border2)", background: isSel ? `${d2?.color||"var(--accent)"}11` : "var(--bg3)", transition:"all .15s" }}>
+                                  <div style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 12px", cursor:"pointer" }}
+                                    onClick={() => {
+                                      if (isSel) { setDwPickerProj(s => { const n={...s}; delete n[ptKey]; return n; }); }
+                                      else { setDwPickerProj(s => ({ ...s, [ptKey]: p.id })); setDwPickerTime(s => ({ ...s, [ptKey]: { startHour:slot.startHour, startMin:slot.startMin, durationMin:slot.durationMin, _tasks:[] } })); }
+                                    }}>
+                                    <div style={{ width:9, height:9, borderRadius:"50%", background: d2?.color||"var(--text3)", flexShrink:0 }} />
+                                    <div style={{ flex:1, minWidth:0 }}>
+                                      <div style={{ fontSize:13, fontWeight:600, color: isSel ? "var(--text)" : "var(--text2)" }}>{p.name}</div>
+                                      <div style={{ fontSize:11, color:"var(--text3)" }}>{d2?.name}{incomp.length>0?` · ${incomp.length} task${incomp.length!==1?"s":""}`:""}</div>
+                                    </div>
+                                    <div style={{ width:18, height:18, borderRadius:"50%", border: isSel ? "none" : "1.5px solid var(--border)", background: isSel ? (d2?.color||"var(--accent)") : "transparent", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                                      {isSel && <span style={{ fontSize:9, color:"#000", fontWeight:800 }}>✓</span>}
+                                    </div>
+                                  </div>
+                                  {isSel && incomp.length > 0 && (
+                                    <div style={{ borderTop:"1px solid var(--border2)", padding:"6px 12px 10px" }}>
+                                      <div style={{ fontSize:10, fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", color:"var(--text3)", marginBottom:6 }}>Focus tasks</div>
+                                      {incomp.map(t => {
+                                        const tSel = tasksSel.includes(t.id);
+                                        return (
+                                          <div key={t.id} onClick={() => togglePT(t.id)} style={{ display:"flex", alignItems:"center", gap:10, padding:"6px 2px", cursor:"pointer" }}>
+                                            <div style={{ width:16, height:16, borderRadius:4, border: tSel ? "none" : "1.5px solid var(--border)", background: tSel ? "var(--accent)" : "transparent", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                                              {tSel && <span style={{ fontSize:8, color:"#000", fontWeight:800 }}>✓</span>}
+                                            </div>
+                                            <span style={{ fontSize:13, color: tSel ? "var(--text)" : "var(--text2)" }}>{t.text}</span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <button className="dw-confirm-btn" disabled={!selProjId} style={{ opacity: selProjId ? 1 : 0.4 }}
+                            onClick={() => {
+                              if (!selProjId) return;
+                              const t = dwPickerTime[ptKey] || { startHour:slot.startHour, startMin:slot.startMin, durationMin:slot.durationMin };
+                              const tasks = (t._tasks && t._tasks.length > 0) ? t._tasks : null;
+                              saveDWSlot(slot.id, slot.slotIndex, selProjId, t.startHour, t.startMin, t.durationMin, tasks);
+                              setExpandedId(null);
+                              setDwPickerProj(s => { const n={...s}; delete n[ptKey]; return n; });
+                              setDwPickerTime(s => { const n={...s}; delete n[ptKey]; return n; });
+                            }}>✓ Assign</button>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                </div>
-              );
-            })()}
+                  );
+                }
 
-            {/* ── NEXT UP strip ── */}
-            {(() => {
-              const upcoming = timeline.filter(item => item.mins > nowMins && item.id !== currentItem?.id).slice(0,2);
-              if (upcoming.length === 0) return null;
-              return (
-                <div className="work-next-strip">
-                  <div style={{ fontSize:11, fontWeight:700, letterSpacing:".08em", textTransform:"uppercase", color:"var(--text3)", padding:"0 2px 4px" }}>Up next</div>
-                  {upcoming.map(item => {
-                    const proj = item.type==="deepwork" && item.data.projectId ? getProject(item.data.projectId) : null;
-                    const dom = proj ? getDomain(proj.domainId) : null;
+                // ── ASSIGNED CARD ──
+                const incompleteTasks = (proj?.tasks||[]).filter(t=>!t.done);
+
+                return (
+                  <div key={slot.id} data-blockid={slot.id}
+                    style={{ flex:flexVal, minHeight:0, borderRadius:18, background:cardBg, border:cardBorder, boxShadow:cardShadow, overflow:"hidden", display:"flex", flexDirection:"column", opacity: isPast && !isCompleted ? 0.45 : 1, transition:"flex .35s cubic-bezier(.4,0,.2,1), opacity .2s", "--domain-color": domainColor || "transparent", position:"relative" }}
+                    onClick={() => !isExp && setExpandedId(slot.id)}
+                  >
+                    {/* Colour stripe */}
+                    {domainColor && <div style={{ position:"absolute", left:0, top:0, bottom:0, width:3, background: domainColor, borderRadius:"18px 0 0 18px" }} />}
+
+                    {/* Collapsed header — visible always, bigger when now */}
+                    <div style={{ padding: isExp ? "14px 16px 10px 20px" : "0 16px 0 20px", flex: isExp ? "none" : 1, display:"flex", alignItems:"center", gap:12, minHeight:0 }}>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        {/* Eyebrow */}
+                        <div style={{ fontSize:10, fontWeight:700, letterSpacing:".08em", textTransform:"uppercase", color: isNow ? (domainColor||"var(--accent)") : "var(--text3)", marginBottom: isNow || isExp ? 4 : 2, opacity: isCompleted ? 0.5 : 1 }}>
+                          {isNow ? "● Now" : isPast ? "Past" : "Upcoming"}{isSessionMode ? " · Session" : " · Deep Work"}{isRunning ? ` · ${cdStr}` : ""}
+                        </div>
+                        <div style={{ fontSize: isNow && !isExp ? 20 : 15, fontWeight:800, color: isCompleted ? "var(--text3)" : "var(--text)", letterSpacing:"-.02em", lineHeight:1.15, overflow:"hidden", textOverflow:"ellipsis", whiteSpace: isExp ? "normal" : "nowrap" }}>{proj.name}</div>
+                        {!isExp && (
+                          <div style={{ fontSize:11, color:"var(--text3)", marginTop:3 }}>
+                            {domain?.name}{data.todayPrefs?.hideTimes ? "" : ` · ${fmtTime(slot.startHour, slot.startMin)}`} · {slot.durationMin} min
+                            {!isSessionMode && hasTodayTasks ? ` · ${relevantDone}/${relevantTasks.length}` : ""}
+                          </div>
+                        )}
+                      </div>
+                      {isCompleted && !isExp && <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                      {!isCompleted && hasTodayTasks && !isExp && (
+                        <div style={{ width:32, height:32, borderRadius:"50%", background:"var(--bg3)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, border:"1px solid var(--border2)" }}>
+                          <span style={{ fontSize:11, fontWeight:800, color: relevantDone === relevantTasks.length ? "var(--green)" : "var(--text2)" }}>{relevantDone}/{relevantTasks.length}</span>
+                        </div>
+                      )}
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style={{ flexShrink:0, color:"var(--text3)", opacity:.4, transform: isExp ? "rotate(90deg)" : "none", transition:"transform .2s", cursor:"pointer" }} onClick={e => { e.stopPropagation(); setExpandedId(isExp ? null : slot.id); }}><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    </div>
+
+                    {/* Expanded body */}
+                    {isExp && (
+                      <div style={{ flex:1, overflowY:"auto", padding:"0 16px 14px 20px" }} onClick={e => e.stopPropagation()}>
+                        <div style={{ fontSize:12, color:"var(--text3)", marginBottom:10 }}>{domain?.name}{data.todayPrefs?.hideTimes ? "" : ` · ${fmtTime(slot.startHour, slot.startMin)}`} · {slot.durationMin} min</div>
+
+                        {isCompleted ? (
+                          <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                            <div style={{ width:24, height:24, borderRadius:"50%", background:"rgba(69,193,122,.15)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                            </div>
+                            <span style={{ fontSize:14, color:"var(--green)", fontWeight:700 }}>{isSessionMode ? "Session logged" : "Block complete"}</span>
+                            <button onClick={() => unmarkManualDone(slot.id, proj.id, slot.todayTasks)}
+                              style={{ marginLeft:"auto", background:"none", border:"1px solid var(--border)", borderRadius:8, fontSize:12, color:"var(--text3)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", padding:"4px 10px" }}>
+                              ← Undo
+                            </button>
+                          </div>
+                        ) : isSessionMode ? (
+                          <div style={{ display:"flex", gap:8 }}>
+                            <button className="tl-start-btn" style={{ ...(isRunning ? { background:"rgba(224,85,85,.12)", color:"var(--red)", borderColor:"rgba(224,85,85,.3)" } : {}) }}
+                              onClick={e => { e.stopPropagation(); isRunning ? setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }) : startBlock(slot.id); }}>
+                              {isRunning ? "Stop ■" : "Start →"}
+                            </button>
+                            <button className="tl-start-btn" style={{ background:"rgba(69,193,122,.12)", color:"var(--green)", borderColor:"rgba(69,193,122,.3)" }}
+                              onClick={e => { e.stopPropagation(); logSession(proj.id, slot.durationMin, null); setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }); markManualDone(slot.id, proj.id, null); }}>
+                              I did this ✓
+                            </button>
+                          </div>
+                        ) : isPicking ? (
+                          (() => {
+                            const ps = pickerState;
+                            const confirmPick = () => {
+                              let finalIds = [...ps.selected];
+                              if (ps.newText.trim()) { const newId = addTaskToProject(proj.id, ps.newText.trim()); finalIds.push(newId); }
+                              saveDWTodayTasks(slot.slotIndex, finalIds);
+                              setPickerState(null);
+                            };
+                            return (
+                              <div>
+                                <div style={{ fontSize:12, fontWeight:700, color:"var(--text3)", letterSpacing:".05em", textTransform:"uppercase", marginBottom:8 }}>Pick today's tasks</div>
+                                {proj.tasks.filter(t=>!t.done).map(t => {
+                                  const checked = ps.selected.has(t.id);
+                                  return (
+                                    <div key={t.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"7px 2px", cursor:"pointer" }}
+                                      onClick={() => setPickerState(prev => { const s = new Set(prev.selected); checked ? s.delete(t.id) : s.add(t.id); return { ...prev, selected: s }; })}>
+                                      <div style={{ width:18, height:18, borderRadius:5, border: checked ? "none" : "1.5px solid var(--border)", background: checked ? "var(--accent)" : "transparent", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                                        {checked && <span style={{ fontSize:10, color:"#000", fontWeight:800 }}>✓</span>}
+                                      </div>
+                                      <span style={{ fontSize:14, color: checked ? "var(--text)" : "var(--text2)" }}>{t.text}</span>
+                                    </div>
+                                  );
+                                })}
+                                <input style={{ width:"100%", background:"var(--bg3)", border:"1px solid var(--border2)", borderRadius:8, padding:"8px 10px", color:"var(--text)", fontSize:13, fontFamily:"'DM Sans',sans-serif", marginTop:8, boxSizing:"border-box" }}
+                                  placeholder="Add new task…" value={ps.newText}
+                                  onChange={e => setPickerState(prev => ({ ...prev, newText: e.target.value }))}
+                                  onKeyDown={e => e.key === "Enter" && confirmPick()} />
+                                <div style={{ display:"flex", gap:8, marginTop:8 }}>
+                                  <button className="dw-confirm-btn" style={{ flex:1 }} onClick={confirmPick}>✓ Confirm</button>
+                                  <button className="dw-back" onClick={() => setPickerState(null)}>✕</button>
+                                </div>
+                              </div>
+                            );
+                          })()
+                        ) : hasTodayTasks ? (
+                          <>
+                            {relevantTasks.map((t, i) => (
+                              <div key={t.id} className="tl-task-row" style={{ padding:"8px 0", borderBottom: i < relevantTasks.length-1 ? "1px solid var(--border2)" : "none" }}>
+                                <div className={`tl-check ${t.done ? "done" : ""} ${recentlyChecked.has(t.id) ? "bounce" : ""}`}
+                                  style={{ width:20, height:20, flexShrink:0 }}
+                                  onClick={e => { e.stopPropagation(); toggleTask(proj.id, t.id); }}>
+                                  {t.done && <span style={{fontSize:10,color:"#fff",fontWeight:700}}>✓</span>}
+                                </div>
+                                <span className={`tl-task-txt ${t.done ? "done" : ""}`} style={{ fontSize:14 }}>{t.text}</span>
+                              </div>
+                            ))}
+                            <div style={{ display:"flex", gap:8, marginTop:10 }}>
+                              <button className="tl-start-btn" style={{ ...(isRunning ? { background:"rgba(224,85,85,.12)", color:"var(--red)", borderColor:"rgba(224,85,85,.3)" } : {}) }}
+                                onClick={e => { e.stopPropagation(); isRunning ? setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }) : startBlock(slot.id); }}>
+                                {isRunning ? "Stop ■" : "Start →"}
+                              </button>
+                              <button className="tl-start-btn" style={{ background:"rgba(69,193,122,.12)", color:"var(--green)", borderColor:"rgba(69,193,122,.3)" }}
+                                onClick={e => { e.stopPropagation(); setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }); markManualDone(slot.id, proj.id, slot.todayTasks); }}>
+                                I did this ✓
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div style={{ fontSize:13, color:"var(--text3)", marginBottom:10 }}>No tasks picked for today.</div>
+                            <div style={{ display:"flex", gap:8 }}>
+                              <button className="tl-start-btn" style={{ ...(isRunning ? { background:"rgba(224,85,85,.12)", color:"var(--red)", borderColor:"rgba(224,85,85,.3)" } : {}) }}
+                                onClick={e => { e.stopPropagation(); isRunning ? setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }) : startBlock(slot.id); }}>
+                                {isRunning ? "Stop ■" : "Start →"}
+                              </button>
+                              <button className="tl-start-btn" style={{ background:"rgba(69,193,122,.12)", color:"var(--green)", borderColor:"rgba(69,193,122,.3)" }}
+                                onClick={e => { e.stopPropagation(); setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }); markManualDone(slot.id, proj.id, slot.todayTasks); }}>
+                                I did this ✓
+                              </button>
+                              <button className="tl-start-btn"
+                                onClick={e => { e.stopPropagation(); setPickerState({ blockId: slot.id, projectId: proj.id, selected: new Set(), newText: "" }); }}>
+                                Pick tasks
+                              </button>
+                            </div>
+                          </>
+                        )}
+
+                        {/* Gear actions */}
+                        <div style={{ marginTop:12, display:"flex", gap:8, flexWrap:"wrap" }}>
+                          <button style={{ background:"none", border:"none", fontSize:11, color:"var(--text3)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", padding:0, fontWeight:600 }}
+                            onClick={() => { mutateDWSlot(toISODate(), slot.slotIndex, null); setExpandedId(null); }}>
+                            ✕ Unassign
+                          </button>
+                          {!viewingTomorrow && (
+                            <button style={{ background:"none", border:"none", fontSize:11, color:"var(--text3)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", padding:0, fontWeight:600, marginLeft:8 }}
+                              onClick={() => {
+                                const tomorrowISO = toISODate(new Date(Date.now() + 86400000));
+                                mutateDWSlot(toISODate(), slot.slotIndex, null);
+                                mutateDWSlot(tomorrowISO, slot.slotIndex, { projectId: slot.projectId, startHour: slot.startHour, startMin: slot.startMin, durationMin: slot.durationMin, todayTasks: slot.todayTasks });
+                                setExpandedId(null);
+                              }}>
+                              → Tomorrow
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
+              return null;
+            })}
+          </div>
+        );
+      })()}
+
+      {/* ── BOTTOM ROW: loose tasks FAB + shutdown ── */}
+      <div style={{ flexShrink:0, display:"flex", alignItems:"center", justifyContent:"space-between", padding:"8px 16px 10px" }}>
+        {/* Loose tasks circular FAB */}
+        {(() => {
+          const looseCt = (data.looseTasks||[]).filter(t=>!t.done).length;
+          return (
+            <button onClick={() => setLooseBlockExp(true)}
+              style={{ width:44, height:44, borderRadius:"50%", background:"var(--bg2)", border:"1px solid var(--border)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", position:"relative", flexShrink:0 }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round"/></svg>
+              {looseCt > 0 && (
+                <div style={{ position:"absolute", top:-3, right:-3, width:16, height:16, borderRadius:"50%", background:"var(--accent)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                  <span style={{ fontSize:9, fontWeight:800, color:"#000" }}>{looseCt}</span>
+                </div>
+              )}
+            </button>
+          );
+        })()}
+
+        {/* Shutdown / tomorrow row */}
+        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+          {!viewingTomorrow && (
+            <button onClick={() => setViewingTomorrow(true)}
+              style={{ background:"none", border:"none", fontSize:12, color: tomorrowActive ? "var(--accent)" : "var(--text3)", fontWeight:600, cursor:"pointer", fontFamily:"'DM Sans',sans-serif", padding:"4px 8px", borderRadius:8, transition:"color .3s" }}>
+              Tomorrow →
+            </button>
+          )}
+          {(data.todayPrefs?.showShutdown !== false) && !shutdownDone && (
+            <div className="shutdown-row" style={{ margin:0, padding:"8px 12px", borderRadius:12, flex:"none" }} onClick={openShutdown}>
+              <span className="sd-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" strokeWidth="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg></span>
+              <span className="sd-txt" style={{ fontSize:12 }}>Shutdown</span>
+            </div>
+          )}
+          {shutdownDone && (
+            <div style={{ display:"flex", alignItems:"center", gap:6, fontSize:12, color:"var(--green)", fontWeight:600, padding:"4px 8px" }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              Done
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── LOOSE TASKS BOTTOM SHEET ── */}
+      {looseBlockExp && (
+        <div style={{ position:"absolute", inset:0, zIndex:120 }} onClick={() => setLooseBlockExp(false)}>
+          <div style={{ position:"absolute", bottom:0, left:0, right:0, background:"var(--bg2)", borderRadius:"20px 20px 0 0", border:"1px solid var(--border)", maxHeight:"70vh", display:"flex", flexDirection:"column", animation:"sheet-up .25s cubic-bezier(.4,0,.2,1)" }}
+            onClick={e => e.stopPropagation()}>
+            {/* Sheet handle */}
+            <div style={{ flexShrink:0, padding:"12px 20px 0", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+              <div style={{ fontSize:15, fontWeight:800, color:"var(--text)", letterSpacing:"-.01em" }}>Loose Tasks</div>
+              <button onClick={() => setLooseBlockExp(false)} style={{ background:"none", border:"none", cursor:"pointer", padding:4, color:"var(--text3)" }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></svg>
+              </button>
+            </div>
+            <div style={{ flex:1, overflowY:"auto", padding:"10px 16px 24px" }}>
+              {(() => {
+                const loose = (data.looseTasks||[]).filter(t=>!t.done);
+                return loose.length === 0 ? (
+                  <div style={{ textAlign:"center", padding:"24px 0", fontSize:13, color:"var(--text3)" }}>No loose tasks</div>
+                ) : (
+                  loose.map(t => {
+                    const dom = data.domains?.find(d => d.id === t.domainId);
                     return (
-                      <div key={item.id} className="work-next-card">
-                        <div style={{ width:8, height:8, borderRadius:"50%", background:dom?.color||"var(--text3)", flexShrink:0 }} />
+                      <div key={t.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 0", borderBottom:"1px solid var(--border2)", cursor:"pointer" }}
+                        onClick={() => setData(d => ({ ...d, looseTasks: (d.looseTasks||[]).map(lt => lt.id===t.id ? { ...lt, done:true, doneAt:new Date().toISOString() } : lt) }))}>
+                        <div className="tl-check" style={{ width:20, height:20, flexShrink:0 }} />
                         <div style={{ flex:1 }}>
-                          <div style={{ fontSize:13, fontWeight:600, color:"var(--text2)" }}>{proj?.name || (item.type==="routine" ? item.data.title : "Deep Work")}</div>
-                          <div style={{ fontSize:11, color:"var(--text3)" }}>{fmtTime(item.data.startHour, item.data.startMin)} · {item.data.durationMin} min</div>
+                          <div style={{ fontSize:14, color:"var(--text)" }}>{t.text}</div>
+                          {dom && <div style={{ fontSize:11, color:"var(--text3)", marginTop:2 }}>{dom.name}</div>}
                         </div>
                       </div>
                     );
-                  })}
-                </div>
-              );
-            })()}
-
-            {/* ── TOMORROW + SHUTDOWN ── */}
-            {(() => {
-              const todayISO = toISODate();
-              const dwBlocksDone = manualCompleted.size;
-              let tasksDone = 0, tasksTotal = 0;
-              const countTasksForBlock = (projectId, todayTaskIds) => {
-                const proj = data.projects.find(p => p.id === projectId);
-                if (!proj) return;
-                const tids = Array.isArray(todayTaskIds) && todayTaskIds.length > 0 ? todayTaskIds : [];
-                tids.forEach(id => { const t = proj.tasks.find(t => t.id === id); if (t) { tasksTotal++; if (t.done) tasksDone++; } });
-              };
-              (data.blocks||[]).forEach(b => { if (b.projectId) countTasksForBlock(b.projectId, b.todayTasks); });
-              ((data.deepWorkSlots||{})[todayISO]||[]).forEach(s => { if (s?.projectId) countTasksForBlock(s.projectId, s.todayTasks); });
-              const todayStr = new Date().toDateString();
-              return (
-                <>
-                  {!viewingTomorrow && (
-                    <button
-                      onClick={() => setViewingTomorrow(true)}
-                      style={{ display:"flex", alignItems:"center", justifyContent:"space-between", width:"100%", background: tomorrowActive ? "rgba(232,160,48,.07)" : "none", border:"none", borderTop: tomorrowActive ? "1px solid rgba(232,160,48,.2)" : "1px solid transparent", cursor:"pointer", padding:"10px 16px 18px", fontFamily:"'DM Sans',sans-serif", transition:"background .35s, border-color .35s" }}
-                    >
-                      <span style={{ fontSize:13, color: tomorrowActive ? "var(--accent)" : "var(--text3)", fontWeight:700, transition:"color .35s", letterSpacing:".02em" }}>Tomorrow</span>
-                      <span style={{ display:"flex", alignItems:"center", gap:4, fontSize:13, color: tomorrowActive ? "var(--accent)" : "var(--text3)", fontWeight:600, transition:"color .35s" }}>
-                        {days[tomorrow.getDay()]}, {months[tomorrow.getMonth()]} {tomorrow.getDate()}
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                      </span>
-                    </button>
-                  )}
-                  {(data.todayPrefs?.showShutdown !== false) && (
-                    shutdownDone ? (
-                      <div style={{ margin:"0 16px 10px", background:"var(--bg2)", borderRadius:16, padding:"16px 18px", border:"1px solid rgba(69,193,122,0.2)" }}>
-                        <div style={{ fontSize:12, fontWeight:700, color:"var(--green)", display:"flex", alignItems:"center", gap:7, letterSpacing:".04em", textTransform:"uppercase" }}>
-                          <div style={{ width:16, height:16, borderRadius:"50%", background:"rgba(69,193,122,0.2)", border:"1.5px solid var(--green)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                            <span style={{ fontSize:8, color:"var(--green)", fontWeight:900 }}>✓</span>
-                          </div>
-                          Shutdown Complete
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="shutdown-row" onClick={openShutdown}>
-                        <span className="sd-ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" strokeWidth="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg></span>
-                        <span className="sd-txt">Shutdown Ritual</span>
-                        <span className="sd-arr">›</span>
-                      </div>
-                    )
-                  )}
-                </>
-              );
-            })()}
-
-            <div className="spacer" />
+                  })
+                );
+              })()}
+              {/* Quick add */}
+              <div style={{ display:"flex", alignItems:"center", gap:8, background:"var(--bg3)", borderRadius:10, padding:"8px 12px", marginTop:10 }}>
+                <span style={{ fontSize:16, color:"var(--text3)", lineHeight:1 }}>+</span>
+                <input style={{ flex:1, background:"none", border:"none", outline:"none", color:"var(--text)", fontSize:13, fontFamily:"'DM Sans',sans-serif", padding:0 }}
+                  placeholder="Add a task…"
+                  value={looseQuickDraft}
+                  onChange={e => setLooseQuickDraft(e.target.value)}
+                  onKeyDown={e => { if (e.key==="Enter") addLooseQuickTask(looseQuickDraft); if (e.key==="Escape") setLooseQuickDraft(""); }} />
+                {looseQuickDraft.trim() && (
+                  <button onClick={() => addLooseQuickTask(looseQuickDraft)}
+                    style={{ background:"var(--accent)", color:"#000", border:"none", borderRadius:6, padding:"4px 10px", fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>Add</button>
+                )}
+              </div>
+            </div>
           </div>
-        </>
+        </div>
+      )}
+
+      {/* Celebration overlay */}
+      {celebratingId && (
+        <div style={{ position:"absolute", inset:0, pointerEvents:"none", zIndex:200 }}>
+          <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center" }}>
+            <div className="celebrate-burst" />
+            <div style={{ fontSize:14, fontWeight:800, color:"var(--accent)", background:"var(--bg2)", borderRadius:20, padding:"8px 20px", border:"1px solid rgba(232,160,48,.3)" }}>Block complete ✓</div>
+          </div>
+        </div>
       )}
 
       {showTodaySettings && <TodaySettingsSheet data={data} setData={setData} onClose={() => setShowTodaySettings(false)} />}
     </div>
   );
 }
+
 
 
 // ─── LOOSE TASKS SECTION ─────────────────────────────────────────────────────
