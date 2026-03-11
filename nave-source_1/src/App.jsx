@@ -145,7 +145,7 @@ const FIELD_DEFAULTS = {
   reviewData:     INITIAL_DATA.reviewData,
   todayPrefs:     { name:"", showShutdown:true, defaultBlock:"9" },
   blockCompletions: [], // [{ blockId, date, durationMin }] — "I did this" / Done logs
-  deepWorkTargets: { dailyHours: 4, weeklyHours: 20 }, // user-configurable
+  deepWorkTargets: { dailyHours: 4, weeklyHours: 20, maxDeepBlocks: 3 }, // user-configurable
   deepWorkSlots: {}, // { [dateStr]: [{ projectId, startHour, startMin, durationMin, todayTasks }] }
   todayLoosePicks: {}, // { [dateStr]: [looseTaskId, ...] } — tasks picked for today's loose block
   onboardingDone: false,
@@ -889,17 +889,21 @@ const css = `
 
   /* QUICK REMINDERS MODAL */
   .qr-backdrop{position:absolute;inset:0;z-index:24;background:rgba(0,0,0,.6);backdrop-filter:blur(2px);}
-  .qr-panel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:calc(100% - 40px);max-width:320px;background:var(--bg2);border-radius:20px;box-shadow:0 16px 48px rgba(0,0,0,.6);z-index:25;overflow:hidden;animation:qr-in .2s cubic-bezier(.34,1.3,.64,1);}
+  .qr-panel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:calc(100% - 40px);max-width:340px;background:var(--bg2);border-radius:20px;box-shadow:0 16px 48px rgba(0,0,0,.6);z-index:25;overflow:hidden;animation:qr-in .2s cubic-bezier(.34,1.3,.64,1);}
   @keyframes qr-in{from{opacity:0;transform:translate(-50%,-46%) scale(.94);}to{opacity:1;transform:translate(-50%,-50%) scale(1);}}
-  .qr-header{padding:18px 18px 12px;font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);}
-  .qr-items{max-height:220px;overflow-y:auto;}
-  .qr-item{display:flex;align-items:center;gap:10px;padding:10px 18px;border-bottom:1px solid var(--border2);}
-  .qr-item-text{flex:1;font-size:14px;color:var(--text);}
-  .qr-item-del{background:none;border:none;color:var(--text3);font-size:18px;cursor:pointer;padding:0 2px;line-height:1;flex-shrink:0;opacity:.5;}
-  .qr-item-del:active{opacity:1;color:var(--red);}
-  .qr-input-row{display:flex;align-items:center;padding:12px 18px 16px;}
+  .qr-header{padding:16px 18px 10px;font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);}
+  .qr-items{max-height:260px;overflow-y:auto;}
+  .qr-item{display:flex;align-items:center;gap:6px;padding:9px 12px 9px 18px;border-bottom:1px solid var(--border2);}
+  .qr-item-text{flex:1;font-size:14px;color:var(--text);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .qr-pill{flex-shrink:0;padding:4px 9px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.03em;cursor:pointer;border:1.5px solid transparent;transition:all .12s;font-family:'DM Sans',sans-serif;line-height:1.4;}
+  .qr-pill-today{border-color:rgba(232,160,48,.3);color:rgba(232,160,48,.45);background:transparent;}
+  .qr-pill-today.active{background:var(--accent-s);border-color:var(--accent);color:var(--accent);}
+  .qr-pill-later{border-color:rgba(255,255,255,.1);color:rgba(255,255,255,.25);background:transparent;}
+  .qr-pill-later.active{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.3);color:var(--text2);}
+  .qr-input-row{display:flex;align-items:center;padding:10px 18px 14px;}
   .qr-input{flex:1;background:transparent;border:none;outline:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:16px;}
   .qr-input::placeholder{color:var(--text3);}
+
 
   /* FAB */
   .fab{width:50px;height:50px;border-radius:50%;background:var(--accent);border:none;color:#000;font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative;bottom:28px;z-index:26;flex-shrink:0;transition:transform .15s,background .15s;font-family:'DM Sans',sans-serif;box-shadow:0 2px 16px rgba(0,0,0,.3);}
@@ -1502,13 +1506,22 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
   // Build deep work slots for active view (today or tomorrow)
   const deepDefaults = getDeepSlots(data);
   const savedDWSlots = (data.deepWorkSlots || {})[viewDateKeyISO] || [];
+  const maxDeepBlocks = data.deepWorkTargets?.maxDeepBlocks ?? 3;
   // For tomorrow: show all slots (don't hide past since nowMins doesn't apply)
   const viewBlocks = viewingTomorrow ? blocks.filter(b => b.dayOffset === 1) : todayBlocks;
   const viewRoutines = viewingTomorrow ? getRoutinesForDate(data.routineBlocks || [], tomorrow) : todayRoutines;
+  // Count filled slots first so we can cap empties
+  const filledDWCount = deepDefaults.filter((_, i) => (savedDWSlots[i] || {}).projectId).length;
+  const emptyDWAllowed = Math.max(0, maxDeepBlocks - filledDWCount);
+  let emptyDWShown = 0;
   const todayDWSlots = deepDefaults.map((def, i) => {
     const saved = savedDWSlots[i] || {};
     const endMins2 = (saved.startHour ?? def.startHour) * 60 + (saved.startMin ?? def.startMin) + (saved.durationMin ?? def.durationMin);
     if (!viewingTomorrow && endMins2 <= nowMins && !saved.projectId) return null; // hide unfilled past slots on today only
+    if (!saved.projectId) {
+      if (emptyDWShown >= emptyDWAllowed) return null; // cap empty slots
+      emptyDWShown++;
+    }
     return {
       id: `dw-${viewDateKeyISO}-${i}`,
       slotIndex: i,
@@ -2005,49 +2018,49 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                           </div>
                         );
                       })()}
-                    </div>
-                    {/* Inline management panel — replaces floating dropdown */}
-                    <div className={`blk-mgmt-panel${blockMenuOpen === blk.id ? " open" : ""}`} onClick={e => e.stopPropagation()}>
-                      <div className="blk-mgmt-inner">
-                        {blockMenuMode === "project" ? (
-                          <>
-                            <button className="blk-mgmt-row" onClick={() => setBlockMenuMode(null)}>
-                              <div className="blk-mgmt-row-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg></div>
-                              <span className="blk-mgmt-row-txt" style={{ fontSize:11, fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", color:"var(--text3)" }}>Change project</span>
-                            </button>
-                            <div className="blk-mgmt-divider" />
-                            {data.projects.filter(p => p.status === "active" && p.id !== proj?.id).map(p => {
-                              const d2 = data.domains?.find(d => d.id === p.domainId);
-                              return (
-                                <button key={p.id} className="blk-mgmt-row sub-item" onClick={() => {
-                                  setData(d => ({ ...d, blocks: d.blocks.map(b => b.id === blk.id ? { ...b, projectId: p.id, todayTasks: undefined } : b) }));
-                                  setBlockMenuOpen(null); setBlockMenuMode(null);
-                                }}>
-                                  <span style={{ width:8, height:8, borderRadius:"50%", background: d2?.color || "var(--text3)", flexShrink:0, display:"inline-block" }} />
-                                  <span className="blk-mgmt-row-txt">{p.name}</span>
+                        {/* Inline management panel — inside tl-card */}
+                        <div className={`blk-mgmt-panel${blockMenuOpen === blk.id ? " open" : ""}`} onClick={e => e.stopPropagation()}>
+                          <div className="blk-mgmt-inner">
+                            {blockMenuMode === "project" ? (
+                              <>
+                                <button className="blk-mgmt-row" onClick={() => setBlockMenuMode(null)}>
+                                  <div className="blk-mgmt-row-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg></div>
+                                  <span className="blk-mgmt-row-txt" style={{ fontSize:11, fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", color:"var(--text3)" }}>Change project</span>
                                 </button>
-                              );
-                            })}
-                          </>
-                        ) : (
-                          <>
-                            <button className="blk-mgmt-row" onClick={() => setBlockMenuMode("project")}>
-                              <div className="blk-mgmt-row-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg></div>
-                              <span className="blk-mgmt-row-txt">Change project</span>
-                            </button>
-                            <div className="blk-mgmt-divider" />
-                            <button className="blk-mgmt-row" onClick={() => { rescheduleToTomorrow(blk.id); setBlockMenuOpen(null); setBlockMenuMode(null); setExpandedId(null); }}>
-                              <div className="blk-mgmt-row-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
-                              <span className="blk-mgmt-row-txt">Push to tomorrow</span>
-                            </button>
-                            <div className="blk-mgmt-divider" />
-                            <button className="blk-mgmt-row danger" onClick={() => { setData(d => ({ ...d, blocks: d.blocks.filter(b => b.id !== blk.id) })); setBlockMenuOpen(null); setBlockMenuMode(null); setExpandedId(null); }}>
-                              <div className="blk-mgmt-row-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></div>
-                              <span className="blk-mgmt-row-txt">Clear slot</span>
-                            </button>
-                          </>
-                        )}
-                      </div>
+                                <div className="blk-mgmt-divider" />
+                                {data.projects.filter(p => p.status === "active" && p.id !== proj?.id).map(p => {
+                                  const d2 = data.domains?.find(d => d.id === p.domainId);
+                                  return (
+                                    <button key={p.id} className="blk-mgmt-row sub-item" onClick={() => {
+                                      setData(d => ({ ...d, blocks: d.blocks.map(b => b.id === blk.id ? { ...b, projectId: p.id, todayTasks: undefined } : b) }));
+                                      setBlockMenuOpen(null); setBlockMenuMode(null);
+                                    }}>
+                                      <span style={{ width:8, height:8, borderRadius:"50%", background: d2?.color || "var(--text3)", flexShrink:0, display:"inline-block" }} />
+                                      <span className="blk-mgmt-row-txt">{p.name}</span>
+                                    </button>
+                                  );
+                                })}
+                              </>
+                            ) : (
+                              <>
+                                <button className="blk-mgmt-row" onClick={() => setBlockMenuMode("project")}>
+                                  <div className="blk-mgmt-row-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg></div>
+                                  <span className="blk-mgmt-row-txt">Change project</span>
+                                </button>
+                                <div className="blk-mgmt-divider" />
+                                <button className="blk-mgmt-row" onClick={() => { rescheduleToTomorrow(blk.id); setBlockMenuOpen(null); setBlockMenuMode(null); setExpandedId(null); }}>
+                                  <div className="blk-mgmt-row-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
+                                  <span className="blk-mgmt-row-txt">Push to tomorrow</span>
+                                </button>
+                                <div className="blk-mgmt-divider" />
+                                <button className="blk-mgmt-row danger" onClick={() => { setData(d => ({ ...d, blocks: d.blocks.filter(b => b.id !== blk.id) })); setBlockMenuOpen(null); setBlockMenuMode(null); setExpandedId(null); }}>
+                                  <div className="blk-mgmt-row-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></div>
+                                  <span className="blk-mgmt-row-txt">Clear slot</span>
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
                     </div>
                     </div>
                   </div>
@@ -2960,7 +2973,7 @@ function SwipeTask({ task, onToggle, onDelete, onSave }) {
 }
 
 // ─── PROJECT CARD ────────────────────────────────────────────────────────────
-const PROJ_COLORS = ["#5B8AF0","#9B72CF","#45C17A","#E8A030","#E05555","#38BDF8","#F472B6","#A3E635","#FB923C","#94A3B8"];
+const PROJ_COLORS = DOMAIN_COLORS;
 
 function ProjectCard({ proj, domain, isExp, newTaskText,
   onToggleExpand, onToggleStatus, onDelete, onEditSave,
@@ -3504,10 +3517,11 @@ function PlanScreen({ data, setData, openAddBlock, onGoToSeason, lightMode, togg
       };
     }).filter(Boolean);
 
-    // How many filled DW slots exist? Empty = 3 - filled - real blocks (min 0)
+    // How many filled DW slots exist? Empty = maxDeepBlocks - filled - real blocks (min 0)
+    const maxDW = data.deepWorkTargets?.maxDeepBlocks ?? 3;
     const filledCount = filledDWSlots.length;
     const realCount = realBlocks.length;
-    const emptyCount = Math.max(0, 3 - filledCount - realCount);
+    const emptyCount = Math.max(0, maxDW - filledCount - realCount);
 
     // Empty DW slots: use the deepSlots that are NOT filled, up to emptyCount
     const emptyDWSlots = deepSlots
@@ -4997,52 +5011,66 @@ function AddBlockSheet({ data, onClose, onAdd, onAddRoutine }) {
 
 // ─── QUICK CAPTURE ────────────────────────────────────────────────────────────
 function QuickReminders({ onClose, onAddAll }) {
+  // items: [{ id, text, dest: "today"|"later"|null }]
   const [items, setItems]   = useState([]);
   const [draft, setDraft]   = useState("");
   const inputRef            = useRef(null);
+  const itemRefsMap         = useRef({}); // id -> ref for future focus if needed
 
   useEffect(() => { setTimeout(() => inputRef.current?.focus(), 60); }, []);
 
   const commitDraft = () => {
     const t = draft.trim();
     if (!t) return;
-    setItems(prev => [...prev, { id: uid(), text: t }]);
+    setItems(prev => [...prev, { id: uid(), text: t, dest: null }]);
     setDraft("");
-    // keep focus on input for rapid entry
     setTimeout(() => inputRef.current?.focus(), 10);
   };
 
-  const removeItem = (id) => setItems(prev => prev.filter(i => i.id !== id));
+  const setDest = (id, dest) => {
+    setItems(prev => prev.map(i => {
+      if (i.id !== id) return i;
+      // tapping active pill deselects it
+      return { ...i, dest: i.dest === dest ? null : dest };
+    }));
+    // advance focus to the input for next entry
+    setTimeout(() => inputRef.current?.focus(), 30);
+  };
 
   const finish = () => {
-    // commit any unsaved draft first
     const finalItems = [...items];
     const t = draft.trim();
-    if (t) finalItems.push({ id: uid(), text: t });
-    finalItems.forEach(i => onAddAll({ id: i.id, text: i.text, createdAt: Date.now() }));
+    if (t) finalItems.push({ id: uid(), text: t, dest: null });
+    if (finalItems.length === 0) { onClose(); return; }
+    // items with no dest default to "later"
+    onAddAll(finalItems.map(i => ({ ...i, dest: i.dest || "later" })));
     onClose();
   };
 
   return (
     <>
-      {/* Tap-outside backdrop — dismisses without saving */}
       <div className="qr-backdrop" onClick={finish} />
       <div className="qr-panel" onClick={e => e.stopPropagation()}>
         <div className="qr-header">Quick Reminders</div>
 
-        {/* Stacked items */}
         {items.length > 0 && (
           <div className="qr-items">
             {items.map(i => (
               <div key={i.id} className="qr-item">
                 <span className="qr-item-text">{i.text}</span>
-                <button className="qr-item-del" onClick={() => removeItem(i.id)}>×</button>
+                <button
+                  className={`qr-pill qr-pill-today${i.dest === "today" ? " active" : ""}`}
+                  onClick={() => setDest(i.id, "today")}
+                >Today</button>
+                <button
+                  className={`qr-pill qr-pill-later${i.dest === "later" ? " active" : ""}`}
+                  onClick={() => setDest(i.id, "later")}
+                >Later</button>
               </div>
             ))}
           </div>
         )}
 
-        {/* Input row */}
         <div className="qr-input-row">
           <input
             ref={inputRef}
@@ -5050,7 +5078,7 @@ function QuickReminders({ onClose, onAddAll }) {
             placeholder="Add a reminder…"
             value={draft}
             onChange={e => setDraft(e.target.value)}
-            onKeyDown={e => { if (e.key === "Enter") commitDraft(); if (e.key === "Escape") onClose(); }}
+            onKeyDown={e => { if (e.key === "Enter") commitDraft(); if (e.key === "Escape") finish(); }}
           />
         </div>
       </div>
@@ -5066,16 +5094,17 @@ function TodaySettingsSheet({ data, setData, onClose }) {
   const [name, setName]           = useState(prefs.name || "");
   const [showShutdown, setShowSD] = useState(prefs.showShutdown !== false);
   const [defaultBlock, setDefault] = useState(prefs.defaultBlock || "9");
-  const targets = data.deepWorkTargets || { dailyHours: 4, weeklyHours: 20 };
+  const targets = data.deepWorkTargets || { dailyHours: 4, weeklyHours: 20, maxDeepBlocks: 3 };
   const dwCount = (data.deepBlockDefaults || []).length;
-  const [dailyHours, setDailyHours]   = useState(String(targets.dailyHours));
-  const [weeklyHours, setWeeklyHours] = useState(String(targets.weeklyHours));
+  const [dailyHours, setDailyHours]     = useState(String(targets.dailyHours));
+  const [weeklyHours, setWeeklyHours]   = useState(String(targets.weeklyHours));
+  const [maxDeepBlocks, setMaxDeepBlocks] = useState(String(targets.maxDeepBlocks ?? 3));
 
   const save = () => {
     setData(d => ({
       ...d,
       todayPrefs: { name: name.trim(), showShutdown, defaultBlock },
-      deepWorkTargets: { dailyHours: parseFloat(dailyHours)||4, weeklyHours: parseFloat(weeklyHours)||20 },
+      deepWorkTargets: { dailyHours: parseFloat(dailyHours)||4, weeklyHours: parseFloat(weeklyHours)||20, maxDeepBlocks: parseInt(maxDeepBlocks)||3 },
     }));
     onClose();
   };
@@ -5117,6 +5146,18 @@ function TodaySettingsSheet({ data, setData, onClose }) {
               <input className="set-input" type="number" min="1" max="60" step="1" value={weeklyHours} onChange={e => setWeeklyHours(e.target.value)} />
             </div>
           </div>
+          <div style={{ marginBottom:16 }}>
+            <div style={{ fontSize:13, color:"var(--text2)", marginBottom:6 }}>Max deep work blocks per day</div>
+            <div style={{ display:"flex", gap:8 }}>
+              {[1,2,3,4,5].map(n => (
+                <button key={n} onClick={() => setMaxDeepBlocks(String(n))}
+                  style={{ flex:1, padding:"9px 0", borderRadius:10, border:`1.5px solid ${String(n) === maxDeepBlocks ? "var(--accent)" : "var(--border)"}`, background: String(n) === maxDeepBlocks ? "var(--accent-s)" : "var(--bg3)", color: String(n) === maxDeepBlocks ? "var(--accent)" : "var(--text2)", fontSize:15, fontWeight:700, cursor:"pointer", fontFamily:"'DM Sans',sans-serif", transition:"all .15s" }}>
+                  {n}
+                </button>
+              ))}
+            </div>
+            <div style={{ fontSize:11, color:"var(--text3)", marginTop:6 }}>Huberman recommends 1–3 blocks of 90 min each</div>
+          </div>
 
           <div className="set-section">Shutdown Ritual</div>
           <div className="set-row">
@@ -5140,7 +5181,7 @@ function TodaySettingsSheet({ data, setData, onClose }) {
 function ProjectsManageSheet({ data, setData, onClose }) {
   const swipe = useSwipeDown(onClose);
   const { domains, projects } = data;
-  const COLORS = ["#5B8AF0","#9B72CF","#45C17A","#E8A030","#E05555","#38BDF8","#F472B6","#A3E635","#FB923C","#94A3B8"];
+  const COLORS = DOMAIN_COLORS;
 
   // ── Categories state ──
   const [catEdits, setCatEdits] = useState(domains.map(d => ({ ...d })));
@@ -5513,7 +5554,22 @@ export default function App() {
 
   const handleAddBlock = b => setData(d => ({ ...d, blocks: [...d.blocks, b] }));
   const handleAddRoutine = r => setData(d => ({ ...d, routineBlocks: [...(d.routineBlocks||[]), r] }));
-  const handleQuickAdd = item => setData(d => ({ ...d, inbox: [...(d.inbox||[]), item] }));
+  const handleQuickAdd = items => {
+    // items is now an array of { id, text, dest: "today"|"later" }
+    const arr = Array.isArray(items) ? items : [items];
+    setData(d => {
+      let newInbox = [...(d.inbox || [])];
+      let newLoose = [...(d.looseTasks || [])];
+      arr.forEach(item => {
+        if (item.dest === "today") {
+          newLoose.push({ id: item.id, domainId: null, text: item.text, done: false, doneAt: null });
+        } else {
+          newInbox.push({ id: item.id, text: item.text, createdAt: Date.now() });
+        }
+      });
+      return { ...d, inbox: newInbox, looseTasks: newLoose };
+    });
+  };
   const handleCategorize = (itemId, projectId, markDone = false) => setData(d => {
     const item = d.inbox.find(i => i.id===itemId);
     if (!item || !projectId) return d;
