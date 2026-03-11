@@ -69,6 +69,11 @@ function fmtTime(h, m) {
   const hh = h > 12 ? h - 12 : h === 0 ? 12 : h;
   return `${hh}:${m.toString().padStart(2,"0")} ${ampm}`;
 }
+
+// Returns "YYYY-MM-DD" for a given Date (or today if omitted)
+function toISODate(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;
+}
 function fmtRange(h, m, dur) {
   const end = h * 60 + m + dur;
   return `${fmtTime(h, m)} – ${fmtTime(Math.floor(end/60), end%60)}`;
@@ -289,8 +294,7 @@ const css = `
   .light .sheet{background:var(--bg2);}
   .light .form-select,.light .blk-edit-select,.light .ww-slot-select,.light .add-goal-domain,.light .ii-select{background:var(--bg3);color:var(--text);}
   .light .intent-textarea,.light .add-task-input,.light .loose-add-input,.light .add-goal-input{background:var(--bg3);color:var(--text);}
-  .light .now-block,.light .card,.light .week-card,.light .cov-card,.light .dw-card,.light .moved-card,.light .stat-box,.light .intention-card,.light .season-hero,.light .sg-card,.light .season-pull-card,.light .loose-zone{background:var(--bg2);} .light .loose-section{background:var(--bg2);}
-  .light .blk-edit-panel,.light .blk-swipe-content{background:var(--bg2);}
+  .light .now-block,.light .card,.light .week-card,.light .cov-card,.light .dw-card,.light .stat-box,.light .intention-card,.light .season-hero,.light .sg-card,.light .season-pull-card,.light .loose-zone{background:var(--bg2);} .light .loose-section{background:var(--bg2);}
   .light .ghost-block{background:transparent;}
   .light .ww-day{border-color:var(--border);color:var(--text2);}
   .light .ww-day.on{background:var(--accent);border-color:var(--accent);color:#fff;}
@@ -368,9 +372,6 @@ const css = `
   .tl-pill.static{cursor:default;}
   .tl-connector{width:1px;flex:1;min-height:8px;background:var(--border2);}
 
-  .tl-swipe-wrap{position:relative;border-radius:14px;margin:8px 0 6px;touch-action:pan-y;overflow:hidden;flex:1;min-width:0;}
-  .tl-swipe-actions{position:absolute;top:0;bottom:0;right:0;width:188px;display:flex;align-items:stretch;z-index:0;}
-  .tl-swipe-action-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:0 18px;cursor:pointer;border:none;font-family:'DM Sans',sans-serif;min-width:90px;}
   .tl-swipe-action-btn.swap{background:var(--accent);color:#000;}
   .tl-swipe-action-btn.tomorrow{background:var(--bg4);color:var(--text);}
   .tl-swipe-action-lbl{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;}
@@ -684,17 +685,6 @@ const css = `
   .wc-day.today{color:var(--accent);}
   .wc-date{font-size:12px;color:var(--text3);}
 
-  /* SWIPEABLE BLOCK ROW */
-  .blk-swipe-wrap{position:relative;overflow:hidden;}
-  .blk-swipe-content{display:flex;gap:12px;align-items:center;padding:10px 18px;border-bottom:1px solid var(--border2);background:var(--bg2);transition:transform .2s ease;position:relative;z-index:1;cursor:pointer;}
-  .blk-swipe-content:last-of-type{}
-  .blk-del-bg{position:absolute;right:0;top:0;bottom:0;width:80px;background:var(--red);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;z-index:0;}
-  .blk-swipe-content.editing{background:var(--bg3);}
-  .wcb-time{font-size:12px;color:var(--text3);min-width:80px;font-variant-numeric:tabular-nums;}
-  .wcb-stripe{width:3px;border-radius:2px;flex-shrink:0;align-self:stretch;min-height:24px;}
-  .wcb-info{flex:1;}
-  .wcb-proj{font-size:13px;font-weight:500;color:var(--text);}
-  .wcb-meta{font-size:11px;color:var(--text3);margin-top:2px;}
   .wc-add{padding:11px 18px;display:flex;align-items:center;gap:8px;cursor:pointer;}
   .wca-ico{font-size:15px;color:var(--text3);}
   .wca-txt{font-size:13px;color:var(--text3);}
@@ -737,12 +727,6 @@ const css = `
   .coach-body{font-size:13px;color:var(--text2);line-height:1.55;}
 
   /* BLOCK INLINE EDIT */
-  .blk-edit-panel{padding:10px 18px 14px;background:var(--bg3);border-bottom:1px solid var(--border2);}
-  .blk-edit-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;}
-  .blk-edit-select{width:100%;background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:16px;outline:none;appearance:none;}
-  .blk-edit-label{font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--text3);margin-bottom:4px;}
-  .blk-edit-actions{display:flex;gap:8px;margin-top:4px;}
-  .blk-edit-save{flex:1;background:var(--accent);color:#000;border:none;border-radius:8px;padding:9px;font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;}
   .blk-edit-del{background:rgba(224,85,85,0.15);color:var(--red);border:none;border-radius:8px;padding:9px 14px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;}
 
   /* ── REVIEW ── */
@@ -766,10 +750,7 @@ const css = `
   .dw-sq{width:100%;aspect-ratio:1;border-radius:8px;background:var(--bg3);}
   .dw-sq.full{background:var(--accent);}
   .dw-sq.half{background:rgba(232,160,48,.3);}
-  .moved-card{margin:0 16px 8px;background:var(--bg2);border-radius:16px;overflow:hidden;}
-  .mv-row{padding:13px 18px;display:flex;align-items:center;gap:14px;border-bottom:1px solid var(--border2);}
-  .mv-row:last-child{border-bottom:none;}
-  .mv-stripe{width:3px;border-radius:2px;flex-shrink:0;align-self:stretch;min-height:30px;}
+
   .mv-info{flex:1;}
   .mv-name{font-size:14px;font-weight:500;color:var(--text);margin-bottom:6px;}
   .mv-bar-wrap{height:3px;background:var(--bg3);border-radius:2px;overflow:hidden;}
@@ -912,6 +893,15 @@ const css = `
 `;
 
 // ─── STATUS BAR (no time) ─────────────────────────────────────────────────────
+// ─── SHARED ICONS ─────────────────────────────────────────────────────────────
+function GearIcon({ size = 17, color = "currentColor" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.92c.04-.36.07-.72.07-1.08s-.03-.73-.07-1.08l2.32-1.82c.21-.16.27-.46.13-.7l-2.2-3.81a.55.55 0 0 0-.67-.24l-2.74 1.1c-.57-.44-1.18-.81-1.86-1.08l-.42-2.9A.55.55 0 0 0 14 2h-4a.55.55 0 0 0-.54.46l-.42 2.9c-.68.27-1.3.64-1.86 1.08L4.44 5.35a.54.54 0 0 0-.67.24L1.57 9.4c-.14.24-.08.54.13.7l2.32 1.82C3.98 12.27 3.95 12.63 3.95 13s.03.73.07 1.08L1.7 15.9c-.21.16-.27.46-.13.7l2.2 3.81c.13.24.43.32.67.24l2.74-1.1c.57.44 1.18.81 1.86 1.08l.42 2.9c.08.28.29.47.54.47h4c.25 0 .46-.19.54-.46l.42-2.9c.68-.27 1.3-.64 1.86-1.08l2.74 1.1c.24.09.54 0 .67-.24l2.2-3.81c.14-.24.08-.54-.13-.7l-2.32-1.82Z" fill={color}/>
+    </svg>
+  );
+}
+
 function StatusBar() {
   return (
     <div className="status">
@@ -920,40 +910,6 @@ function StatusBar() {
   );
 }
 
-// ─── SWIPEABLE ROW ────────────────────────────────────────────────────────────
-function SwipeRow({ onDelete, children, className = "" }) {
-  const [offset, setOffset] = useState(0);
-  const startX = useRef(null);
-  const revealed = offset < -60;
-
-  const onTouchStart = e => { startX.current = e.touches[0].clientX; };
-  const onTouchMove = e => {
-    if (startX.current === null) return;
-    const dx = e.touches[0].clientX - startX.current;
-    if (dx < 0) setOffset(Math.max(dx, -80));
-    else if (offset < 0) setOffset(Math.min(0, offset + dx));
-  };
-  const onTouchEnd = () => {
-    if (revealed) setOffset(-80); else setOffset(0);
-    startX.current = null;
-  };
-
-  return (
-    <div className={`swipe-wrapper ${className}`} style={{ position: "relative", overflow: "hidden" }}>
-      <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 80, background: "var(--red)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", cursor: "pointer" }} onClick={onDelete}>
-        Delete
-      </div>
-      <div
-        style={{ transform: `translateX(${offset}px)`, transition: startX.current === null ? "transform .2s ease" : "none", position: "relative", zIndex: 1 }}
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
-      >
-        {children}
-      </div>
-    </div>
-  );
-}
 
 // ─── TODAY SCREEN ─────────────────────────────────────────────────────────────
 function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: focusModeprop, setFocusMode: setFocusModeApp, onSignOut }) {
@@ -964,7 +920,7 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
   const [dragId, setDragId] = useState(null);
   const [dragOverId, setDragOverId] = useState(null);
   const swipeState = useRef({});
-  const [revealedBlockId] = useState(null); // kept for compatibility, unused
+  const [revealedBlockId, setRevealedBlockId] = useState(null); // unused visually but guards close-on-drag
   const [dwPickerOpen, setDwPickerOpen] = useState(null); // slotId of open picker
   const [dwPickerStep, setDwPickerStep] = useState({}); // { [slotId]: "project" | "confirm" }
   const [dwPickerProj, setDwPickerProj] = useState({}); // { [slotId]: projectId }
@@ -976,25 +932,21 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
     setRevealedBlockId(null);
   };
 
-  const saveDWSlot = (slotId, slotIndex, projectId, startHour, startMin, durationMin, todayTasks) => {
-    const dateKeyISO2 = (() => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}-${String(t.getDate()).padStart(2,"0")}`; })();
+  // ── DW slot mutation helper — all slot saves go through this ──────────────
+  const mutateDWSlot = (dateStr, slotIndex, patch) => {
     setData(prev => {
-      const existing = [...((prev.deepWorkSlots || {})[dateKeyISO2] || [])];
+      const existing = [...((prev.deepWorkSlots || {})[dateStr] || [])];
       while (existing.length <= slotIndex) existing.push({});
-      existing[slotIndex] = { projectId, startHour, startMin, durationMin, todayTasks: todayTasks || null };
-      return { ...prev, deepWorkSlots: { ...(prev.deepWorkSlots || {}), [dateKeyISO2]: existing } };
+      existing[slotIndex] = patch === null ? {} : { ...existing[slotIndex], ...patch };
+      return { ...prev, deepWorkSlots: { ...(prev.deepWorkSlots || {}), [dateStr]: existing } };
     });
   };
 
-  const clearDWSlot = (slotIndex) => {
-    const dateKeyISO2 = (() => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}-${String(t.getDate()).padStart(2,"0")}`; })();
-    setData(prev => {
-      const existing = [...((prev.deepWorkSlots || {})[dateKeyISO2] || [])];
-      while (existing.length <= slotIndex) existing.push({});
-      existing[slotIndex] = {};
-      return { ...prev, deepWorkSlots: { ...(prev.deepWorkSlots || {}), [dateKeyISO2]: existing } };
-    });
-  };
+  const saveDWSlot = (slotId, slotIndex, projectId, startHour, startMin, durationMin, todayTasks) =>
+    mutateDWSlot(toISODate(), slotIndex, { projectId, startHour, startMin, durationMin, todayTasks: todayTasks || null });
+
+  const clearDWSlot = (slotIndex) =>
+    mutateDWSlot(toISODate(), slotIndex, null);
 
   const handleDragStart = (e, blockId) => {
     setDragId(blockId);
@@ -1026,6 +978,7 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
 
   const [newTaskText, setNewTaskText] = useState({});
   const [tick, setTick] = useState(0);
+  const [viewingTomorrow, setViewingTomorrow] = useState(false);
   // lateStarted: { [blockId]: { startedAt: ISO string } }
   const [lateStarted, setLateStarted] = useState({});
   const [conflictWarning, setConflictWarning] = useState(null); // blockId with conflict
@@ -1140,15 +1093,12 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
   };
 
   const rescheduleDWSlot = (slotIndex, newHour, newMin) => {
-    const dateKeyISO2 = (() => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}-${String(t.getDate()).padStart(2,"0")}`; })();
-    setData(prev => {
-      const existing = [...((prev.deepWorkSlots || {})[dateKeyISO2] || [])];
-      while (existing.length <= slotIndex) existing.push({});
-      existing[slotIndex] = { ...existing[slotIndex], startHour: newHour, startMin: newMin };
-      return { ...prev, deepWorkSlots: { ...(prev.deepWorkSlots || {}), [dateKeyISO2]: existing } };
-    });
+    mutateDWSlot(toISODate(), slotIndex, { startHour: newHour, startMin: newMin });
     setEditingTime(null);
   };
+
+  const saveDWTodayTasks = (slotIndex, taskIds) =>
+    mutateDWSlot(toISODate(), slotIndex, { todayTasks: taskIds.length > 0 ? taskIds : null });
 
   const markManualDone = (blockId, projectId, todayTaskIds) => {
     setData(d => {
@@ -1183,16 +1133,6 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
     const newId = uid();
     setData(d => ({ ...d, projects: d.projects.map(p => p.id === projectId ? { ...p, tasks: [...p.tasks, { id: newId, text, done: false }] } : p) }));
     return newId;
-  };
-
-  const saveDWTodayTasks = (slotIndex, taskIds) => {
-    const dateKeyISO2 = (() => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}-${String(t.getDate()).padStart(2,"0")}`; })();
-    setData(prev => {
-      const existing = [...((prev.deepWorkSlots || {})[dateKeyISO2] || [])];
-      while (existing.length <= slotIndex) existing.push({});
-      existing[slotIndex] = { ...existing[slotIndex], todayTasks: taskIds.length > 0 ? taskIds : null };
-      return { ...prev, deepWorkSlots: { ...(prev.deepWorkSlots || {}), [dateKeyISO2]: existing } };
-    });
   };
 
   const startBlock = (blkId) => {
@@ -1265,17 +1205,30 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
   const todayBlocksSorted = [...todayBlocks].sort((a,b) => a.startHour*60+a.startMin - (b.startHour*60+b.startMin));
   const todayRoutines = getRoutinesForDate(data.routineBlocks || [], today);
   const dateKey = today.toDateString();
-  const dateKeyISO = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}-${String(today.getDate()).padStart(2,"0")}`;
+  const dateKeyISO = toISODate(today);
 
-  // Build deep work slots for today
+  // Tomorrow date keys
+  const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
+  const tomorrowDateKey = tomorrow.toDateString();
+  const tomorrowDateKeyISO = toISODate(tomorrow);
+
+  // Active view date (today or tomorrow)
+  const viewDate = viewingTomorrow ? tomorrow : today;
+  const viewDateKey = viewingTomorrow ? tomorrowDateKey : dateKey;
+  const viewDateKeyISO = viewingTomorrow ? tomorrowDateKeyISO : dateKeyISO;
+
+  // Build deep work slots for active view (today or tomorrow)
   const deepDefaults = getDeepSlots(data);
-  const savedDWSlots = (data.deepWorkSlots || {})[dateKeyISO] || [];
+  const savedDWSlots = (data.deepWorkSlots || {})[viewDateKeyISO] || [];
+  // For tomorrow: show all slots (don't hide past since nowMins doesn't apply)
+  const viewBlocks = viewingTomorrow ? blocks.filter(b => b.dayOffset === 1) : todayBlocks;
+  const viewRoutines = viewingTomorrow ? getRoutinesForDate(data.routineBlocks || [], tomorrow) : todayRoutines;
   const todayDWSlots = deepDefaults.map((def, i) => {
     const saved = savedDWSlots[i] || {};
     const endMins2 = (saved.startHour ?? def.startHour) * 60 + (saved.startMin ?? def.startMin) + (saved.durationMin ?? def.durationMin);
-    if (endMins2 <= nowMins && !saved.projectId) return null; // hide unfilled past slots
+    if (!viewingTomorrow && endMins2 <= nowMins && !saved.projectId) return null; // hide unfilled past slots on today only
     return {
-      id: `dw-${dateKeyISO}-${i}`,
+      id: `dw-${viewDateKeyISO}-${i}`,
       slotIndex: i,
       startHour: saved.startHour ?? def.startHour,
       startMin: saved.startMin ?? def.startMin,
@@ -1286,8 +1239,8 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
   }).filter(Boolean);
 
   const timeline = [
-    ...todayBlocks.map(b => ({ type: "block", id: b.id, mins: b.startHour * 60 + b.startMin, data: b })),
-    ...todayRoutines.map(r => ({ type: "routine", id: r.id, mins: r.startHour * 60 + r.startMin, data: r })),
+    ...viewBlocks.map(b => ({ type: "block", id: b.id, mins: b.startHour * 60 + b.startMin, data: b })),
+    ...viewRoutines.map(r => ({ type: "routine", id: r.id, mins: r.startHour * 60 + r.startMin, data: r })),
     ...todayDWSlots.map(s => ({ type: "deepwork", id: s.id, mins: s.startHour * 60 + s.startMin, data: s })),
   ].sort((a, b) => a.mins - b.mins);
 
@@ -1325,17 +1278,25 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
         <div className="ph" style={{ paddingBottom: 12 }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
             <div>
-              <div className="ph-eye">{days[today.getDay()]}, {months[today.getMonth()]} {today.getDate()}</div>
+              {viewingTomorrow && (
+                <button onClick={() => setViewingTomorrow(false)} style={{ background:"none", border:"none", cursor:"pointer", padding:"0 0 6px", display:"flex", alignItems:"center", gap:4, color:"var(--text3)", fontFamily:"'DM Sans',sans-serif", fontSize:12, fontWeight:600 }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  Today
+                </button>
+              )}
+              <div className="ph-eye">{days[viewDate.getDay()]}, {months[viewDate.getMonth()]} {viewDate.getDate()}</div>
               <div style={{ display:"flex", alignItems:"baseline", gap:2, marginTop:2 }}>
-                <span className="today-clock">{clockH}:{clockM}</span>
-                <span className="today-clock-ampm">{clockAmpm}</span>
+                {!viewingTomorrow && <><span className="today-clock">{clockH}:{clockM}</span><span className="today-clock-ampm">{clockAmpm}</span></>}
+                {viewingTomorrow && <span className="today-clock" style={{ fontSize:28 }}>Tomorrow</span>}
               </div>
               <div style={{ fontSize:13, color:"var(--text3)", marginTop:4 }}>
-                {greeting}{name ? `, ${name}` : ""}.
-                {currentItem ? ` You're in a block.` : nextItem ? ` Next up at ${fmtTime(nextItem.data.startHour, nextItem.data.startMin)}.` : " No more blocks today."}
+                {viewingTomorrow
+                  ? `${timeline.length} block${timeline.length !== 1 ? "s" : ""} planned`
+                  : `${greeting}${name ? `, ${name}` : ""}.${currentItem ? ` You're in a block.` : nextItem ? ` Next up at ${fmtTime(nextItem.data.startHour, nextItem.data.startMin)}.` : " No more blocks today."}`
+                }
               </div>
             </div>
-<button className="tab-gear" onClick={() => setShowTodaySettings(true)} onContextMenu={e => { e.preventDefault(); if(onSignOut) onSignOut(); }}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.92c.04-.36.07-.72.07-1.08s-.03-.73-.07-1.08l2.32-1.82c.21-.16.27-.46.13-.7l-2.2-3.81a.55.55 0 0 0-.67-.24l-2.74 1.1c-.57-.44-1.18-.81-1.86-1.08l-.42-2.9A.55.55 0 0 0 14 2h-4a.55.55 0 0 0-.54.46l-.42 2.9c-.68.27-1.3.64-1.86 1.08L4.44 5.35a.54.54 0 0 0-.67.24L1.57 9.4c-.14.24-.08.54.13.7l2.32 1.82C3.98 12.27 3.95 12.63 3.95 13s.03.73.07 1.08L1.7 15.9c-.21.16-.27.46-.13.7l2.2 3.81c.13.24.43.32.67.24l2.74-1.1c.57.44 1.18.81 1.86 1.08l.42 2.9c.08.28.29.47.54.47h4c.25 0 .46-.19.54-.46l.42-2.9c.68-.27 1.3-.64 1.86-1.08l2.74 1.1c.24.09.54 0 .67-.24l2.2-3.81c.14-.24.08-.54-.13-.7l-2.32-1.82Z" fill="currentColor"/></svg></button>
+            <button className="tab-gear" onClick={() => setShowTodaySettings(true)} onContextMenu={e => { e.preventDefault(); if(onSignOut) onSignOut(); }}><GearIcon size={20} /></button>
           </div>
         </div>
       )}
@@ -1428,8 +1389,8 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
 
           <div className="tl-wrap" style={{ paddingTop: 4 }}>
             {timeline.map((item, idx) => {
-              const isPast = (item.mins + (item.data.durationMin || 60)) <= nowMins;
-              const isNow = currentItem?.id === item.id;
+              const isPast = !viewingTomorrow && (item.mins + (item.data.durationMin || 60)) <= nowMins;
+              const isNow = !viewingTomorrow && currentItem?.id === item.id;
               const isExp = expandedId === item.id;
 
               // Project block
@@ -1607,7 +1568,7 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                         {/* Gear icon when expanded */}
                         {isExp && <button onClick={e => { e.stopPropagation(); setBlockMenuOpen(blockMenuOpen === blk.id ? null : blk.id); setBlockMenuMode(null); }}
                             style={{ background:"none", border:"none", cursor:"pointer", padding:"4px 6px", color:"var(--text3)", lineHeight:1, borderRadius:8, flexShrink:0 }}>
-                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.92c.04-.36.07-.72.07-1.08s-.03-.73-.07-1.08l2.32-1.82c.21-.16.27-.46.13-.7l-2.2-3.81a.55.55 0 0 0-.67-.24l-2.74 1.1c-.57-.44-1.18-.81-1.86-1.08l-.42-2.9A.55.55 0 0 0 14 2h-4a.55.55 0 0 0-.54.46l-.42 2.9c-.68.27-1.3.64-1.86 1.08L4.44 5.35a.54.54 0 0 0-.67.24L1.57 9.4c-.14.24-.08.54.13.7l2.32 1.82C3.98 12.27 3.95 12.63 3.95 13s.03.73.07 1.08L1.7 15.9c-.21.16-.27.46-.13.7l2.2 3.81c.13.24.43.32.67.24l2.74-1.1c.57.44 1.18.81 1.86 1.08l.42 2.9c.08.28.29.47.54.47h4c.25 0 .46-.19.54-.46l.42-2.9c.68-.27 1.3-.64 1.86-1.08l2.74 1.1c.24.09.54 0 .67-.24l2.2-3.81c.14-.24.08-.54-.13-.7l-2.32-1.82Z" fill="currentColor"/></svg>
+                            <GearIcon size={17} />
                           </button>
                         }
                       </div>
@@ -1887,7 +1848,7 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                             {/* Gear icon when expanded only */}
                             {isExp && <button onClick={e => { e.stopPropagation(); setBlockMenuOpen(blockMenuOpen === slot.id ? null : slot.id); setBlockMenuMode(null); }}
                                 style={{ background:"none", border:"none", cursor:"pointer", padding:"4px 6px", color:"var(--text3)", lineHeight:1, borderRadius:8, flexShrink:0 }}>
-                                <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.92c.04-.36.07-.72.07-1.08s-.03-.73-.07-1.08l2.32-1.82c.21-.16.27-.46.13-.7l-2.2-3.81a.55.55 0 0 0-.67-.24l-2.74 1.1c-.57-.44-1.18-.81-1.86-1.08l-.42-2.9A.55.55 0 0 0 14 2h-4a.55.55 0 0 0-.54.46l-.42 2.9c-.68.27-1.3.64-1.86 1.08L4.44 5.35a.54.54 0 0 0-.67.24L1.57 9.4c-.14.24-.08.54.13.7l2.32 1.82C3.98 12.27 3.95 12.63 3.95 13s.03.73.07 1.08L1.7 15.9c-.21.16-.27.46-.13.7l2.2 3.81c.13.24.43.32.67.24l2.74-1.1c.57.44 1.18.81 1.86 1.08l.42 2.9c.08.28.29.47.54.47h4c.25 0 .46-.19.54-.46l.42-2.9c.68-.27 1.3-.64 1.86-1.08l2.74 1.1c.24.09.54 0 .67-.24l2.2-3.81c.14-.24.08-.54-.13-.7l-2.32-1.82Z" fill="currentColor"/></svg>
+                                <GearIcon size={17} />
                               </button>
                             }
                           </div>
@@ -2148,7 +2109,7 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
               // Routine block
               if (item.type === "routine") {
                 const rb = item.data;
-                const comp = (rb.completions || {})[dateKey] || {};
+                const comp = (rb.completions || {})[viewDateKey] || {};
                 const doneCt = rb.tasks.filter(t => comp[t.id]).length;
                 const allDone = rb.tasks.length > 0 && doneCt === rb.tasks.length;
                 const toggleRtTask = (taskId) => {
@@ -2223,14 +2184,16 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
           </div>
 
           {/* + Add block link */}
-          <div style={{ display:"flex", alignItems:"center", gap:8, padding:"6px 16px 14px", opacity:.5 }}>
-            <button onClick={openAddBlock} style={{ background:"none", border:"none", color:"var(--text3)", fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:"'DM Sans',sans-serif", display:"flex", alignItems:"center", gap:5 }}>
-              <span style={{ fontSize:16 }}>＋</span> Add block
-            </button>
-          </div>
+          {!viewingTomorrow && (
+            <div style={{ display:"flex", alignItems:"center", gap:8, padding:"6px 16px 14px", opacity:.5 }}>
+              <button onClick={openAddBlock} style={{ background:"none", border:"none", color:"var(--text3)", fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:"'DM Sans',sans-serif", display:"flex", alignItems:"center", gap:5 }}>
+                <span style={{ fontSize:16 }}>＋</span> Add block
+              </button>
+            </div>
+          )}
 
           {/* LOOSE TASKS BLOCK */}
-          {(() => {
+          {!viewingTomorrow && (() => {
             const allLoose = data.looseTasks || [];
             const incomplete = allLoose.filter(t => !t.done);
             const isExp = looseBlockExp;
@@ -2357,19 +2320,28 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
             );
           })()}
 
+          {/* TOMORROW LINK / BACK */}
+          {!viewingTomorrow && (
+            <button
+              onClick={() => setViewingTomorrow(true)}
+              style={{ display:"flex", alignItems:"center", justifyContent:"space-between", width:"100%", background:"none", border:"none", cursor:"pointer", padding:"4px 16px 18px", fontFamily:"'DM Sans',sans-serif" }}
+            >
+              <span style={{ fontSize:13, color:"var(--text3)", fontWeight:600 }}>Tomorrow</span>
+              <span style={{ display:"flex", alignItems:"center", gap:4, fontSize:13, color:"var(--text3)", fontWeight:600 }}>
+                {days[tomorrow.getDay()]}, {months[tomorrow.getMonth()]} {tomorrow.getDate()}
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </span>
+            </button>
+          )}
+
           {/* END OF DAY */}
-          {(data.todayPrefs?.showShutdown !== false) && (() => {
+          {!viewingTomorrow && (data.todayPrefs?.showShutdown !== false) && (() => {
             // Compute day stats using the same sources the timeline uses
             const todayStr = new Date().toDateString();
-            const todayISO = new Date().toISOString().slice(0,10);
+            const todayISO = toISODate();
 
             // DW blocks done = manual completions today (covers both regular blocks and DW slots)
-            // Also count blocks where all todayTasks are done even without manual completion
-            const allBlockIds = new Set([
-              ...(data.blocks || []).map(b => b.id),
-              ...((data.deepWorkSlots || {})[todayISO] || []).filter(s => s?.projectId).map(s => s.id),
-            ]);
-            const dwBlocksDone = manualCompleted.size; // manualCompleted is already filtered to today
+            const dwBlocksDone = manualCompleted.size;
 
             // Tasks done today across all project blocks
             let tasksDone = 0, tasksTotal = 0;
@@ -2968,7 +2940,7 @@ function ProjectsScreen({ data, setData, openCategorize }) {
       <div className="ph">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div className="ph-title">Projects</div>
-          <button className="tab-gear" onClick={() => setShowManage(true)}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.92c.04-.36.07-.72.07-1.08s-.03-.73-.07-1.08l2.32-1.82c.21-.16.27-.46.13-.7l-2.2-3.81a.55.55 0 0 0-.67-.24l-2.74 1.1c-.57-.44-1.18-.81-1.86-1.08l-.42-2.9A.55.55 0 0 0 14 2h-4a.55.55 0 0 0-.54.46l-.42 2.9c-.68.27-1.3.64-1.86 1.08L4.44 5.35a.54.54 0 0 0-.67.24L1.57 9.4c-.14.24-.08.54.13.7l2.32 1.82C3.98 12.27 3.95 12.63 3.95 13s.03.73.07 1.08L1.7 15.9c-.21.16-.27.46-.13.7l2.2 3.81c.13.24.43.32.67.24l2.74-1.1c.57.44 1.18.81 1.86 1.08l.42 2.9c.08.28.29.47.54.47h4c.25 0 .46-.19.54-.46l.42-2.9c.68-.27 1.3-.64 1.86-1.08l2.74 1.1c.24.09.54 0 .67-.24l2.2-3.81c.14-.24.08-.54-.13-.7l-2.32-1.82Z" fill="currentColor"/></svg></button>
+          <button className="tab-gear" onClick={() => setShowManage(true)}><GearIcon size={20} /></button>
         </div>
         <div className="ph-sub">{activeCount} active · {projects.length - activeCount} in backlog</div>
       </div>
@@ -3155,23 +3127,21 @@ function PlanScreen({ data, setData, openAddBlock, onGoToSeason, lightMode, togg
   const deleteBlock   = id => setData(d => ({ ...d, blocks: d.blocks.filter(b => b.id !== id) }));
   const updateBlock   = (id, changes) => { setData(d => ({ ...d, blocks: d.blocks.map(b => b.id===id?{...b,...changes}:b) })); setEditingBlockId(null); };
 
-  const saveDWSlotForDate = (dateStr, slotIndex, projectId, startHour, startMin, durationMin, todayTasks) => {
+  // DW slot mutation for week view — uses same pattern as TodayScreen's mutateDWSlot
+  const mutateDWSlotForDate = (dateStr, slotIndex, patch) => {
     setData(prev => {
       const existing = [...((prev.deepWorkSlots || {})[dateStr] || [])];
       while (existing.length <= slotIndex) existing.push({});
-      existing[slotIndex] = { projectId, startHour, startMin, durationMin, todayTasks: todayTasks || null };
+      existing[slotIndex] = patch === null ? {} : { ...existing[slotIndex], ...patch };
       return { ...prev, deepWorkSlots: { ...(prev.deepWorkSlots || {}), [dateStr]: existing } };
     });
   };
 
-  const clearDWSlotForDate = (dateStr, slotIndex) => {
-    setData(prev => {
-      const existing = [...((prev.deepWorkSlots || {})[dateStr] || [])];
-      while (existing.length <= slotIndex) existing.push({});
-      existing[slotIndex] = {};
-      return { ...prev, deepWorkSlots: { ...(prev.deepWorkSlots || {}), [dateStr]: existing } };
-    });
-  };
+  const saveDWSlotForDate = (dateStr, slotIndex, projectId, startHour, startMin, durationMin, todayTasks) =>
+    mutateDWSlotForDate(dateStr, slotIndex, { projectId, startHour, startMin, durationMin, todayTasks: todayTasks || null });
+
+  const clearDWSlotForDate = (dateStr, slotIndex) =>
+    mutateDWSlotForDate(dateStr, slotIndex, null);
 
   // Live slot definitions for this user
   const deepSlots = getDeepSlots(data);
@@ -3247,7 +3217,7 @@ function PlanScreen({ data, setData, openAddBlock, onGoToSeason, lightMode, togg
             <div className="ph-eye">Week of {months[today.getMonth()]} {today.getDate()}</div>
             <div className="ph-title">Weekly Plan</div>
           </div>
-          <button className="plan-gear" onClick={() => setShowWorkWeek(true)}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.92c.04-.36.07-.72.07-1.08s-.03-.73-.07-1.08l2.32-1.82c.21-.16.27-.46.13-.7l-2.2-3.81a.55.55 0 0 0-.67-.24l-2.74 1.1c-.57-.44-1.18-.81-1.86-1.08l-.42-2.9A.55.55 0 0 0 14 2h-4a.55.55 0 0 0-.54.46l-.42 2.9c-.68.27-1.3.64-1.86 1.08L4.44 5.35a.54.54 0 0 0-.67.24L1.57 9.4c-.14.24-.08.54.13.7l2.32 1.82C3.98 12.27 3.95 12.63 3.95 13s.03.73.07 1.08L1.7 15.9c-.21.16-.27.46-.13.7l2.2 3.81c.13.24.43.32.67.24l2.74-1.1c.57.44 1.18.81 1.86 1.08l.42 2.9c.08.28.29.47.54.47h4c.25 0 .46-.19.54-.46l.42-2.9c.68-.27 1.3-.64 1.86-1.08l2.74 1.1c.24.09.54 0 .67-.24l2.2-3.81c.14-.24.08-.54-.13-.7l-2.32-1.82Z" fill="currentColor"/></svg></button>
+          <button className="plan-gear" onClick={() => setShowWorkWeek(true)}><GearIcon size={20} /></button>
         </div>
       </div>
       <div className="scroll">
@@ -3861,66 +3831,6 @@ function WorkWeekSheet({ workWeek, data, onClose, onSave, lightMode, onToggleThe
   );
 }
 
-// ─── BLOCK EDIT PANEL (inline) ────────────────────────────────────────────────
-function BlockEditPanel({ blk, data, onSave, onDelete }) {
-  const { projects, domains } = data;
-  const [projectId, setProjectId] = useState(blk.projectId || "");
-  const [isAdmin, setIsAdmin] = useState(blk.isAdmin || false);
-  const [label, setLabel] = useState(blk.label || "Admin & Communication");
-  const [startHour, setStartHour] = useState(blk.startHour);
-  const [duration, setDuration] = useState(blk.durationMin);
-
-  return (
-    <div className="blk-edit-panel">
-      <div className="blk-edit-row">
-        <div>
-          <div className="blk-edit-label">Type</div>
-          <select className="blk-edit-select" value={isAdmin ? "admin" : "project"} onChange={e => setIsAdmin(e.target.value === "admin")}>
-            <option value="project">Project Work</option>
-            <option value="admin">Admin</option>
-          </select>
-        </div>
-        <div>
-          <div className="blk-edit-label">Start Time</div>
-          <select className="blk-edit-select" value={startHour} onChange={e => setStartHour(Number(e.target.value))}>
-            {Array.from({length:13},(_,i)=>i+7).map(h => (
-              <option key={h} value={h}>{h>12?h-12:h}:00 {h>=12?"PM":"AM"}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-      <div className="blk-edit-row">
-        <div>
-          <div className="blk-edit-label">{isAdmin ? "Label" : "Project"}</div>
-          {isAdmin ? (
-            <input className="blk-edit-select" style={{fontFamily:"'DM Sans',sans-serif"}} value={label} onChange={e => setLabel(e.target.value)} />
-          ) : (
-            <select className="blk-edit-select" value={projectId} onChange={e => setProjectId(e.target.value)}>
-              <option value="">— none —</option>
-              {projects.map(p => {
-                const d = domains.find(d => d.id === p.domainId);
-                return <option key={p.id} value={p.id}>{p.name} ({d?.name})</option>;
-              })}
-            </select>
-          )}
-        </div>
-        <div>
-          <div className="blk-edit-label">Duration</div>
-          <select className="blk-edit-select" value={duration} onChange={e => setDuration(Number(e.target.value))}>
-            <option value={25}>25 min</option><option value={45}>45 min</option>
-            <option value={60}>60 min</option><option value={90}>90 min</option>
-            <option value={120}>2 hours</option>
-          </select>
-        </div>
-      </div>
-      <div className="blk-edit-actions">
-        <button className="blk-edit-save" onClick={() => onSave({ projectId: isAdmin ? null : projectId || null, isAdmin, label: isAdmin ? label : undefined, startHour, durationMin: duration })}>Save</button>
-        <button className="blk-edit-del" onClick={onDelete}>Delete</button>
-      </div>
-    </div>
-  );
-}
-
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 function getQuarterLabel() {
@@ -4502,19 +4412,6 @@ function ShutdownSheet({ onClose, onComplete, alreadyDone, data, onAddBlock }) {
       </div>
     </>
   );
-}
-
-// ─── TIME-OF-DAY HINT ─────────────────────────────────────────────────────────
-function getTimeHint(hour, isAdmin) {
-  if (isAdmin) {
-    if (hour < 12) return { icon: "warn", text: "Admin before noon uses your peak cognitive window — consider shifting to after 3pm.", tone: "warn" };
-    if (hour < 15) return { icon: "info", text: "Early afternoon works for lighter admin — energy is good but not at its peak.", tone: "neutral" };
-    return { icon: "✓", text: "After 3pm is ideal for admin and communication — your analytical peak has passed.", tone: "good" };
-  }
-  // deep work
-  if (hour < 12) return { icon: "peak", text: "Before noon — your best window for deep analytical work. Neurochemicals are at peak.", tone: "good" };
-  if (hour < 15) return { icon: "info", text: "Early afternoon — solid for creative or generative work. Less ideal for hard analysis.", tone: "neutral" };
-  return { icon: "warn", text: "After 3pm — cognitive resources are winding down. Better suited for admin than deep work.", tone: "warn" };
 }
 
 // ─── ADD BLOCK SHEET ──────────────────────────────────────────────────────────
