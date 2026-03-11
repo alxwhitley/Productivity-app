@@ -1365,6 +1365,8 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
   const [pickerState, setPickerState] = useState(null);
   const [dwAddingTask, setDwAddingTask] = useState(null); // slotId currently adding task
   const [dwNewTaskText, setDwNewTaskText] = useState("");
+  const [editingDwTaskId, setEditingDwTaskId] = useState(null); // taskId being edited inline
+  const [editingDwTaskText, setEditingDwTaskText] = useState("");
   const [editingTaskId, setEditingTaskId] = useState(null); // { taskId, projectId, text }
   // manualCompleted derived from persisted data (today's date only)
   const todayStr = new Date().toDateString();
@@ -2092,7 +2094,8 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                               return (
                                 <div style={{ marginTop:8, display:"flex", flexDirection:"column", gap:5 }}>
                                   {preview.map(t => (
-                                    <div key={t.id} style={{ display:"flex", alignItems:"center", gap:7 }}>
+                                    <div key={t.id} onClick={e => { e.stopPropagation(); toggleTask(proj.id, t.id); }}
+                                      style={{ display:"flex", alignItems:"center", gap:7, cursor:"pointer" }}>
                                       <div style={{ width:13, height:13, borderRadius:3, border: t.done ? "none" : `1.5px solid ${domainColor ? domainColor+"60" : "var(--border)"}`, background: t.done ? (domainColor||"var(--green)") : "transparent", flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center" }}>
                                         {t.done && <span style={{ fontSize:7, color:"#000", fontWeight:900 }}>✓</span>}
                                       </div>
@@ -2190,7 +2193,24 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                                   onClick={e => { e.stopPropagation(); toggleTask(proj.id, t.id); }}>
                                   {t.done && <span style={{fontSize:10,color:"#fff",fontWeight:700}}>✓</span>}
                                 </div>
-                                <span className={`tl-task-txt ${t.done ? "done" : ""}`} style={{ fontSize:14 }}>{t.text}</span>
+                                {editingDwTaskId === t.id ? (
+                                  <input autoFocus
+                                    style={{ flex:1, background:"transparent", border:"none", borderBottom:"1.5px solid var(--accent)", outline:"none", color:"var(--text)", fontSize:14, fontFamily:"'DM Sans',sans-serif", padding:"1px 0" }}
+                                    value={editingDwTaskText}
+                                    onChange={e => setEditingDwTaskText(e.target.value)}
+                                    onBlur={() => {
+                                      const txt = editingDwTaskText.trim();
+                                      if (txt && txt !== t.text) setData(d => ({ ...d, projects: d.projects.map(p => p.id !== proj.id ? p : { ...p, tasks: p.tasks.map(tk => tk.id !== t.id ? tk : { ...tk, text: txt }) }) }));
+                                      setEditingDwTaskId(null);
+                                    }}
+                                    onKeyDown={e => { if (e.key === "Enter" || e.key === "Escape") e.target.blur(); }}
+                                    onClick={e => e.stopPropagation()} />
+                                ) : (
+                                  <span className={`tl-task-txt ${t.done ? "done" : ""}`} style={{ fontSize:14, cursor:"text" }}
+                                    onClick={e => { e.stopPropagation(); if (!t.done) { setEditingDwTaskId(t.id); setEditingDwTaskText(t.text); } }}>
+                                    {t.text}
+                                  </span>
+                                )}
                               </div>
                             ))}
                             <div style={{ display:"flex", gap:8, marginTop:10 }}>
@@ -2328,16 +2348,16 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                     const dom = data.domains?.find(d => d.id === t.domainId);
                     const isEditing = looseEditId === t.id;
                     return (
-                      <div key={t.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 0", borderBottom:"1px solid rgba(232,160,48,.08)" }}>
+                      <div key={t.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 0", borderBottom:"1px solid var(--border2)" }}>
                         {/* Circle — tap to check */}
                         <div onClick={() => setData(d => ({ ...d, looseTasks: (d.looseTasks||[]).map(lt => lt.id===t.id ? { ...lt, done:true, doneAt:new Date().toISOString() } : lt) }))}
-                          style={{ width:22, height:22, borderRadius:"50%", border:"1.5px solid rgba(232,160,48,.35)", background:"transparent", flexShrink:0, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", transition:"border-color .15s, background .15s" }} />
+                          style={{ width:22, height:22, borderRadius:"50%", border:"1.5px solid var(--border)", background:"transparent", flexShrink:0, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", transition:"border-color .15s, background .15s" }} />
                         {/* Text — tap to edit */}
                         <div style={{ flex:1, minWidth:0 }}>
                           {isEditing ? (
                             <input
                               autoFocus
-                              style={{ width:"100%", background:"rgba(232,160,48,.08)", border:"1px solid rgba(232,160,48,.3)", borderRadius:7, padding:"5px 8px", color:"var(--text)", fontSize:14, fontFamily:"'DM Sans',sans-serif", outline:"none", boxSizing:"border-box" }}
+                              style={{ width:"100%", background:"var(--bg3)", border:"1px solid var(--border)", borderRadius:7, padding:"5px 8px", color:"var(--text)", fontSize:14, fontFamily:"'DM Sans',sans-serif", outline:"none", boxSizing:"border-box" }}
                               value={looseEditText}
                               onChange={e => setLooseEditText(e.target.value)}
                               onKeyDown={e => { if (e.key==="Enter") saveEdit(t.id); if (e.key==="Escape") { setLooseEditId(null); setLooseEditText(""); } }}
@@ -2354,8 +2374,8 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                 );
               })()}
               {/* Quick add */}
-              <div style={{ display:"flex", alignItems:"center", gap:8, background:"rgba(232,160,48,.06)", border:"1px solid rgba(232,160,48,.12)", borderRadius:10, padding:"8px 12px", marginTop:12 }}>
-                <span style={{ fontSize:16, color:"rgba(232,160,48,.4)", lineHeight:1 }}>+</span>
+              <div style={{ display:"flex", alignItems:"center", gap:8, background:"var(--bg3)", border:"1px solid var(--border2)", borderRadius:10, padding:"8px 12px", marginTop:12 }}>
+                <span style={{ fontSize:16, color:"var(--text3)", lineHeight:1 }}>+</span>
                 <input style={{ flex:1, background:"none", border:"none", outline:"none", color:"var(--text)", fontSize:13, fontFamily:"'DM Sans',sans-serif", padding:0 }}
                   placeholder="Add a task…"
                   value={looseQuickDraft}
