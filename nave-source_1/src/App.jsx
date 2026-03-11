@@ -2038,7 +2038,7 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                       <div style={{ flex:1, minWidth:0 }}>
                         {/* Eyebrow */}
                         <div style={{ fontSize:10, fontWeight:700, letterSpacing:".08em", textTransform:"uppercase", color: isNow ? (domainColor||"var(--accent)") : "var(--text3)", marginBottom: isNow || isExp ? 4 : 2, opacity: isCompleted ? 0.5 : 1 }}>
-                          {isNow ? "● Now" : isPast ? "Past" : "Upcoming"}{isSessionMode ? " · Session" : " · Deep Work"}{isRunning ? ` · ${cdStr}` : ""}
+                          {isSessionMode ? "Deep Work · Session" : "Deep Work · Tasks"}{isRunning ? ` · ${cdStr}` : ""}
                         </div>
                         <div style={{ fontSize: isNow && !isExp ? 20 : 15, fontWeight:800, color: isCompleted ? "var(--text3)" : "var(--text)", letterSpacing:"-.02em", lineHeight:1.15, overflow:"hidden", textOverflow:"ellipsis", whiteSpace: isExp ? "normal" : "nowrap" }}>{proj.name}</div>
                         {!isExp && (
@@ -2286,7 +2286,7 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                             <div onClick={() => { setLooseEditId(t.id); setLooseEditText(t.text); }}
                               style={{ fontSize:14, color:"var(--text)", cursor:"text", padding:"2px 0" }}>{t.text}</div>
                           )}
-                          {dom && !isEditing && <div style={{ fontSize:11, color:"rgba(232,160,48,.5)", marginTop:2 }}>{dom.name}</div>}
+                          {dom && !isEditing && <div style={{ fontSize:11, color:"var(--text3)", marginTop:2 }}>{dom.name}</div>}
                         </div>
                       </div>
                     );
