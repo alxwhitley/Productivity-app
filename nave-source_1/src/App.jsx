@@ -407,10 +407,11 @@ const css = `
   .tl-item.dragging{opacity:.4;border:1px dashed var(--border);}
   .tl-item.drag-over{border-top:2px solid var(--accent);}
 
-  .tl-card{width:100%;background:var(--bg2);border-radius:14px;overflow:hidden;transition:opacity .2s,border-color .2s,box-shadow .2s;}
+  .tl-card{width:100%;background:var(--bg2);border-radius:14px;overflow:hidden;transition:opacity .2s,border-color .2s,box-shadow .2s,transform .25s;}
   .tl-card.done-card{opacity:.32;filter:saturate(0.1);}
   .tl-card.missed-card{border:1px solid var(--domain-color,rgba(255,255,255,.1));box-shadow:0 0 14px var(--domain-color,transparent);}
-  .tl-card.now-card{border:2px solid var(--domain-color,rgba(232,160,48,.5));box-shadow:0 0 32px var(--domain-color,rgba(232,160,48,.15)),0 0 0 0 var(--domain-color,rgba(232,160,48,.1));transform:scale(1.012);transform-origin:center top;background:var(--bg2);}
+  .tl-card.now-card{border:2px solid var(--domain-color,rgba(232,160,48,.7));box-shadow:0 0 0 4px var(--domain-color,rgba(232,160,48,.08)),0 0 40px var(--domain-color,rgba(232,160,48,.2));transform:scale(1.018);transform-origin:center top;background:var(--bg2);animation:now-pulse 3s ease-in-out infinite;}
+  @keyframes now-pulse{0%,100%{box-shadow:0 0 0 4px var(--domain-color,rgba(232,160,48,.08)),0 0 40px var(--domain-color,rgba(232,160,48,.2));}50%{box-shadow:0 0 0 6px var(--domain-color,rgba(232,160,48,.14)),0 0 55px var(--domain-color,rgba(232,160,48,.28));}}
   .tl-card.active-card{border:1px solid rgba(232,160,48,.25);box-shadow:0 0 24px rgba(232,160,48,.09);}
   .tl-card.upcoming-card{border:1px solid var(--domain-color,rgba(255,255,255,.08));box-shadow:0 0 14px var(--domain-color,transparent);}
   /* Routine pill card */
@@ -820,6 +821,8 @@ const css = `
   .nav-lbl{font-size:10px;font-weight:500;letter-spacing:.04em;color:var(--text3);text-transform:uppercase;transition:color .15s;}
   .nav-btn.on .nav-ico,.nav-btn.on .nav-lbl{color:var(--accent);}
   .nav-dot{position:absolute;top:8px;right:calc(50% - 14px);width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px rgba(232,160,48,.6);}
+  .nav-dot.urgent{background:var(--red);box-shadow:0 0 8px rgba(224,85,85,.7);animation:dot-pulse 1.5s ease-in-out infinite;}
+  @keyframes dot-pulse{0%,100%{box-shadow:0 0 8px rgba(224,85,85,.7);}50%{box-shadow:0 0 14px rgba(224,85,85,.9);}}
   .nav-btn{position:relative;}
 
   /* ── SHEETS ── */
@@ -885,6 +888,20 @@ const css = `
   .ii-save:disabled{opacity:.4;cursor:not-allowed;}
   .ii-dismiss{background:var(--bg4);color:var(--text3);border:none;border-radius:8px;padding:9px 14px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;}
   .inbox-empty{text-align:center;padding:30px 0;color:var(--text3);font-size:14px;}
+
+  /* ── Block completion celebration ── */
+  .block-celebrate{position:relative;padding:18px 0 14px;display:flex;flex-direction:column;align-items:center;gap:6px;overflow:hidden;}
+  .block-celebrate-burst{position:relative;height:40px;width:100%;display:flex;align-items:center;justify-content:center;gap:6px;}
+  .celebrate-particle{font-size:16px;display:inline-block;animation:celebrate-pop .7s cubic-bezier(.22,.68,0,1.2) calc(var(--i) * 60ms) both;}
+  @keyframes celebrate-pop{0%{transform:scale(0) translateY(8px);opacity:0;}60%{transform:scale(1.3) translateY(-4px);opacity:1;}100%{transform:scale(1) translateY(0);opacity:1;}}
+  .block-celebrate-label{font-size:13px;font-weight:700;letter-spacing:.04em;color:var(--green);animation:fade-up .4s ease .3s both;}
+  @keyframes fade-up{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+
+  /* ── Inbox aging badges ── */
+  .reminder-card-age{font-size:10px;font-weight:700;letter-spacing:.05em;padding:2px 7px;border-radius:10px;flex-shrink:0;margin-top:3px;}
+  .reminder-card-age.age-fresh{background:rgba(69,193,122,.15);color:var(--green);}
+  .reminder-card-age.age-warn{background:rgba(232,160,48,.15);color:var(--accent);}
+  .reminder-card-age.age-old{background:rgba(224,85,85,.15);color:var(--red);}
 
 
   /* QUICK REMINDERS MODAL */
@@ -1202,6 +1219,7 @@ function StatusBar() {
 function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: focusModeprop, setFocusMode: setFocusModeApp, onSignOut }) {
   const [showTodaySettings, setShowTodaySettings] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
+  const [celebratingId, setCelebratingId] = useState(null); // blockId currently showing completion burst
   const [blockMenuOpen, setBlockMenuOpen] = useState(null); // blockId with gear menu open
   const [blockMenuMode, setBlockMenuMode] = useState(null); // null | "project"
   const [dragId, setDragId] = useState(null);
@@ -1412,7 +1430,12 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
       const blockCompletions = alreadyLogged ? existing : [...existing, { blockId, date: todayStr, durationMin }];
       return { ...d, projects, blockCompletions };
     });
-    setExpandedId(null); // collapse the card
+    // Show celebration burst, then collapse
+    setCelebratingId(blockId);
+    setTimeout(() => {
+      setCelebratingId(null);
+      setExpandedId(null);
+    }, 1600);
   };
 
   // Add a brand-new task to project AND return its id so caller can also select it
@@ -1562,6 +1585,15 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
     const endMins = item.mins + (item.data.durationMin || 60);
     return item.mins <= nowMins && nowMins < endMins;
   });
+
+  // Auto-expand the current block so the user always sees what to do right now
+  const lastAutoExpanded = useRef(null);
+  useEffect(() => {
+    if (currentItem && currentItem.id !== lastAutoExpanded.current) {
+      setExpandedId(currentItem.id);
+      lastAutoExpanded.current = currentItem.id;
+    }
+  }, [currentItem?.id]);
   // Next upcoming
   const nextItem = timeline.find(item => item.mins > nowMins);
 
@@ -2027,6 +2059,17 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                           </div>
                         );
                       })()}
+                        {/* Completion celebration overlay */}
+                        {celebratingId === blk.id && (
+                          <div className="block-celebrate" onClick={e => e.stopPropagation()}>
+                            <div className="block-celebrate-burst">
+                              {["🟢","✦","✦","🟢","✦","✦","🟢"].map((s,i) => (
+                                <span key={i} className="celebrate-particle" style={{ "--i": i }}>{s}</span>
+                              ))}
+                            </div>
+                            <div className="block-celebrate-label">Block complete</div>
+                          </div>
+                        )}
                         {/* Inline management panel — inside tl-card */}
                         <div className={`blk-mgmt-panel${blockMenuOpen === blk.id ? " open" : ""}`} onClick={e => e.stopPropagation()}>
                           <div className="blk-mgmt-inner">
@@ -3318,13 +3361,20 @@ function ProjectsScreen({ data, setData, openCategorize }) {
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M22 12h-6l-2 3H10l-2-3H2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
               Reminders · tap to assign
             </div>
-            {data.inbox.map(item => (
-              <div key={item.id} className="reminder-card">
-                <div className="reminder-card-dot" />
-                <div className="reminder-card-text">{item.text}</div>
-                <button className="reminder-card-assign" onClick={e => { e.stopPropagation(); openCategorize(); }}>Assign →</button>
-              </div>
-            ))}
+            {data.inbox.map(item => {
+              const ageMs = item.createdAt ? Date.now() - item.createdAt : 0;
+              const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
+              const ageClass = ageDays >= 3 ? "age-old" : ageDays >= 1 ? "age-warn" : "age-fresh";
+              const ageLabel = ageDays === 0 ? "Today" : ageDays === 1 ? "1 day" : `${ageDays} days`;
+              return (
+                <div key={item.id} className="reminder-card">
+                  <div className="reminder-card-dot" />
+                  <div className="reminder-card-text">{item.text}</div>
+                  <span className={`reminder-card-age ${ageClass}`}>{ageLabel}</span>
+                  <button className="reminder-card-assign" onClick={e => { e.stopPropagation(); openCategorize(); }}>Assign →</button>
+                </div>
+              );
+            })}
           </>
         )}
 
@@ -5630,7 +5680,9 @@ export default function App() {
             {/* Today + Projects */}
             {NAV_ITEMS.slice(0,2).map(n => (
               <div key={n.id} className={`nav-btn ${tab===n.id?"on":""}`} onClick={()=>setTab(n.id)}>
-                {n.id === "projects" && data.inbox.length > 0 && <span className="nav-dot" />}
+                {n.id === "projects" && data.inbox.length > 0 && (
+                  <span className={`nav-dot${data.inbox.some(i => i.createdAt && Date.now() - i.createdAt > 2 * 24 * 60 * 60 * 1000) ? " urgent" : ""}`} />
+                )}
                 <span className="nav-ico"><NavIcon id={n.id} active={tab===n.id} /></span>
                 <span className="nav-lbl">{n.lbl}</span>
               </div>
