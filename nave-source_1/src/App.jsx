@@ -407,12 +407,12 @@ const css = `
 
   .tl-card{width:100%;background:var(--bg2);border-radius:14px;overflow:hidden;transition:opacity .2s,border-color .2s,box-shadow .2s;}
   .tl-card.done-card{opacity:.42;filter:saturate(0.15);}
-  .tl-card.missed-card{}
+  .tl-card.missed-card{border:1px solid var(--domain-color,rgba(255,255,255,.1));box-shadow:0 0 14px var(--domain-color,transparent);}
   .tl-card.now-card{border:1px solid rgba(232,160,48,.25);box-shadow:0 0 24px rgba(232,160,48,.09);}
   .tl-card.active-card{border:1px solid rgba(232,160,48,.25);box-shadow:0 0 24px rgba(232,160,48,.09);}
-  .tl-card.upcoming-card{}
+  .tl-card.upcoming-card{border:1px solid var(--domain-color,rgba(255,255,255,.08));box-shadow:0 0 14px var(--domain-color,transparent);}
   .tl-check-icon.missed{width:20px;height:20px;border-radius:50%;border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-  .tl-card-head{display:flex;align-items:center;gap:10px;padding:13px 14px;cursor:pointer;}
+  .tl-card-head{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;}
   .tl-stripe{width:3px;border-radius:2px;align-self:stretch;min-height:28px;flex-shrink:0;}
   .tl-info{flex:1;min-width:0;}
   .tl-name{font-size:15px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -1601,7 +1601,14 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                       {/* Revealed action buttons — shown when swiped left */}
                       {!isCompleted && (
                         <div className="tl-swipe-actions">
-                          <button className="tl-swipe-action-btn swap" onPointerUp={e => { e.stopPropagation(); setSwapBlockId(swapBlockId === blk.id ? null : blk.id); }}>
+                          <button className="tl-swipe-action-btn swap" onPointerUp={e => {
+                            e.stopPropagation();
+                            // Snap card back before showing swap panel
+                            const card = e.currentTarget.closest(".tl-swipe-wrap")?.querySelector(".tl-swipe-card");
+                            if (card) { card.style.transition = ""; card.style.transform = "translateX(0)"; }
+                            setRevealedBlockId(null);
+                            setSwapBlockId(swapBlockId === blk.id ? null : blk.id);
+                          }}>
                             <span className="tl-swipe-action-ico">⇄</span>
                             <span className="tl-swipe-action-lbl">Swap</span>
                           </button>
@@ -1621,9 +1628,10 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                           <button onClick={e => { e.stopPropagation(); setConflictWarning(null); }} style={{ background:"var(--bg3)", color:"var(--text3)", border:"none", borderRadius:6, padding:"3px 8px", fontSize:10, cursor:"pointer", fontFamily:"'DM Sans',sans-serif", flexShrink:0 }}>Cancel</button>
                         </div>
                       )}
-                      <div className="tl-card-head" onClick={() => setExpandedId(isExp ? null : item.id)}>
+                      <div className="tl-card-head" onClick={() => { if (revealedBlockId === blk.id || swapBlockId === blk.id) return; setExpandedId(isExp ? null : item.id); }}>
                         <div className="tl-stripe" style={{ background: domain?.color || "var(--bg4)" }} />
                         <div className="tl-info">
+                          <div style={{ fontSize:10, fontWeight:700, letterSpacing:".08em", textTransform:"uppercase", color: domain?.color || "var(--accent)", marginBottom:2, opacity:.9 }}>Deep Work</div>
                           <div className="tl-name">{proj?.name || blk.label || "Block"}</div>
                           <div className="tl-meta">
                             {domain ? `${domain.name} · ` : ""}{blk.durationMin} min
@@ -1849,7 +1857,13 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                       >
                         {/* Swipe actions */}
                         <div className="tl-swipe-actions">
-                          <button className="tl-swipe-action-btn swap" onPointerUp={e => { e.stopPropagation(); setSwapBlockId(swapBlockId === slot.id ? null : slot.id); }}>
+                          <button className="tl-swipe-action-btn swap" onPointerUp={e => {
+                            e.stopPropagation();
+                            const card = e.currentTarget.closest(".tl-swipe-wrap")?.querySelector(".tl-swipe-card");
+                            if (card) { card.style.transition = ""; card.style.transform = "translateX(0)"; }
+                            setRevealedBlockId(null);
+                            setSwapBlockId(swapBlockId === slot.id ? null : slot.id);
+                          }}>
                             <span className="tl-swipe-action-ico">⇄</span>
                             <span className="tl-swipe-action-lbl">Swap</span>
                           </button>
@@ -1861,7 +1875,7 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                         <div className={`tl-swipe-card tl-card${isExp ? " active-card" : ""}`}
                           data-blockid={slot.id}
                           style={{ border: cardBorder, boxShadow: cardShadow }}
-                          onClick={() => setExpandedId(isExp ? null : slot.id)}
+                          onClick={() => { if (revealedBlockId === slot.id || swapBlockId === slot.id) return; setExpandedId(isExp ? null : slot.id); }}
                         >
                           <div className="tl-card-head" style={{ padding:"15px 14px" }}>
                             <div className="tl-stripe" style={{ background: domainColor || "var(--bg4)" }} />
