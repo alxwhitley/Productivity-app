@@ -390,11 +390,12 @@ const css = `
   .dw-empty-dur{font-size:11px;color:rgba(255,255,255,.18);margin-left:auto;flex-shrink:0;}
   .dw-picker-wrap{background:var(--bg3);border:1.5px dashed rgba(255,255,255,.14);border-top:none;border-radius:0 0 14px 14px;overflow:hidden;}
   .dw-picker-sect{padding:10px 10px 6px;font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text3);}
-  .dw-proj-row{display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;border-radius:8px;margin:0 4px;}
-  .dw-proj-row:active{background:var(--bg4);}
-  .dw-proj-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
-  .dw-proj-name{font-size:14px;color:var(--text);flex:1;}
-  .dw-proj-domain{font-size:11px;color:var(--text3);}
+  .dw-proj-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px 6px 8px;}
+  .dw-proj-row{display:flex;align-items:center;gap:8px;padding:9px 10px;cursor:pointer;border-radius:10px;background:var(--bg4);}
+  .dw-proj-row:active{background:var(--border);}
+  .dw-proj-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+  .dw-proj-name{font-size:13px;color:var(--text);flex:1;font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .dw-proj-domain{font-size:10px;color:var(--text3);}
   .dw-confirm-wrap{padding:12px;}
   .dw-time-row{display:flex;gap:8px;margin-bottom:12px;}
   .dw-time-sel{flex:1;background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:9px 10px;color:var(--text);font-family:"DM Sans",sans-serif;font-size:16px;outline:none;appearance:none;}
@@ -1547,11 +1548,15 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
     allCandidates.push({ i, def, saved, isFilled: !!saved.projectId });
   }
 
-  // Enforce cap: all filled slots count toward the max, empties fill the remainder
+  // Regular blocks (from data.blocks) also count toward the cap
+  const regularBlockCount = viewBlocks.length;
+  const dwCapRemaining = Math.max(0, maxDeepBlocks - regularBlockCount);
+
+  // Enforce cap: all filled slots count toward the remaining budget, empties fill the remainder
   const filledCandidates = allCandidates.filter(c => c.isFilled);
   const emptyCandidates  = allCandidates.filter(c => !c.isFilled);
-  const filledToShow     = filledCandidates.slice(0, maxDeepBlocks);
-  const emptyAllowed     = Math.max(0, maxDeepBlocks - filledToShow.length);
+  const filledToShow     = filledCandidates.slice(0, dwCapRemaining);
+  const emptyAllowed     = Math.max(0, dwCapRemaining - filledToShow.length);
   const emptyToShow      = emptyCandidates.slice(0, emptyAllowed);
   const slotsToShow      = [...filledToShow, ...emptyToShow];
 
@@ -2417,7 +2422,7 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                           {pickerStep === "project" && (
                             <>
                               <div className="dw-picker-sect">Choose a project</div>
-                              <div style={{ maxHeight:220, overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
+                              <div className="dw-proj-grid">
                               {data.projects.filter(p => p.status === "active").map(p => {
                                 const d2 = data.domains?.find(d => d.id === p.domainId);
                                 return (
@@ -2429,8 +2434,10 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                                     }}
                                   >
                                     <div className="dw-proj-dot" style={{ background: d2?.color || "var(--text3)" }} />
-                                    <div className="dw-proj-name">{p.name}</div>
-                                    <div className="dw-proj-domain">{d2?.name}</div>
+                                    <div style={{ flex:1, minWidth:0 }}>
+                                      <div className="dw-proj-name">{p.name}</div>
+                                      <div className="dw-proj-domain">{d2?.name}</div>
+                                    </div>
                                   </div>
                                 );
                               })}
@@ -3870,7 +3877,7 @@ function PlanScreen({ data, setData, openAddBlock, onGoToSeason, lightMode, togg
                         {pickerStep2 === "project" && (
                           <>
                             <div className="dw-picker-sect">Choose a project</div>
-                            <div>
+                            <div className="dw-proj-grid">
                             {data.projects.filter(p => p.status === "active").map(p => {
                               const d2 = data.domains?.find(d => d.id === p.domainId);
                               return (
@@ -3882,8 +3889,10 @@ function PlanScreen({ data, setData, openAddBlock, onGoToSeason, lightMode, togg
                                   }}
                                 >
                                   <div className="dw-proj-dot" style={{ background: d2?.color || "var(--text3)" }} />
-                                  <div className="dw-proj-name">{p.name}</div>
-                                  <div className="dw-proj-domain">{d2?.name}</div>
+                                  <div style={{ flex:1, minWidth:0 }}>
+                                    <div className="dw-proj-name">{p.name}</div>
+                                    <div className="dw-proj-domain">{d2?.name}</div>
+                                  </div>
                                 </div>
                               );
                             })}
@@ -5069,70 +5078,42 @@ function AddBlockSheet({ data, onClose, onAdd, onAddRoutine }) {
 }
 
 // ─── QUICK CAPTURE ────────────────────────────────────────────────────────────
-function QuickReminders({ onClose, onAddAll, onReadyChange }) {
+function QuickReminders({ onClose, onAdd }) {
   const [items, setItems] = useState([]);
   const [draft, setDraft] = useState("");
-  const [draftDest, setDraftDest] = useState(null);
   const inputRef = useRef(null);
 
   useEffect(() => { setTimeout(() => inputRef.current?.focus(), 60); }, []);
 
-  // Tell parent whether all committed items are tagged
-  useEffect(() => {
-    const allTagged = items.length > 0 && items.every(i => i.dest !== null);
-    onReadyChange?.(allTagged);
-  }, [items]);
-
   const commitDraft = () => {
     const t = draft.trim();
     if (!t) return;
-    setItems(prev => [...prev, { id: uid(), text: t, dest: draftDest }]);
+    // Commit immediately to inbox — no routing decision needed here
+    onAdd({ id: uid(), text: t, createdAt: Date.now() });
+    setItems(prev => [...prev, t]);
     setDraft("");
-    setDraftDest(null);
-    setTimeout(() => inputRef.current?.focus(), 10);
   };
-
-  const setDest = (id, dest) => {
-    setItems(prev => prev.map(i => i.id !== id ? i : { ...i, dest: i.dest === dest ? null : dest }));
-    setTimeout(() => inputRef.current?.focus(), 30);
-  };
-
-  const setDraftDestToggle = (dest) => {
-    setDraftDest(prev => prev === dest ? null : dest);
-    setTimeout(() => inputRef.current?.focus(), 30);
-  };
-
-  const updateText = (id, text) => setItems(prev => prev.map(i => i.id === id ? { ...i, text } : i));
 
   const finish = () => {
-    const finalItems = [...items];
+    // Commit any unsubmitted draft on close
     const t = draft.trim();
-    if (t) finalItems.push({ id: uid(), text: t, dest: draftDest });
-    if (finalItems.length === 0) { onClose(); return; }
-    onAddAll(finalItems.map(i => ({ ...i, dest: i.dest || "later" })));
+    if (t) onAdd({ id: uid(), text: t, createdAt: Date.now() });
     onClose();
   };
-
-  const hasDraftText = draft.trim().length > 0;
 
   return (
     <>
       <div className="qr-backdrop" onClick={finish} />
       <div className="qr-panel" onClick={e => e.stopPropagation()}>
-        <div className="qr-header">Quick Reminders</div>
+        <div className="qr-header">Capture</div>
 
+        {/* Already-captured items — reassurance list */}
         {items.length > 0 && (
           <div className="qr-items">
-            {items.map(i => (
-              <div key={i.id} className="qr-item">
-                <input
-                  className="qr-item-input"
-                  value={i.text}
-                  onChange={e => updateText(i.id, e.target.value)}
-                  onKeyDown={e => { if (e.key === "Enter") inputRef.current?.focus(); }}
-                />
-                <button className={`qr-pill qr-pill-today${i.dest === "today" ? " active" : ""}`} onClick={() => setDest(i.id, "today")}>Today</button>
-                <button className={`qr-pill qr-pill-later${i.dest === "later" ? " active" : ""}`} onClick={() => setDest(i.id, "later")}>Later</button>
+            {items.map((text, i) => (
+              <div key={i} className="qr-item">
+                <span style={{ fontSize:11, color:"var(--green)", marginRight:6 }}>✓</span>
+                <span className="qr-item-text">{text}</span>
               </div>
             ))}
           </div>
@@ -5142,18 +5123,23 @@ function QuickReminders({ onClose, onAddAll, onReadyChange }) {
           <input
             ref={inputRef}
             className="qr-input"
-            placeholder="Add a reminder…"
+            placeholder="What's on your mind…"
             value={draft}
             onChange={e => setDraft(e.target.value)}
-            onKeyDown={e => { if (e.key === "Enter") commitDraft(); if (e.key === "Escape") finish(); }}
+            onKeyDown={e => {
+              if (e.key === "Enter") commitDraft();
+              if (e.key === "Escape") finish();
+            }}
           />
-          {hasDraftText && (
-            <>
-              <button className={`qr-pill qr-pill-today${draftDest === "today" ? " active" : ""}`} onClick={() => setDraftDestToggle("today")}>Today</button>
-              <button className={`qr-pill qr-pill-later${draftDest === "later" ? " active" : ""}`} onClick={() => setDraftDestToggle("later")}>Later</button>
-            </>
-          )}
         </div>
+
+        {items.length > 0 && (
+          <div style={{ padding:"8px 18px 14px", textAlign:"center" }}>
+            <span style={{ fontSize:11, color:"var(--text3)" }}>
+              {items.length} item{items.length !== 1 ? "s" : ""} saved to inbox
+            </span>
+          </div>
+        )}
       </div>
     </>
   );
@@ -5377,7 +5363,7 @@ function ProjectsManageSheet({ data, setData, onClose }) {
 // ─── INBOX SWIPE ROW ─────────────────────────────────────────────────────────
 // swipe right → mark done (add to project as completed task)
 // swipe left  → delete from inbox
-function InboxSwipeRow({ item, projects, domains, onCategorize, onDismiss, defaultProjectId }) {
+function InboxSwipeRow({ item, projects, domains, onCategorize, onDismiss, onDoToday, defaultProjectId }) {
   const [offset, setOffset] = useState(0);
   const startX = useRef(null);
   const THRESHOLD = 72;
@@ -5428,7 +5414,16 @@ function InboxSwipeRow({ item, projects, domains, onCategorize, onDismiss, defau
         {offset > 20  && <div style={{ fontSize:11, color:"var(--green)", fontWeight:700, letterSpacing:".05em", textTransform:"uppercase", marginBottom:6, opacity: Math.min(1, offset/THRESHOLD) }}>→ Mark as done</div>}
         {offset < -20 && <div style={{ fontSize:11, color:"var(--red)", fontWeight:700, letterSpacing:".05em", textTransform:"uppercase", marginBottom:6, opacity: Math.min(1, -offset/THRESHOLD) }}>← Delete</div>}
         <div className="ii-text">{item.text}</div>
-        <div className="ii-label">Assign to project</div>
+
+        {/* Do Today — prominent single action at top */}
+        <button
+          onClick={() => onDoToday(item.id)}
+          style={{ width:"100%", background:"var(--accent-s)", border:"1.5px solid rgba(232,160,48,.35)", borderRadius:10, padding:"10px", fontSize:13, fontWeight:700, color:"var(--accent)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", marginBottom:10, marginTop:4 }}
+        >
+          Do Today →
+        </button>
+
+        <div className="ii-label">Or assign to project</div>
         <select className="ii-select" value={selectedProject} onChange={e => setSelectedProject(e.target.value)}>
           <option value="">— choose a project —</option>
           {domains.map(d => (
@@ -5449,7 +5444,7 @@ function InboxSwipeRow({ item, projects, domains, onCategorize, onDismiss, defau
   );
 }
 
-function CategorizeSheet({ data, onClose, onCategorize, onDismiss }) {
+function CategorizeSheet({ data, onClose, onCategorize, onDismiss, onDoToday }) {
   const swipe = useSwipeDown(onClose);
   const { inbox, projects, domains } = data;
   if (!inbox.length) return (
@@ -5479,6 +5474,7 @@ function CategorizeSheet({ data, onClose, onCategorize, onDismiss }) {
               defaultProjectId={projects.find(p=>p.status==="active")?.id || projects[0]?.id || ""}
               onCategorize={onCategorize}
               onDismiss={onDismiss}
+              onDoToday={onDoToday}
             />
           ))}
         </div>
@@ -5602,7 +5598,6 @@ export default function App() {
   const [sheet, setSheet] = useState(null);
   const [focusMode, setFocusMode] = useState(false);
   const [captureOpen, setCaptureOpen] = useState(false);
-  const [captureReady, setCaptureReady] = useState(false); // true when all QR items are tagged
   const [lightMode, setLightMode] = useState(() => {
     try { return localStorage.getItem(THEME_KEY) === "light"; } catch { return false; }
   });
@@ -5627,21 +5622,11 @@ export default function App() {
 
   const handleAddBlock = b => setData(d => ({ ...d, blocks: [...d.blocks, b] }));
   const handleAddRoutine = r => setData(d => ({ ...d, routineBlocks: [...(d.routineBlocks||[]), r] }));
-  const handleQuickAdd = items => {
-    // items is now an array of { id, text, dest: "today"|"later" }
-    const arr = Array.isArray(items) ? items : [items];
-    setData(d => {
-      let newInbox = [...(d.inbox || [])];
-      let newLoose = [...(d.looseTasks || [])];
-      arr.forEach(item => {
-        if (item.dest === "today") {
-          newLoose.push({ id: item.id, domainId: null, text: item.text, done: false, doneAt: null });
-        } else {
-          newInbox.push({ id: item.id, text: item.text, createdAt: Date.now() });
-        }
-      });
-      return { ...d, inbox: newInbox, looseTasks: newLoose };
-    });
+  const handleQuickAdd = item => {
+    setData(d => ({
+      ...d,
+      inbox: [...(d.inbox || []), { id: item.id, text: item.text, createdAt: item.createdAt || Date.now() }]
+    }));
   };
   const handleCategorize = (itemId, projectId, markDone = false) => setData(d => {
     const item = d.inbox.find(i => i.id===itemId);
@@ -5649,6 +5634,15 @@ export default function App() {
     return { ...d, inbox: d.inbox.filter(i=>i.id!==itemId), projects: d.projects.map(p => p.id===projectId ? { ...p, tasks: [...p.tasks,{id:uid(),text:item.text,done:markDone}] } : p) };
   });
   const handleDismissInbox = itemId => setData(d => ({ ...d, inbox: d.inbox.filter(i=>i.id!==itemId) }));
+  const handleDoToday = itemId => setData(d => {
+    const item = d.inbox.find(i => i.id === itemId);
+    if (!item) return d;
+    return {
+      ...d,
+      inbox: d.inbox.filter(i => i.id !== itemId),
+      looseTasks: [...(d.looseTasks || []), { id: uid(), domainId: null, text: item.text, done: false, doneAt: null }],
+    };
+  });
 
   return (
     <>
@@ -5666,13 +5660,12 @@ export default function App() {
           {sheet==="shutdown"  && <ShutdownSheet    onClose={closeSheet} onComplete={()=>setData(d=>({...d,shutdownDone:true}))} alreadyDone={data.shutdownDone} data={data} onAddBlock={b=>setData(d=>({...d,blocks:[...d.blocks,b]}))} />}
           {sheet==="addblock"  && <AddBlockSheet    data={data} onClose={closeSheet} onAdd={handleAddBlock} onAddRoutine={handleAddRoutine} />}
 
-          {sheet==="categorize"&& <CategorizeSheet  data={data} onClose={closeSheet} onCategorize={handleCategorize} onDismiss={handleDismissInbox} />}
+          {sheet==="categorize"&& <CategorizeSheet  data={data} onClose={closeSheet} onCategorize={handleCategorize} onDismiss={handleDismissInbox} onDoToday={handleDoToday} />}
 
           {!focusMode && captureOpen && (
             <QuickReminders
-              onClose={() => { setCaptureOpen(false); setCaptureReady(false); }}
-              onAddAll={handleQuickAdd}
-              onReadyChange={setCaptureReady}
+              onClose={() => setCaptureOpen(false)}
+              onAdd={handleQuickAdd}
             />
           )}
 
@@ -5691,18 +5684,10 @@ export default function App() {
             {/* Center FAB */}
             <button
               className={`fab${captureOpen ? " open" : ""}`}
-              style={captureOpen ? { background: captureReady ? "var(--accent)" : "var(--bg4)", boxShadow: captureReady ? undefined : "none", transition: "background .2s" } : undefined}
-              onClick={() => {
-                if (captureOpen) {
-                  // act as confirm — trigger finish via ref or just close
-                  setCaptureOpen(v => !v);
-                } else {
-                  setCaptureOpen(true);
-                }
-              }}
+              onClick={() => setCaptureOpen(v => !v)}
             >
               {captureOpen
-                ? <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5L19 7" stroke={captureReady ? "currentColor" : "var(--text3)"} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                ? <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></svg>
                 : <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></svg>
               }
             </button>
