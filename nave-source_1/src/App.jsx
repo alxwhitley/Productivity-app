@@ -1377,6 +1377,8 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
   const [loosePickerOpen, setLoosePickerOpen] = useState(false);
   // looseQuickAdd: inline quick-add input state
   const [looseQuickDraft, setLooseQuickDraft] = useState("");
+  const [looseEditId, setLooseEditId] = useState(null);
+  const [looseEditText, setLooseEditText] = useState("");
   const { domains, projects, blocks, shutdownDone } = data;
 
 
@@ -1929,59 +1931,81 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                         </div>
                       ) : (
                         <div style={{ flex:1, overflowY:"auto", padding:"14px 16px" }} onClick={e => e.stopPropagation()}>
-                          <div style={{ fontSize:11, fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", color:"var(--text3)", marginBottom:10 }}>Assign project</div>
-                          <div style={{ display:"flex", flexDirection:"column", gap:6, marginBottom:10 }}>
-                            {data.projects.filter(p => p.status === "active").map(p => {
-                              const d2 = data.domains?.find(d => d.id === p.domainId);
-                              const isSel = selProjId === p.id;
-                              const incomp = (p.tasks||[]).filter(t=>!t.done);
-                              const tasksSel = isSel ? curSelTasks : [];
+                          {!selProjId ? (
+                            /* ── STEP 1: 2-col project grid ── */
+                            <>
+                              <div style={{ fontSize:11, fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", color:"var(--text3)", marginBottom:10 }}>Assign project</div>
+                              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:7 }}>
+                                {data.projects.filter(p => p.status === "active").map(p => {
+                                  const d2 = data.domains?.find(d => d.id === p.domainId);
+                                  const incomp = (p.tasks||[]).filter(t=>!t.done);
+                                  return (
+                                    <div key={p.id}
+                                      onClick={() => { setDwPickerProj(s => ({ ...s, [ptKey]: p.id })); setDwPickerTime(s => ({ ...s, [ptKey]: { startHour:slot.startHour, startMin:slot.startMin, durationMin:slot.durationMin, _tasks:[] } })); }}
+                                      style={{ borderRadius:11, background:"var(--bg3)", border:"1.5px solid var(--border2)", padding:"10px 12px", cursor:"pointer", display:"flex", flexDirection:"column", gap:4, transition:"border-color .15s, background .15s" }}>
+                                      <div style={{ display:"flex", alignItems:"center", gap:7 }}>
+                                        <div style={{ width:8, height:8, borderRadius:"50%", background: d2?.color||"var(--text3)", flexShrink:0 }} />
+                                        <span style={{ fontSize:13, fontWeight:700, color:"var(--text)", lineHeight:1.2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{p.name}</span>
+                                      </div>
+                                      <div style={{ fontSize:11, color:"var(--text3)", paddingLeft:15 }}>{d2?.name}{incomp.length > 0 ? ` · ${incomp.length}t` : ""}</div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </>
+                          ) : (
+                            /* ── STEP 2: task list for selected project ── */
+                            (() => {
+                              const sp = data.projects.find(p => p.id === selProjId);
+                              const sd = data.domains?.find(d => d.id === sp?.domainId);
+                              const incomp = (sp?.tasks||[]).filter(t=>!t.done);
+                              const confirmAssign = () => {
+                                const t = dwPickerTime[ptKey] || { startHour:slot.startHour, startMin:slot.startMin, durationMin:slot.durationMin };
+                                const tasks = (t._tasks && t._tasks.length > 0) ? t._tasks : null;
+                                saveDWSlot(slot.id, slot.slotIndex, selProjId, t.startHour, t.startMin, t.durationMin, tasks);
+                                setExpandedId(null);
+                                setDwPickerProj(s => { const n={...s}; delete n[ptKey]; return n; });
+                                setDwPickerTime(s => { const n={...s}; delete n[ptKey]; return n; });
+                              };
                               return (
-                                <div key={p.id} style={{ borderRadius:10, overflow:"hidden", border: isSel ? `1.5px solid ${d2?.color||"var(--accent)"}` : "1.5px solid var(--border2)", background: isSel ? `${d2?.color||"var(--accent)"}11` : "var(--bg3)", transition:"all .15s" }}>
-                                  <div style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 12px", cursor:"pointer" }}
-                                    onClick={() => {
-                                      if (isSel) { setDwPickerProj(s => { const n={...s}; delete n[ptKey]; return n; }); }
-                                      else { setDwPickerProj(s => ({ ...s, [ptKey]: p.id })); setDwPickerTime(s => ({ ...s, [ptKey]: { startHour:slot.startHour, startMin:slot.startMin, durationMin:slot.durationMin, _tasks:[] } })); }
-                                    }}>
-                                    <div style={{ width:9, height:9, borderRadius:"50%", background: d2?.color||"var(--text3)", flexShrink:0 }} />
-                                    <div style={{ flex:1, minWidth:0 }}>
-                                      <div style={{ fontSize:13, fontWeight:600, color: isSel ? "var(--text)" : "var(--text2)" }}>{p.name}</div>
-                                      <div style={{ fontSize:11, color:"var(--text3)" }}>{d2?.name}{incomp.length>0?` · ${incomp.length} task${incomp.length!==1?"s":""}`:""}</div>
-                                    </div>
-                                    <div style={{ width:18, height:18, borderRadius:"50%", border: isSel ? "none" : "1.5px solid var(--border)", background: isSel ? (d2?.color||"var(--accent)") : "transparent", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                                      {isSel && <span style={{ fontSize:9, color:"#000", fontWeight:800 }}>✓</span>}
-                                    </div>
+                                <>
+                                  {/* Back + project name header */}
+                                  <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:12 }}>
+                                    <button onClick={() => setDwPickerProj(s => { const n={...s}; delete n[ptKey]; return n; })}
+                                      style={{ background:"none", border:"none", color:"var(--text3)", cursor:"pointer", padding:0, fontFamily:"'DM Sans',sans-serif", fontSize:12, display:"flex", alignItems:"center", gap:4, fontWeight:600 }}>
+                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                      Back
+                                    </button>
+                                    <div style={{ width:8, height:8, borderRadius:"50%", background: sd?.color||"var(--text3)", flexShrink:0 }} />
+                                    <span style={{ fontSize:13, fontWeight:700, color:"var(--text)", flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{sp?.name}</span>
                                   </div>
-                                  {isSel && incomp.length > 0 && (
-                                    <div style={{ borderTop:"1px solid var(--border2)", padding:"6px 12px 10px" }}>
-                                      <div style={{ fontSize:10, fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", color:"var(--text3)", marginBottom:6 }}>Focus tasks</div>
+                                  {/* Task list */}
+                                  {incomp.length > 0 ? (
+                                    <>
+                                      <div style={{ fontSize:11, fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", color:"var(--text3)", marginBottom:8 }}>Pick focus tasks</div>
                                       {incomp.map(t => {
-                                        const tSel = tasksSel.includes(t.id);
+                                        const tSel = curSelTasks.includes(t.id);
                                         return (
-                                          <div key={t.id} onClick={() => togglePT(t.id)} style={{ display:"flex", alignItems:"center", gap:10, padding:"6px 2px", cursor:"pointer" }}>
-                                            <div style={{ width:16, height:16, borderRadius:4, border: tSel ? "none" : "1.5px solid var(--border)", background: tSel ? "var(--accent)" : "transparent", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                                              {tSel && <span style={{ fontSize:8, color:"#000", fontWeight:800 }}>✓</span>}
+                                          <div key={t.id} onClick={() => togglePT(t.id)}
+                                            style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 4px", borderBottom:"1px solid var(--border2)", cursor:"pointer" }}>
+                                            <div style={{ width:18, height:18, borderRadius:5, border: tSel ? "none" : "1.5px solid var(--border)", background: tSel ? (sd?.color||"var(--accent)") : "transparent", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, transition:"all .12s" }}>
+                                              {tSel && <span style={{ fontSize:9, color:"#000", fontWeight:800 }}>✓</span>}
                                             </div>
                                             <span style={{ fontSize:13, color: tSel ? "var(--text)" : "var(--text2)" }}>{t.text}</span>
                                           </div>
                                         );
                                       })}
-                                    </div>
+                                    </>
+                                  ) : (
+                                    <div style={{ fontSize:13, color:"var(--text3)", padding:"8px 0 12px" }}>No open tasks — assigning project only.</div>
                                   )}
-                                </div>
+                                  <button className="dw-confirm-btn" style={{ marginTop:12, width:"100%" }} onClick={confirmAssign}>
+                                    ✓ Assign{curSelTasks.length > 0 ? ` · ${curSelTasks.length} task${curSelTasks.length!==1?"s":""}` : ""}
+                                  </button>
+                                </>
                               );
-                            })}
-                          </div>
-                          <button className="dw-confirm-btn" disabled={!selProjId} style={{ opacity: selProjId ? 1 : 0.4 }}
-                            onClick={() => {
-                              if (!selProjId) return;
-                              const t = dwPickerTime[ptKey] || { startHour:slot.startHour, startMin:slot.startMin, durationMin:slot.durationMin };
-                              const tasks = (t._tasks && t._tasks.length > 0) ? t._tasks : null;
-                              saveDWSlot(slot.id, slot.slotIndex, selProjId, t.startHour, t.startMin, t.durationMin, tasks);
-                              setExpandedId(null);
-                              setDwPickerProj(s => { const n={...s}; delete n[ptKey]; return n; });
-                              setDwPickerTime(s => { const n={...s}; delete n[ptKey]; return n; });
-                            }}>✓ Assign</button>
+                            })()
+                          )}
                         </div>
                       )}
                     </div>
@@ -2184,7 +2208,7 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round"/></svg>
             <span style={{ flex:1, fontSize:13, fontWeight:600, color:"var(--text2)" }}>Loose Tasks</span>
             {looseCt > 0
-              ? <span style={{ fontSize:12, fontWeight:700, color:"var(--accent)", background:"rgba(232,160,48,.12)", borderRadius:20, padding:"2px 10px" }}>{looseCt} open</span>
+              ? <span style={{ fontSize:12, fontWeight:700, color:"var(--accent)", background:"rgba(232,160,48,.12)", borderRadius:20, padding:"2px 10px" }}>{looseCt} left</span>
               : <span style={{ fontSize:12, color:"var(--text3)" }}>None</span>
             }
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style={{ color:"var(--text3)", opacity:.5 }}><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -2217,31 +2241,52 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
 
       {/* ── LOOSE TASKS BOTTOM SHEET ── */}
       {looseBlockExp && (
-        <div style={{ position:"absolute", inset:0, zIndex:120 }} onClick={() => setLooseBlockExp(false)}>
-          <div style={{ position:"absolute", bottom:0, left:0, right:0, background:"var(--bg2)", borderRadius:"20px 20px 0 0", border:"1px solid var(--border)", maxHeight:"70vh", display:"flex", flexDirection:"column", animation:"sheet-up .25s cubic-bezier(.4,0,.2,1)" }}
+        <div style={{ position:"absolute", inset:0, zIndex:120 }} onClick={() => { setLooseBlockExp(false); setLooseEditId(null); }}>
+          <div style={{ position:"absolute", bottom:0, left:0, right:0, background:"rgba(30,22,10,1)", borderRadius:"20px 20px 0 0", border:"1px solid rgba(232,160,48,.18)", maxHeight:"70vh", display:"flex", flexDirection:"column", animation:"sheet-up .25s cubic-bezier(.4,0,.2,1)", boxShadow:"0 -8px 40px rgba(232,160,48,.08)" }}
             onClick={e => e.stopPropagation()}>
-            {/* Sheet handle */}
-            <div style={{ flexShrink:0, padding:"12px 20px 0", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+            {/* Header */}
+            <div style={{ flexShrink:0, padding:"14px 20px 10px", display:"flex", alignItems:"center", justifyContent:"space-between", borderBottom:"1px solid rgba(232,160,48,.1)" }}>
               <div style={{ fontSize:15, fontWeight:800, color:"var(--text)", letterSpacing:"-.01em" }}>Loose Tasks</div>
-              <button onClick={() => setLooseBlockExp(false)} style={{ background:"none", border:"none", cursor:"pointer", padding:4, color:"var(--text3)" }}>
+              <button onClick={() => { setLooseBlockExp(false); setLooseEditId(null); }} style={{ background:"none", border:"none", cursor:"pointer", padding:4, color:"var(--text3)" }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></svg>
               </button>
             </div>
-            <div style={{ flex:1, overflowY:"auto", padding:"10px 16px 24px" }}>
+            <div style={{ flex:1, overflowY:"auto", padding:"6px 16px 24px" }}>
               {(() => {
                 const loose = (data.looseTasks||[]).filter(t=>!t.done);
+                const saveEdit = (id) => {
+                  if (looseEditText.trim()) {
+                    setData(d => ({ ...d, looseTasks: (d.looseTasks||[]).map(lt => lt.id===id ? { ...lt, text: looseEditText.trim() } : lt) }));
+                  }
+                  setLooseEditId(null);
+                  setLooseEditText("");
+                };
                 return loose.length === 0 ? (
                   <div style={{ textAlign:"center", padding:"24px 0", fontSize:13, color:"var(--text3)" }}>No loose tasks</div>
                 ) : (
                   loose.map(t => {
                     const dom = data.domains?.find(d => d.id === t.domainId);
+                    const isEditing = looseEditId === t.id;
                     return (
-                      <div key={t.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 0", borderBottom:"1px solid var(--border2)", cursor:"pointer" }}
-                        onClick={() => setData(d => ({ ...d, looseTasks: (d.looseTasks||[]).map(lt => lt.id===t.id ? { ...lt, done:true, doneAt:new Date().toISOString() } : lt) }))}>
-                        <div className="tl-check" style={{ width:20, height:20, flexShrink:0 }} />
-                        <div style={{ flex:1 }}>
-                          <div style={{ fontSize:14, color:"var(--text)" }}>{t.text}</div>
-                          {dom && <div style={{ fontSize:11, color:"var(--text3)", marginTop:2 }}>{dom.name}</div>}
+                      <div key={t.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 0", borderBottom:"1px solid rgba(232,160,48,.08)" }}>
+                        {/* Circle — tap to check */}
+                        <div onClick={() => setData(d => ({ ...d, looseTasks: (d.looseTasks||[]).map(lt => lt.id===t.id ? { ...lt, done:true, doneAt:new Date().toISOString() } : lt) }))}
+                          style={{ width:22, height:22, borderRadius:"50%", border:"1.5px solid rgba(232,160,48,.35)", background:"transparent", flexShrink:0, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", transition:"border-color .15s, background .15s" }} />
+                        {/* Text — tap to edit */}
+                        <div style={{ flex:1, minWidth:0 }}>
+                          {isEditing ? (
+                            <input
+                              autoFocus
+                              style={{ width:"100%", background:"rgba(232,160,48,.08)", border:"1px solid rgba(232,160,48,.3)", borderRadius:7, padding:"5px 8px", color:"var(--text)", fontSize:14, fontFamily:"'DM Sans',sans-serif", outline:"none", boxSizing:"border-box" }}
+                              value={looseEditText}
+                              onChange={e => setLooseEditText(e.target.value)}
+                              onKeyDown={e => { if (e.key==="Enter") saveEdit(t.id); if (e.key==="Escape") { setLooseEditId(null); setLooseEditText(""); } }}
+                              onBlur={() => saveEdit(t.id)} />
+                          ) : (
+                            <div onClick={() => { setLooseEditId(t.id); setLooseEditText(t.text); }}
+                              style={{ fontSize:14, color:"var(--text)", cursor:"text", padding:"2px 0" }}>{t.text}</div>
+                          )}
+                          {dom && !isEditing && <div style={{ fontSize:11, color:"rgba(232,160,48,.5)", marginTop:2 }}>{dom.name}</div>}
                         </div>
                       </div>
                     );
@@ -2249,8 +2294,8 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                 );
               })()}
               {/* Quick add */}
-              <div style={{ display:"flex", alignItems:"center", gap:8, background:"var(--bg3)", borderRadius:10, padding:"8px 12px", marginTop:10 }}>
-                <span style={{ fontSize:16, color:"var(--text3)", lineHeight:1 }}>+</span>
+              <div style={{ display:"flex", alignItems:"center", gap:8, background:"rgba(232,160,48,.06)", border:"1px solid rgba(232,160,48,.12)", borderRadius:10, padding:"8px 12px", marginTop:12 }}>
+                <span style={{ fontSize:16, color:"rgba(232,160,48,.4)", lineHeight:1 }}>+</span>
                 <input style={{ flex:1, background:"none", border:"none", outline:"none", color:"var(--text)", fontSize:13, fontFamily:"'DM Sans',sans-serif", padding:0 }}
                   placeholder="Add a task…"
                   value={looseQuickDraft}
