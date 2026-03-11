@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "./supabase.js";
 
-const DOMAIN_COLORS = ["#5B8AF0","#9B72CF","#45C17A","#E8A030","#E05555","#4BAABB"];
+// 5 colors mapped to Huberman's psychology of motivation:
+// Blue=deep focus, Amber=drive/dopamine, Green=completion/recovery, Purple=identity/seasons, Slate=neutral/admin
+const DOMAIN_COLORS = ["#5B8AF0","#E8A030","#45C17A","#9B72CF","#8A9BB0"];
 
 const INITIAL_DATA = {
   domains: [
@@ -669,6 +671,20 @@ const css = `
   .color-picker-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
   .color-swatch{width:28px;height:28px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:transform .1s;}
   .color-swatch.sel{border-color:#fff;transform:scale(1.15);}
+  .gear-btn-inline{background:none;border:none;cursor:pointer;padding:4px 6px;color:var(--text3);line-height:1;border-radius:8px;flex-shrink:0;transition:color .15s,transform .25s ease;}
+  .gear-btn-inline:hover{color:var(--text2);}
+  .gear-btn-inline.open{color:var(--text2);transform:rotate(45deg);}
+  .blk-mgmt-panel{overflow:hidden;max-height:0;transition:max-height .3s cubic-bezier(.4,0,.2,1),opacity .22s ease;opacity:0;}
+  .blk-mgmt-panel.open{max-height:220px;opacity:1;}
+  .blk-mgmt-inner{border-top:1px solid var(--border2);padding:3px 0;}
+  .blk-mgmt-row{display:flex;align-items:center;gap:12px;padding:11px 16px;cursor:pointer;background:none;border:none;width:100%;font-family:'DM Sans',sans-serif;transition:background .12s;}
+  .blk-mgmt-row:hover{background:rgba(255,255,255,.04);}
+  .blk-mgmt-row-ico{width:18px;display:flex;align-items:center;justify-content:center;color:var(--text3);flex-shrink:0;}
+  .blk-mgmt-row-txt{font-size:14px;color:var(--text2);font-weight:500;}
+  .blk-mgmt-row.danger .blk-mgmt-row-ico{color:var(--red);}
+  .blk-mgmt-row.danger .blk-mgmt-row-txt{color:var(--red);}
+  .blk-mgmt-row.sub-item{padding-left:24px;}
+  .blk-mgmt-divider{height:1px;background:var(--border2);margin:2px 14px;}
   .add-domain-btn{width:100%;background:var(--bg3);border:1.5px dashed var(--border);border-radius:12px;padding:12px;color:var(--text3);font-size:14px;cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:8px;}
 
   /* ── PLAN ── */
@@ -1838,7 +1854,7 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                         {/* Gear icon when expanded, chevron when collapsed */}
                         {isExp
                           ? <button onClick={e => { e.stopPropagation(); setBlockMenuOpen(blockMenuOpen === blk.id ? null : blk.id); setBlockMenuMode(null); }}
-                              style={{ background:"none", border:"none", cursor:"pointer", padding:"4px 6px", color:"var(--text3)", lineHeight:1, borderRadius:8, flexShrink:0 }}>
+                              className={`gear-btn-inline${blockMenuOpen === blk.id ? " open" : ""}`}>
                               <GearIcon size={17} />
                             </button>
                           : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ flexShrink:0, color:"var(--text3)", opacity:.4 }}><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -1990,44 +2006,49 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                         );
                       })()}
                     </div>
-                    {/* Gear menu — outside swipe-wrap */}
-                    {blockMenuOpen === blk.id && (
-                      <div style={{ marginLeft:68, paddingRight:16, marginTop:-6, marginBottom:6 }} onClick={e => e.stopPropagation()}>
-                        <div style={{ background:"var(--bg3)", borderRadius:"0 0 14px 14px", border:"1px solid var(--border)", borderTop:"none", overflow:"hidden" }}>
-                          {blockMenuMode === "project" ? (
-                            <>
-                              <button onClick={() => setBlockMenuMode(null)} style={{ display:"flex", alignItems:"center", gap:6, width:"100%", background:"none", border:"none", borderBottom:"1px solid var(--border2)", padding:"10px 14px", fontSize:11, fontWeight:700, color:"var(--text3)", letterSpacing:".06em", textTransform:"uppercase", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
-                                ‹ Change project
-                              </button>
-                              {data.projects.filter(p => p.status === "active" && p.id !== proj?.id).map(p => {
-                                const d2 = data.domains?.find(d => d.id === p.domainId);
-                                return (
-                                  <button key={p.id} onClick={() => {
-                                    setData(d => ({ ...d, blocks: d.blocks.map(b => b.id === blk.id ? { ...b, projectId: p.id, todayTasks: undefined } : b) }));
-                                    setBlockMenuOpen(null); setBlockMenuMode(null);
-                                  }} style={{ background:"none", border:"none", textAlign:"left", padding:"11px 14px", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontSize:14, color:"var(--text)", display:"flex", alignItems:"center", gap:10, width:"100%" }}>
-                                    <span style={{ width:9, height:9, borderRadius:"50%", background: d2?.color || "var(--text3)", flexShrink:0, display:"inline-block" }} />
-                                    {p.name}
-                                  </button>
-                                );
-                              })}
-                            </>
-                          ) : (
-                            <>
-                              <button onClick={() => setBlockMenuMode("project")} style={{ display:"flex", alignItems:"center", gap:10, width:"100%", background:"none", border:"none", borderBottom:"1px solid var(--border2)", padding:"13px 14px", fontSize:14, color:"var(--text)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
-                                <span style={{ fontSize:16 }}>⇄</span> Change project
-                              </button>
-                              <button onClick={() => { rescheduleToTomorrow(blk.id); setBlockMenuOpen(null); setBlockMenuMode(null); setExpandedId(null); }} style={{ display:"flex", alignItems:"center", gap:10, width:"100%", background:"none", border:"none", borderBottom:"1px solid var(--border2)", padding:"13px 14px", fontSize:14, color:"var(--text)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
-                                <span style={{ fontSize:16 }}>→</span> Push to tomorrow
-                              </button>
-                              <button onClick={() => { setData(d => ({ ...d, blocks: d.blocks.filter(b => b.id !== blk.id) })); setBlockMenuOpen(null); setBlockMenuMode(null); setExpandedId(null); }} style={{ display:"flex", alignItems:"center", gap:10, width:"100%", background:"none", border:"none", padding:"13px 14px", fontSize:14, color:"var(--red)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
-                                <span style={{ fontSize:16 }}>✕</span> Clear slot
-                              </button>
-                            </>
-                          )}
-                        </div>
+                    {/* Inline management panel — replaces floating dropdown */}
+                    <div className={`blk-mgmt-panel${blockMenuOpen === blk.id ? " open" : ""}`} onClick={e => e.stopPropagation()}>
+                      <div className="blk-mgmt-inner">
+                        {blockMenuMode === "project" ? (
+                          <>
+                            <button className="blk-mgmt-row" onClick={() => setBlockMenuMode(null)}>
+                              <div className="blk-mgmt-row-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg></div>
+                              <span className="blk-mgmt-row-txt" style={{ fontSize:11, fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", color:"var(--text3)" }}>Change project</span>
+                            </button>
+                            <div className="blk-mgmt-divider" />
+                            {data.projects.filter(p => p.status === "active" && p.id !== proj?.id).map(p => {
+                              const d2 = data.domains?.find(d => d.id === p.domainId);
+                              return (
+                                <button key={p.id} className="blk-mgmt-row sub-item" onClick={() => {
+                                  setData(d => ({ ...d, blocks: d.blocks.map(b => b.id === blk.id ? { ...b, projectId: p.id, todayTasks: undefined } : b) }));
+                                  setBlockMenuOpen(null); setBlockMenuMode(null);
+                                }}>
+                                  <span style={{ width:8, height:8, borderRadius:"50%", background: d2?.color || "var(--text3)", flexShrink:0, display:"inline-block" }} />
+                                  <span className="blk-mgmt-row-txt">{p.name}</span>
+                                </button>
+                              );
+                            })}
+                          </>
+                        ) : (
+                          <>
+                            <button className="blk-mgmt-row" onClick={() => setBlockMenuMode("project")}>
+                              <div className="blk-mgmt-row-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg></div>
+                              <span className="blk-mgmt-row-txt">Change project</span>
+                            </button>
+                            <div className="blk-mgmt-divider" />
+                            <button className="blk-mgmt-row" onClick={() => { rescheduleToTomorrow(blk.id); setBlockMenuOpen(null); setBlockMenuMode(null); setExpandedId(null); }}>
+                              <div className="blk-mgmt-row-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
+                              <span className="blk-mgmt-row-txt">Push to tomorrow</span>
+                            </button>
+                            <div className="blk-mgmt-divider" />
+                            <button className="blk-mgmt-row danger" onClick={() => { setData(d => ({ ...d, blocks: d.blocks.filter(b => b.id !== blk.id) })); setBlockMenuOpen(null); setBlockMenuMode(null); setExpandedId(null); }}>
+                              <div className="blk-mgmt-row-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></div>
+                              <span className="blk-mgmt-row-txt">Clear slot</span>
+                            </button>
+                          </>
+                        )}
                       </div>
-                    )}
+                    </div>
                     </div>
                   </div>
                 );
@@ -2120,7 +2141,7 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                             {/* Gear icon when expanded, chevron when collapsed */}
                             {isExp
                               ? <button onClick={e => { e.stopPropagation(); setBlockMenuOpen(blockMenuOpen === slot.id ? null : slot.id); setBlockMenuMode(null); }}
-                                  style={{ background:"none", border:"none", cursor:"pointer", padding:"4px 6px", color:"var(--text3)", lineHeight:1, borderRadius:8, flexShrink:0 }}>
+                                  className={`gear-btn-inline${blockMenuOpen === slot.id ? " open" : ""}`}>
                                   <GearIcon size={17} />
                                 </button>
                               : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ flexShrink:0, color:"var(--text3)", opacity:.4 }}><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -2255,44 +2276,49 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                             );
                           })()}
                         </div>
-                        {/* Gear menu — outside swipe-card */}
-                        {blockMenuOpen === slot.id && (
-                          <div style={{ marginTop:-6, marginBottom:6 }} onClick={e => e.stopPropagation()}>
-                            <div style={{ background:"var(--bg3)", borderRadius:"0 0 14px 14px", border:"1px solid var(--border)", borderTop:"none", overflow:"hidden" }}>
-                              {blockMenuMode === "project" ? (
-                                <>
-                                  <button onClick={() => setBlockMenuMode(null)} style={{ display:"flex", alignItems:"center", gap:6, width:"100%", background:"none", border:"none", borderBottom:"1px solid var(--border2)", padding:"10px 14px", fontSize:11, fontWeight:700, color:"var(--text3)", letterSpacing:".06em", textTransform:"uppercase", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
-                                    ‹ Change project
-                                  </button>
-                                  {data.projects.filter(p => p.status === "active" && p.id !== slot.projectId).map(p => {
-                                    const d2 = data.domains?.find(d => d.id === p.domainId);
-                                    return (
-                                      <button key={p.id} onClick={() => {
-                                        saveDWSlot(slot.id, slot.slotIndex, p.id, slot.startHour, slot.startMin, slot.durationMin, null);
-                                        setBlockMenuOpen(null); setBlockMenuMode(null);
-                                      }} style={{ background:"none", border:"none", textAlign:"left", padding:"11px 14px", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontSize:14, color:"var(--text)", display:"flex", alignItems:"center", gap:10, width:"100%" }}>
-                                        <span style={{ width:9, height:9, borderRadius:"50%", background: d2?.color || "var(--text3)", flexShrink:0, display:"inline-block" }} />
-                                        {p.name}
-                                      </button>
-                                    );
-                                  })}
-                                </>
-                              ) : (
-                                <>
-                                  <button onClick={() => setBlockMenuMode("project")} style={{ display:"flex", alignItems:"center", gap:10, width:"100%", background:"none", border:"none", borderBottom:"1px solid var(--border2)", padding:"13px 14px", fontSize:14, color:"var(--text)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
-                                    <span style={{ fontSize:16 }}>⇄</span> Change project
-                                  </button>
-                                  <button onClick={() => { clearDWSlot(slot.slotIndex); setBlockMenuOpen(null); setBlockMenuMode(null); setExpandedId(null); }} style={{ display:"flex", alignItems:"center", gap:10, width:"100%", background:"none", border:"none", borderBottom:"1px solid var(--border2)", padding:"13px 14px", fontSize:14, color:"var(--text)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
-                                    <span style={{ fontSize:16 }}>→</span> Push to tomorrow
-                                  </button>
-                                  <button onClick={() => { clearDWSlot(slot.slotIndex); setBlockMenuOpen(null); setBlockMenuMode(null); setExpandedId(null); }} style={{ display:"flex", alignItems:"center", gap:10, width:"100%", background:"none", border:"none", padding:"13px 14px", fontSize:14, color:"var(--red)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
-                                    <span style={{ fontSize:16 }}>✕</span> Clear slot
-                                  </button>
-                                </>
-                              )}
-                            </div>
+                        {/* Inline management panel — replaces floating dropdown */}
+                        <div className={`blk-mgmt-panel${blockMenuOpen === slot.id ? " open" : ""}`} onClick={e => e.stopPropagation()}>
+                          <div className="blk-mgmt-inner">
+                            {blockMenuMode === "project" ? (
+                              <>
+                                <button className="blk-mgmt-row" onClick={() => setBlockMenuMode(null)}>
+                                  <div className="blk-mgmt-row-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg></div>
+                                  <span className="blk-mgmt-row-txt" style={{ fontSize:11, fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", color:"var(--text3)" }}>Change project</span>
+                                </button>
+                                <div className="blk-mgmt-divider" />
+                                {data.projects.filter(p => p.status === "active" && p.id !== slot.projectId).map(p => {
+                                  const d2 = data.domains?.find(d => d.id === p.domainId);
+                                  return (
+                                    <button key={p.id} className="blk-mgmt-row sub-item" onClick={() => {
+                                      saveDWSlot(slot.id, slot.slotIndex, p.id, slot.startHour, slot.startMin, slot.durationMin, null);
+                                      setBlockMenuOpen(null); setBlockMenuMode(null);
+                                    }}>
+                                      <span style={{ width:8, height:8, borderRadius:"50%", background: d2?.color || "var(--text3)", flexShrink:0, display:"inline-block" }} />
+                                      <span className="blk-mgmt-row-txt">{p.name}</span>
+                                    </button>
+                                  );
+                                })}
+                              </>
+                            ) : (
+                              <>
+                                <button className="blk-mgmt-row" onClick={() => setBlockMenuMode("project")}>
+                                  <div className="blk-mgmt-row-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg></div>
+                                  <span className="blk-mgmt-row-txt">Change project</span>
+                                </button>
+                                <div className="blk-mgmt-divider" />
+                                <button className="blk-mgmt-row" onClick={() => { rescheduleDWSlot(slot.slotIndex, slot.startHour, slot.startMin); setBlockMenuOpen(null); setBlockMenuMode(null); setExpandedId(null); }}>
+                                  <div className="blk-mgmt-row-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
+                                  <span className="blk-mgmt-row-txt">Push to tomorrow</span>
+                                </button>
+                                <div className="blk-mgmt-divider" />
+                                <button className="blk-mgmt-row danger" onClick={() => { clearDWSlot(slot.slotIndex); setBlockMenuOpen(null); setBlockMenuMode(null); setExpandedId(null); }}>
+                                  <div className="blk-mgmt-row-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></div>
+                                  <span className="blk-mgmt-row-txt">Clear slot</span>
+                                </button>
+                              </>
+                            )}
                           </div>
-                        )}
+                        </div>
                       </div>
                     </div>
                   );
