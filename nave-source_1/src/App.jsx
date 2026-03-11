@@ -392,7 +392,7 @@ const css = `
   .dw-empty-dur{font-size:11px;color:rgba(255,255,255,.18);margin-left:auto;flex-shrink:0;}
   .dw-picker-wrap{background:var(--bg3);border:1.5px dashed rgba(255,255,255,.14);border-top:none;border-radius:0 0 14px 14px;overflow:hidden;}
   .dw-picker-sect{padding:10px 10px 6px;font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text3);}
-  .dw-proj-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px 6px 8px;}
+  .dw-proj-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px 6px 8px;max-height:240px;overflow-y:auto;overscroll-behavior:contain;}
   .dw-proj-row{display:flex;align-items:center;gap:8px;padding:9px 10px;cursor:pointer;border-radius:10px;background:var(--bg4);}
   .dw-proj-row:active{background:var(--border);}
   .dw-proj-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
@@ -689,8 +689,9 @@ const css = `
   .gear-btn-inline:hover{color:var(--text2);}
   .gear-btn-inline.open{color:var(--text2);transform:rotate(45deg);}
   .blk-mgmt-panel{overflow:hidden;max-height:0;transition:max-height .3s cubic-bezier(.4,0,.2,1),opacity .22s ease;opacity:0;}
-  .blk-mgmt-panel.open{max-height:220px;opacity:1;}
+  .blk-mgmt-panel.open{max-height:420px;opacity:1;}
   .blk-mgmt-inner{border-top:1px solid var(--border2);padding:3px 0;}
+  .blk-mgmt-proj-list{max-height:220px;overflow-y:auto;overscroll-behavior:contain;}
   .blk-mgmt-row{display:flex;align-items:center;gap:12px;padding:11px 16px;cursor:pointer;background:none;border:none;width:100%;font-family:'DM Sans',sans-serif;transition:background .12s;}
   .blk-mgmt-row:hover{background:rgba(255,255,255,.04);}
   .blk-mgmt-row-ico{width:18px;display:flex;align-items:center;justify-content:center;color:var(--text3);flex-shrink:0;}
@@ -1317,6 +1318,8 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
   const [looseBlockExp, setLooseBlockExp] = useState(false);
   // loosePickerOpen: is the task picker open inside loose block
   const [loosePickerOpen, setLoosePickerOpen] = useState(false);
+  // looseQuickAdd: inline quick-add input state
+  const [looseQuickDraft, setLooseQuickDraft] = useState("");
   const { domains, projects, blocks, shutdownDone } = data;
 
   const [focusModeLocal, setFocusModeLocal] = useState(false);
@@ -1510,6 +1513,18 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
       ...d,
       todayLoosePicks: { ...(d.todayLoosePicks||{}), [todayDateStr]: ids }
     }));
+  };
+
+  const addLooseQuickTask = (text) => {
+    const t = text.trim();
+    if (!t) return;
+    const newTask = { id: uid(), text: t, done: false, domainId: null, doneAt: null, createdAt: Date.now() };
+    setData(d => ({
+      ...d,
+      looseTasks: [...(d.looseTasks||[]), newTask],
+      todayLoosePicks: { ...(d.todayLoosePicks||{}), [todayDateStr]: [...((d.todayLoosePicks||{})[todayDateStr]||[]), newTask.id] },
+    }));
+    setLooseQuickDraft("");
   };
 
   const toggleLooseTask = (taskId) => {
@@ -2130,6 +2145,7 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                                   <span className="blk-mgmt-row-txt" style={{ fontSize:11, fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", color:"var(--text3)" }}>Change project</span>
                                 </button>
                                 <div className="blk-mgmt-divider" />
+                                <div className="blk-mgmt-proj-list">
                                 {data.projects.filter(p => p.status === "active" && p.id !== proj?.id).map(p => {
                                   const d2 = data.domains?.find(d => d.id === p.domainId);
                                   return (
@@ -2142,6 +2158,7 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                                     </button>
                                   );
                                 })}
+                                </div>
                               </>
                             ) : (
                               <>
@@ -2401,6 +2418,7 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                                   <span className="blk-mgmt-row-txt" style={{ fontSize:11, fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", color:"var(--text3)" }}>Change project</span>
                                 </button>
                                 <div className="blk-mgmt-divider" />
+                                <div className="blk-mgmt-proj-list">
                                 {data.projects.filter(p => p.status === "active" && p.id !== slot.projectId).map(p => {
                                   const d2 = data.domains?.find(d => d.id === p.domainId);
                                   return (
@@ -2413,6 +2431,7 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                                     </button>
                                   );
                                 })}
+                                </div>
                               </>
                             ) : (
                               <>
@@ -2664,6 +2683,28 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                               </div>
                             );
                           })}
+                        </div>
+                      )}
+
+                      {/* Quick-add input */}
+                      {!isPicking && (
+                        <div style={{ padding: pickedLooseTasks.length > 0 ? "8px 14px" : "10px 14px 8px", borderTop: pickedLooseTasks.length > 0 ? "1px solid var(--border2)" : "none" }} onClick={e => e.stopPropagation()}>
+                          <div style={{ display:"flex", alignItems:"center", gap:8, background:"var(--bg3)", borderRadius:10, padding:"8px 12px" }}>
+                            <span style={{ fontSize:16, color:"var(--text3)", lineHeight:1, flexShrink:0 }}>+</span>
+                            <input
+                              style={{ flex:1, background:"none", border:"none", outline:"none", color:"var(--text)", fontSize:13, fontFamily:"'DM Sans',sans-serif", padding:0 }}
+                              placeholder="Add a task for right now…"
+                              value={looseQuickDraft}
+                              onChange={e => setLooseQuickDraft(e.target.value)}
+                              onKeyDown={e => { if (e.key === "Enter") { addLooseQuickTask(looseQuickDraft); } if (e.key === "Escape") setLooseQuickDraft(""); }}
+                            />
+                            {looseQuickDraft.trim() && (
+                              <button
+                                onClick={() => addLooseQuickTask(looseQuickDraft)}
+                                style={{ background:"var(--accent)", color:"#000", border:"none", borderRadius:6, padding:"4px 10px", fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"'DM Sans',sans-serif", flexShrink:0 }}
+                              >Add</button>
+                            )}
+                          </div>
                         </div>
                       )}
 
@@ -4621,7 +4662,7 @@ const SD_ITEMS = [
   "Mind cleared — nothing left open",
 ];
 
-function ShutdownSheet({ onClose, onComplete, alreadyDone, data, onAddBlock }) {
+function ShutdownSheet({ onClose, onComplete, alreadyDone, data, onAddBlock, onCategorizeLoose }) {
   const swipe = useSwipeDown(onClose);
   const [checked, setChecked]       = useState(alreadyDone ? [0,1,2,3] : []);
   const [addingBlock, setAddingBlock] = useState(false);
@@ -4630,6 +4671,22 @@ function ShutdownSheet({ onClose, onComplete, alreadyDone, data, onAddBlock }) {
   const [projectId, setProjectId]   = useState(projects.find(p=>p.status==="active")?.id || projects[0]?.id || "");
   const [startHour, setStartHour]   = useState(9);
   const [duration, setDuration]     = useState(90);
+
+  // Uncategorized loose tasks added today
+  const todayStr = new Date().toDateString();
+  const uncategorized = (data.looseTasks || []).filter(t =>
+    !t.done && t.domainId === null && t.createdAt && new Date(t.createdAt).toDateString() === todayStr
+  );
+  const [localDomains, setLocalDomains] = useState(() => {
+    const m = {};
+    uncategorized.forEach(t => { m[t.id] = null; });
+    return m;
+  });
+  const allCategorized = uncategorized.every(t => localDomains[t.id] !== null && localDomains[t.id] !== undefined);
+  const assignDomain = (taskId, domainId) => {
+    setLocalDomains(m => ({ ...m, [taskId]: domainId }));
+    onCategorizeLoose(taskId, domainId);
+  };
 
   const tomorrowBlocks = blocks
     .filter(b => b.dayOffset === 1)
@@ -4640,7 +4697,7 @@ function ShutdownSheet({ onClose, onComplete, alreadyDone, data, onAddBlock }) {
 
   // step 5 is auto-checked if tomorrow already has a block
   const step5Done    = hasTomorrow || addingBlock === "saved";
-  const allDone      = checked.length === SD_ITEMS.length && step5Done;
+  const allDone      = checked.length === SD_ITEMS.length && step5Done && (uncategorized.length === 0 || allCategorized);
 
   const toggle = i => setChecked(p => p.includes(i) ? p.filter(x=>x!==i) : [...p, i]);
 
@@ -4864,6 +4921,57 @@ function ShutdownSheet({ onClose, onComplete, alreadyDone, data, onAddBlock }) {
               );
             })()}
           </div>
+
+          {/* UNCATEGORIZED LOOSE TASKS */}
+          {uncategorized.length > 0 && (
+            <div style={{ margin:"4px 0 14px" }}>
+              <div style={{ height:1, background:"var(--border2)", marginBottom:14 }} />
+              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10 }}>
+                <div style={{
+                  width:20, height:20, borderRadius:6, flexShrink:0,
+                  background: allCategorized ? "var(--green)" : "rgba(232,160,48,0.15)",
+                  border: allCategorized ? "none" : "1.5px solid rgba(232,160,48,0.5)",
+                  display:"flex", alignItems:"center", justifyContent:"center", transition:"all .15s",
+                }}>
+                  {allCategorized
+                    ? <span style={{fontSize:10,color:"#fff",fontWeight:700}}>✓</span>
+                    : <span style={{fontSize:10,color:"var(--accent)",fontWeight:700}}>{uncategorized.filter(t => !localDomains[t.id]).length}</span>
+                  }
+                </div>
+                <span style={{ fontSize:14, color:"var(--text)", fontWeight:500 }}>
+                  Categorize today's loose tasks
+                </span>
+              </div>
+              <div style={{ marginLeft:28, display:"flex", flexDirection:"column", gap:8 }}>
+                {uncategorized.map(task => {
+                  const assigned = localDomains[task.id];
+                  return (
+                    <div key={task.id} style={{ background:"var(--bg3)", borderRadius:12, padding:"12px 14px" }}>
+                      <div style={{ fontSize:13, color:"var(--text)", marginBottom:10, fontWeight:500 }}>{task.text}</div>
+                      <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+                        {domains.map(d => (
+                          <button key={d.id} onClick={() => assignDomain(task.id, d.id)}
+                            style={{
+                              display:"flex", alignItems:"center", gap:6,
+                              padding:"6px 12px", borderRadius:20,
+                              border: assigned === d.id ? `1.5px solid ${d.color}` : "1.5px solid var(--border)",
+                              background: assigned === d.id ? `${d.color}22` : "var(--bg4)",
+                              color: assigned === d.id ? d.color : "var(--text2)",
+                              fontSize:12, fontWeight:600, cursor:"pointer",
+                              fontFamily:"'DM Sans',sans-serif", transition:"all .12s",
+                            }}
+                          >
+                            <span style={{ width:7, height:7, borderRadius:"50%", background:d.color, flexShrink:0, display:"inline-block" }} />
+                            {d.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* COMPLETED TODAY */}
           {(() => {
@@ -5785,7 +5893,7 @@ export default function App() {
           {tab==="plan"     && <PlanScreen     data={data} setData={setData} openAddBlock={()=>setSheet("addblock")} onGoToSeason={()=>setTab("season")} lightMode={lightMode} toggleTheme={toggleTheme} />}
           {tab==="season"  && <SeasonScreen   data={data} setData={setData} />}
 
-          {sheet==="shutdown"  && <ShutdownSheet    onClose={closeSheet} onComplete={()=>setData(d=>({...d,shutdownDone:true}))} alreadyDone={data.shutdownDone} data={data} onAddBlock={b=>setData(d=>({...d,blocks:[...d.blocks,b]}))} />}
+          {sheet==="shutdown"  && <ShutdownSheet    onClose={closeSheet} onComplete={()=>setData(d=>({...d,shutdownDone:true}))} alreadyDone={data.shutdownDone} data={data} onAddBlock={b=>setData(d=>({...d,blocks:[...d.blocks,b]}))} onCategorizeLoose={(taskId, domainId) => setData(d => ({ ...d, looseTasks: (d.looseTasks||[]).map(t => t.id === taskId ? { ...t, domainId } : t) }))} />}
           {sheet==="addblock"  && <AddBlockSheet    data={data} onClose={closeSheet} onAdd={handleAddBlock} onAddRoutine={handleAddRoutine} />}
 
           {sheet==="categorize"&& <CategorizeSheet  data={data} onClose={closeSheet} onCategorize={handleCategorize} onDismiss={handleDismissInbox} onDoToday={handleDoToday} />}
