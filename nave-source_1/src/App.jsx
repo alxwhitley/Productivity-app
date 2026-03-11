@@ -364,6 +364,8 @@ const css = `
   .t-check{width:20px;height:20px;border-radius:50%;border:1.5px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .15s;margin-top:1px;}
   .t-check.done{background:var(--green);border-color:var(--green);}
   .t-check.done::after{content:'✓';font-size:10px;color:#fff;font-weight:700;}
+  .t-check.bouncing{animation:check-bounce .35s cubic-bezier(.22,.68,0,1.4) forwards;}
+  .st-wrap.flash{animation:task-flash .4s ease forwards;}
   .t-text{font-size:14px;color:var(--text);line-height:1.4;}
   .t-text.done{color:var(--text3);text-decoration:line-through;}
   /* TIMELINE */
@@ -429,9 +431,14 @@ const css = `
   .tl-prime-pill{font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:2px 7px;border-radius:20px;background:rgba(232,160,48,.12);color:var(--accent);border:1px solid rgba(232,160,48,.25);flex-shrink:0;white-space:nowrap;}
   .tl-now-pill{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;background:rgba(232,160,48,.15);color:var(--accent);border:1px solid rgba(232,160,48,.3);padding:2px 7px;border-radius:20px;flex-shrink:0;}
   .tl-tasks{border-top:1px solid var(--border2);padding:10px 14px 14px 14px;}
-  .tl-task-row{display:flex;align-items:center;gap:10px;padding:6px 0;}
+  .tl-task-row{display:flex;align-items:center;gap:10px;padding:6px 0;border-radius:8px;transition:background .2s;}
+  .tl-task-row.next-action{background:rgba(232,160,48,.07);border-left:2px solid var(--accent);padding-left:8px;margin-left:-2px;}
   .tl-check{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;}
   .tl-check.done{background:var(--green);border-color:var(--green);}
+  .tl-check.bouncing{animation:check-bounce .35s cubic-bezier(.22,.68,0,1.4) forwards;}
+  @keyframes check-bounce{0%{transform:scale(0);opacity:0;}60%{transform:scale(1.4);}100%{transform:scale(1);opacity:1;}}
+  .tl-task-row.flash{animation:task-flash .4s ease forwards;}
+  @keyframes task-flash{0%{background:rgba(69,193,122,.18);}100%{background:transparent;}}
   .tl-task-txt{font-size:13px;color:var(--text);flex:1;}
   .tl-task-txt.done{text-decoration:line-through;opacity:.45;}
   .tl-add-task{display:flex;gap:8px;margin-top:6px;padding-top:8px;border-top:1px solid var(--border2);}
@@ -1217,10 +1224,11 @@ function StatusBar() {
 
 
 // ─── TODAY SCREEN ─────────────────────────────────────────────────────────────
-function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: focusModeprop, setFocusMode: setFocusModeApp, onSignOut }) {
+function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: focusModeprop, setFocusMode: setFocusModeApp, onSignOut, jumpToBlock, onClearJump }) {
   const [showTodaySettings, setShowTodaySettings] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
-  const [celebratingId, setCelebratingId] = useState(null); // blockId currently showing completion burst
+  const [celebratingId, setCelebratingId] = useState(null);
+  const [recentlyChecked, setRecentlyChecked] = useState(new Set()); // taskIds with bounce animation
   const [blockMenuOpen, setBlockMenuOpen] = useState(null); // blockId with gear menu open
   const [blockMenuMode, setBlockMenuMode] = useState(null); // null | "project"
   const [dragId, setDragId] = useState(null);
@@ -1326,11 +1334,22 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
   const getProject = id => projects.find(p => p.id === id);
   const getDomain  = id => domains.find(d => d.id === id);
 
-  const toggleTask = (projectId, taskId) => setData(d => ({
-    ...d, projects: d.projects.map(p =>
-      p.id === projectId ? { ...p, tasks: p.tasks.map(t => t.id === taskId ? { ...t, done: !t.done, doneAt: !t.done ? new Date().toISOString() : null } : t) } : p
-    )
-  }));
+  const toggleTask = (projectId, taskId) => {
+    setData(d => ({
+      ...d, projects: d.projects.map(p =>
+        p.id === projectId ? { ...p, tasks: p.tasks.map(t => t.id === taskId ? { ...t, done: !t.done, doneAt: !t.done ? new Date().toISOString() : null } : t) } : p
+      )
+    }));
+    // Trigger bounce + flash on check (not uncheck)
+    setRecentlyChecked(prev => {
+      const next = new Set(prev);
+      next.add(taskId);
+      return next;
+    });
+    setTimeout(() => setRecentlyChecked(prev => {
+      const next = new Set(prev); next.delete(taskId); return next;
+    }), 450);
+  };
 
   const updateTaskText = (projectId, taskId, newText) => {
     if (!newText.trim()) return;
@@ -1599,6 +1618,22 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
       lastAutoExpanded.current = currentItem.id;
     }
   }, [currentItem?.id]);
+
+  // Jump to a specific block when navigating from Projects "Work Now"
+  const scrollRef = useRef(null);
+  useEffect(() => {
+    if (!jumpToBlock) return;
+    setExpandedId(jumpToBlock);
+    // Scroll to the block after a short delay for render
+    setTimeout(() => {
+      const el = document.querySelector(`[data-blockid="${jumpToBlock}"]`);
+      if (el && scrollRef.current) {
+        const top = el.getBoundingClientRect().top - scrollRef.current.getBoundingClientRect().top + scrollRef.current.scrollTop - 20;
+        scrollRef.current.scrollTo({ top, behavior: "smooth" });
+      }
+      onClearJump?.();
+    }, 120);
+  }, [jumpToBlock]);
   // Next upcoming
   const nextItem = timeline.find(item => item.mins > nowMins);
 
@@ -2009,11 +2044,15 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
 
                         // TASKS PICKED — show only today's tasks
                         const todayTaskObjs = todayTaskIds.map(id => proj.tasks.find(t => t.id === id)).filter(Boolean);
+                        const firstUncheckedId = todayTaskObjs.find(t => !t.done)?.id;
                         return (
                           <div className="tl-tasks" onClick={e => e.stopPropagation()}>
-                            {todayTaskObjs.map(t => (
-                              <div key={t.id} className="tl-task-row" onClick={e => e.stopPropagation()}>
-                                <div className={`tl-check ${t.done ? "done" : ""}`} onClick={e => { e.stopPropagation(); toggleTask(proj.id, t.id); }}>
+                            {todayTaskObjs.map(t => {
+                              const isNext = isNow && !t.done && t.id === firstUncheckedId;
+                              const isBouncing = recentlyChecked.has(t.id);
+                              return (
+                              <div key={t.id} className={`tl-task-row${isNext ? " next-action" : ""}${isBouncing ? " flash" : ""}`} onClick={e => e.stopPropagation()}>
+                                <div className={`tl-check${t.done ? " done" : ""}${isBouncing ? " bouncing" : ""}`} onClick={e => { e.stopPropagation(); toggleTask(proj.id, t.id); }}>
                                   {t.done && <span style={{fontSize:9,color:"#fff",fontWeight:700}}>✓</span>}
                                 </div>
                                 {editingTaskId?.taskId === t.id ? (
@@ -2033,7 +2072,8 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                                   </span>
                                 )}
                               </div>
-                            ))}
+                              );
+                            })}
                             {/* Edit picks link */}
                             <div style={{ paddingTop:8, borderTop:"1px solid var(--border2)", marginTop:4 }} onClick={e => e.stopPropagation()}>
                               <button onClick={() => setPickerState({ blockId: blk.id, projectId: proj.id, selected: new Set(todayTaskIds), newText: "" })}
@@ -2965,6 +3005,7 @@ function SwipeTask({ task, onToggle, onDelete, onSave }) {
   const [offset, setOffset]   = useState(0);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft]     = useState(task.text);
+  const [bouncing, setBouncing] = useState(false);
   const startX = useRef(null);
   const THRESHOLD = 56;
   const MAX = 72;
@@ -2988,8 +3029,17 @@ function SwipeTask({ task, onToggle, onDelete, onSave }) {
     setEditing(false);
   };
 
+  const handleToggle = (e) => {
+    e.stopPropagation();
+    if (!task.done) {
+      setBouncing(true);
+      setTimeout(() => setBouncing(false), 400);
+    }
+    onToggle();
+  };
+
   return (
-    <div className="st-wrap">
+    <div className={`st-wrap${bouncing ? " flash" : ""}`}>
       <div className="st-delete-bg" onClick={onDelete}>
         <span className="st-delete-ico">Delete</span>
       </div>
@@ -3002,9 +3052,9 @@ function SwipeTask({ task, onToggle, onDelete, onSave }) {
       >
         {/* Circle — toggles done */}
         <div
-          className={`t-check ${task.done ? "done" : ""}`}
+          className={`t-check ${task.done ? "done" : ""}${bouncing ? " bouncing" : ""}`}
           style={{ flexShrink: 0, marginTop: 2, cursor: "pointer" }}
-          onClick={e => { e.stopPropagation(); onToggle(); }}
+          onClick={handleToggle}
         />
         {/* Text — tapping opens edit; done tasks show strikethrough, no edit */}
         {editing ? (
@@ -3036,7 +3086,8 @@ const PROJ_COLORS = DOMAIN_COLORS;
 
 function ProjectCard({ proj, domain, isExp, newTaskText,
   onToggleExpand, onToggleStatus, onDelete, onEditSave,
-  onToggleTask, onDeleteTask, onSaveTask, onNewTaskChange, onAddTask, autoFocus }) {
+  onToggleTask, onDeleteTask, onSaveTask, onNewTaskChange, onAddTask, autoFocus,
+  onWorkNow, hasBlockToday }) {
   const [addingTask, setAddingTask] = useState(false);
   const taskInputRef = useRef(null);
   const nameInputRef = useRef(null);
@@ -3186,6 +3237,36 @@ function ProjectCard({ proj, domain, isExp, newTaskText,
               onClick={() => { setAddingTask(true); setTimeout(() => taskInputRef.current?.focus(), 30); }}
             />
           )}
+
+          {/* Work Now button — only show when card is expanded */}
+          {onWorkNow && proj.status === "active" && (
+            <div style={{ padding:"10px 14px 14px", borderTop:"1px solid var(--border2)" }}>
+              <button
+                onClick={e => { e.stopPropagation(); onWorkNow(); }}
+                style={{
+                  width:"100%", padding:"11px",
+                  background: hasBlockToday ? "var(--accent-s)" : "var(--accent)",
+                  border: hasBlockToday ? "1.5px solid rgba(232,160,48,.4)" : "none",
+                  borderRadius:12, fontSize:13, fontWeight:700,
+                  color: hasBlockToday ? "var(--accent)" : "#000",
+                  cursor:"pointer", fontFamily:"'DM Sans',sans-serif",
+                  display:"flex", alignItems:"center", justifyContent:"center", gap:6,
+                }}
+              >
+                {hasBlockToday ? (
+                  <>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5L19 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    Go to Today's Block
+                  </>
+                ) : (
+                  <>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><polygon points="5,3 19,12 5,21" fill="currentColor"/></svg>
+                    Work on This Now
+                  </>
+                )}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -3245,7 +3326,7 @@ function RoutineBlockView({ routine, dateKey, data, setData, compact }) {
 }
 
 // ─── PROJECTS SCREEN ──────────────────────────────────────────────────────────
-function ProjectsScreen({ data, setData, openCategorize }) {
+function ProjectsScreen({ data, setData, openCategorize, onWorkNow }) {
   const { domains, projects } = data;
   const [activeDomain, setActiveDomain] = useState(domains[0]?.id || null);
   const [collapsedProjs, setCollapsedProjs] = useState(new Set());
@@ -3404,6 +3485,8 @@ function ProjectsScreen({ data, setData, openCategorize }) {
             onSaveTask={(taskId, text) => saveTask(proj.id, taskId, text)}
             onNewTaskChange={v => setNewTaskText(t => ({ ...t, [proj.id]: v }))}
             onAddTask={() => addTask(proj.id)}
+            onWorkNow={onWorkNow ? () => onWorkNow(proj.id) : null}
+            hasBlockToday={data.blocks?.some(b => b.projectId === proj.id && b.dayOffset === 0)}
           />
         ))}
 
@@ -5598,6 +5681,7 @@ export default function App() {
   const [sheet, setSheet] = useState(null);
   const [focusMode, setFocusMode] = useState(false);
   const [captureOpen, setCaptureOpen] = useState(false);
+  const [jumpToBlock, setJumpToBlock] = useState(null); // blockId to auto-expand when switching to Today
   const [lightMode, setLightMode] = useState(() => {
     try { return localStorage.getItem(THEME_KEY) === "light"; } catch { return false; }
   });
@@ -5644,6 +5728,33 @@ export default function App() {
     };
   });
 
+  const handleWorkNow = (projectId) => {
+    // Check if project already has a block for today
+    const existing = (data.blocks || []).find(b => b.projectId === projectId && b.dayOffset === 0);
+    if (existing) {
+      // Jump to Today and open that block
+      setJumpToBlock(existing.id);
+      setTab("today");
+    } else {
+      // Create a new block starting now (rounded to nearest 15 min)
+      const now = new Date();
+      const totalMins = now.getHours() * 60 + now.getMinutes();
+      const rounded = Math.ceil(totalMins / 15) * 15;
+      const startHour = Math.floor(rounded / 60) % 24;
+      const startMin = rounded % 60;
+      const newId = uid();
+      setData(d => ({
+        ...d,
+        blocks: [...(d.blocks || []), {
+          id: newId, projectId, startHour, startMin,
+          durationMin: 90, dayOffset: 0, todayTasks: undefined,
+        }]
+      }));
+      setJumpToBlock(newId);
+      setTab("today");
+    }
+  };
+
   return (
     <>
       <style>{css}</style>
@@ -5652,8 +5763,8 @@ export default function App() {
           {!data.onboardingDone && (
             <OnboardingFlow onDone={() => setData(d => ({ ...d, onboardingDone: true }))} />
           )}
-          {tab==="today"    && <TodayScreen    data={data} setData={setData} openShutdown={()=>setSheet("shutdown")} openAddBlock={()=>setSheet("addblock")} focusMode={focusMode} setFocusMode={setFocusMode} onSignOut={() => supabase.auth.signOut()} />}
-          {tab==="projects" && <ProjectsScreen data={data} setData={setData} openCategorize={()=>setSheet("categorize")} />}
+          {tab==="today"    && <TodayScreen    data={data} setData={setData} openShutdown={()=>setSheet("shutdown")} openAddBlock={()=>setSheet("addblock")} focusMode={focusMode} setFocusMode={setFocusMode} onSignOut={() => supabase.auth.signOut()} jumpToBlock={jumpToBlock} onClearJump={() => setJumpToBlock(null)} />}
+          {tab==="projects" && <ProjectsScreen data={data} setData={setData} openCategorize={()=>setSheet("categorize")} onWorkNow={handleWorkNow} />}
           {tab==="plan"     && <PlanScreen     data={data} setData={setData} openAddBlock={()=>setSheet("addblock")} onGoToSeason={()=>setTab("season")} lightMode={lightMode} toggleTheme={toggleTheme} />}
           {tab==="season"  && <SeasonScreen   data={data} setData={setData} />}
 
