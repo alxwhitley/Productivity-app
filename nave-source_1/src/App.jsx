@@ -1214,6 +1214,16 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
     return newId;
   };
 
+  const saveDWTodayTasks = (slotIndex, taskIds) => {
+    const dateKeyISO2 = (() => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}-${String(t.getDate()).padStart(2,"0")}`; })();
+    setData(prev => {
+      const existing = [...((prev.deepWorkSlots || {})[dateKeyISO2] || [])];
+      while (existing.length <= slotIndex) existing.push({});
+      existing[slotIndex] = { ...existing[slotIndex], todayTasks: taskIds.length > 0 ? taskIds : null };
+      return { ...prev, deepWorkSlots: { ...(prev.deepWorkSlots || {}), [dateKeyISO2]: existing } };
+    });
+  };
+
   const startBlock = (blkId) => {
     // Check for overlap with next block
     const blk = blocks.find(b => b.id === blkId);
@@ -1865,23 +1875,109 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                               {isCompleted ? "✓" : ""}
                             </div>
                           </div>
-                          {isExp && (
-                            <div style={{ padding:"0 14px 14px" }}>
-                              {relevantTasks.map(t => (
-                                <div key={t.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"7px 0", borderTop:"1px solid var(--border2)" }}>
-                                  <div className={`t-check${t.done ? " done" : ""}`} onClick={e => { e.stopPropagation(); toggleTaskDone(proj.id, t.id); }} />
-                                  <span className="tl-task-txt" style={{ textDecoration: t.done ? "line-through" : "none", opacity: t.done ? .5 : 1 }}>{t.text}</span>
+                          {isExp && (() => {
+                            const todayTaskIds = slot.todayTasks;
+                            const hasPicked = Array.isArray(todayTaskIds) && todayTaskIds.length > 0;
+                            const isPicking = pickerState?.blockId === slot.id;
+
+                            // PICKER MODE
+                            if (isPicking) {
+                              const ps = pickerState;
+                              const confirmPick = () => {
+                                let finalIds = [...ps.selected];
+                                if (ps.newText.trim()) {
+                                  const newId = addTaskToProject(proj.id, ps.newText.trim());
+                                  finalIds.push(newId);
+                                }
+                                saveDWTodayTasks(slot.slotIndex, finalIds);
+                                setPickerState(null);
+                              };
+                              return (
+                                <div className="picker-wrap" onClick={e => e.stopPropagation()}>
+                                  <div className="picker-heading">What are you working on today?</div>
+                                  {proj.tasks.filter(t => !t.done).map(t => {
+                                    const checked = ps.selected.has(t.id);
+                                    return (
+                                      <div key={t.id} className="picker-task" onClick={() => {
+                                        setPickerState(prev => {
+                                          const s = new Set(prev.selected);
+                                          checked ? s.delete(t.id) : s.add(t.id);
+                                          return { ...prev, selected: s };
+                                        });
+                                      }}>
+                                        <div className={`picker-box ${checked ? "checked" : ""}`} />
+                                        <span className="picker-task-txt">{t.text}</span>
+                                      </div>
+                                    );
+                                  })}
+                                  <div className="picker-add">
+                                    <input className="picker-input" placeholder="Add a new task…"
+                                      value={ps.newText}
+                                      onChange={e => setPickerState(prev => ({ ...prev, newText: e.target.value }))}
+                                      onKeyDown={e => { if (e.key === "Enter" && ps.newText.trim()) confirmPick(); }}
+                                    />
+                                  </div>
+                                  <button className="picker-confirm"
+                                    disabled={ps.selected.size === 0 && !ps.newText.trim()}
+                                    onClick={confirmPick}>
+                                    {ps.selected.size + (ps.newText.trim() ? 1 : 0) > 0
+                                      ? `Focus on ${ps.selected.size + (ps.newText.trim() ? 1 : 0)} task${ps.selected.size + (ps.newText.trim() ? 1 : 0) > 1 ? "s" : ""} today`
+                                      : "Select at least one task"}
+                                  </button>
                                 </div>
-                              ))}
-                              <div style={{ display:"flex", gap:8, marginTop:10 }}>
-                                <button className="tl-start-btn" onClick={e => { e.stopPropagation(); setFocusBlockId(slot.id); setFocusMode(true); }}>Start →</button>
-                                <button className="tl-start-btn" style={{ background:"rgba(69,193,122,.12)", color:"var(--green)", borderColor:"rgba(69,193,122,.3)" }}
-                                  onClick={e => { e.stopPropagation(); markManualDone(slot.id, proj.id, slot.todayTasks); }}>I did this ✓</button>
-                                <button className="tl-start-btn" style={{ background:"rgba(224,85,85,.1)", color:"var(--red)", borderColor:"rgba(224,85,85,.25)", marginLeft:"auto" }}
-                                  onClick={e => { e.stopPropagation(); clearDWSlot(slot.slotIndex); setExpandedId(null); }}>Clear slot</button>
+                              );
+                            }
+
+                            // NO TASKS PICKED YET
+                            if (!hasPicked) {
+                              return (
+                                <div className="tl-tasks" onClick={e => e.stopPropagation()}>
+                                  <div style={{ padding:"4px 0 10px", textAlign:"center" }}>
+                                    <div style={{ fontSize:12, color:"var(--text3)", marginBottom:10 }}>What are you working on today?</div>
+                                    <button onClick={() => setPickerState({ blockId: slot.id, projectId: proj.id, selected: new Set(), newText: "" })}
+                                      style={{ background:"var(--bg3)", border:"1px solid var(--border)", borderRadius:8, padding:"7px 16px", fontSize:12, fontWeight:600, color:"var(--text2)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
+                                      Pick tasks
+                                    </button>
+                                  </div>
+                                  <div style={{ display:"flex", gap:8, paddingTop:4 }} onClick={e => e.stopPropagation()}>
+                                    <button className="tl-start-btn" onClick={e => { e.stopPropagation(); setFocusBlockId(slot.id); setFocusMode(true); }}>Start →</button>
+                                    <button className="tl-start-btn" style={{ background:"rgba(69,193,122,.12)", color:"var(--green)", borderColor:"rgba(69,193,122,.3)" }}
+                                      onClick={e => { e.stopPropagation(); markManualDone(slot.id, proj.id, slot.todayTasks); }}>I did this ✓</button>
+                                    <button className="tl-start-btn" style={{ background:"rgba(224,85,85,.1)", color:"var(--red)", borderColor:"rgba(224,85,85,.25)", marginLeft:"auto" }}
+                                      onClick={e => { e.stopPropagation(); clearDWSlot(slot.slotIndex); setExpandedId(null); }}>Clear slot</button>
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            // TASKS PICKED — show today's tasks
+                            const todayTaskObjs = todayTaskIds.map(id => proj.tasks.find(t => t.id === id)).filter(Boolean);
+                            return (
+                              <div className="tl-tasks">
+                                {todayTaskObjs.map(t => (
+                                  <div key={t.id} className="tl-task-row">
+                                    <div className={`tl-check ${t.done ? "done" : ""}`} onClick={e => { e.stopPropagation(); toggleTask(proj.id, t.id); }}>
+                                      {t.done && <span style={{fontSize:9,color:"#fff",fontWeight:700}}>✓</span>}
+                                    </div>
+                                    <span className={`tl-task-txt ${t.done ? "done" : ""}`}>{t.text}</span>
+                                  </div>
+                                ))}
+                                <div style={{ paddingTop:8, borderTop:"1px solid var(--border2)", marginTop:4 }} onClick={e => e.stopPropagation()}>
+                                  <button onClick={() => setPickerState({ blockId: slot.id, projectId: proj.id, selected: new Set(todayTaskIds), newText: "" })}
+                                    style={{ background:"none", border:"none", fontSize:11, color:"var(--text3)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", padding:0 }}>
+                                    ✎ Change today's tasks
+                                  </button>
+                                </div>
+                                <div style={{ display:"flex", gap:8, marginTop:10 }} onClick={e => e.stopPropagation()}>
+                                  <button className="tl-start-btn" onClick={e => { e.stopPropagation(); setFocusBlockId(slot.id); setFocusMode(true); }}>Start →</button>
+                                  <button className="tl-start-btn" style={{ background:"rgba(69,193,122,.12)", color:"var(--green)", borderColor:"rgba(69,193,122,.3)" }}
+                                    onClick={e => { e.stopPropagation(); markManualDone(slot.id, proj.id, slot.todayTasks); }}>I did this ✓</button>
+                                  <button className="tl-start-btn" style={{ background:"rgba(224,85,85,.1)", color:"var(--red)", borderColor:"rgba(224,85,85,.25)", marginLeft:"auto" }}
+                                    onClick={e => { e.stopPropagation(); clearDWSlot(slot.slotIndex); setExpandedId(null); }}>Clear slot</button>
+                                </div>
                               </div>
-                            </div>
-                          )}
+                            );
+                          })()}
                         </div>
                         {/* Swap panel */}
                         {swapBlockId === slot.id && (
