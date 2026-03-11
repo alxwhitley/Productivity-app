@@ -412,7 +412,7 @@ const css = `
   /* Routine pill card */
   .tl-card.routine-pill{background:var(--bg3);border-radius:22px;border:1px solid var(--border2);}
   .tl-card.routine-pill.now-card{border:1.5px solid rgba(232,160,48,.4);box-shadow:0 0 12px rgba(232,160,48,.1);transform:none;}
-  .tl-card.routine-pill.done-card{opacity:.3;filter:saturate(0);}
+  .tl-card.routine-pill.done-card{opacity:.32;filter:saturate(0.1);}
   .tl-check-icon.missed{width:20px;height:20px;border-radius:50%;border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
   .tl-card-head{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;}
   .tl-stripe{width:3px;border-radius:2px;align-self:stretch;min-height:28px;flex-shrink:0;}
@@ -1520,8 +1520,8 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                           <button
                             className={`tl-time-btn${editingTime === blk.id ? " open" : ""}`}
                             style={{
-                              "--pill-bg": isCompleted ? "rgba(69,193,122,.15)" : (isNow || isLateActive) ? `${domain?.color || "var(--accent)"}33` : isPast ? "var(--bg3)" : isMissedAndNotStarted ? `${domain?.color || "rgba(255,255,255,.1)"}22` : domain?.color ? `${domain.color}22` : "var(--bg3)",
-                              "--pill-color": isCompleted ? "var(--green)" : (isNow || isLateActive) ? (domain?.color || "var(--accent)") : isPast ? "var(--text3)" : isMissedAndNotStarted ? (domain?.color || "var(--text3)") : domain?.color || "var(--text3)",
+                              "--pill-bg": isCompleted ? "rgba(255,255,255,.06)" : (isNow || isLateActive) ? "rgba(232,160,48,.2)" : isPast ? "rgba(255,255,255,.06)" : "rgba(255,255,255,.1)",
+                              "--pill-color": isCompleted ? "rgba(255,255,255,.25)" : (isNow || isLateActive) ? "var(--accent)" : isPast ? "rgba(255,255,255,.25)" : "rgba(255,255,255,.55)",
                             }}
                             onClick={e => { e.stopPropagation(); setEditingTime(editingTime === blk.id ? null : blk.id); }}
                             title="Tap to reschedule"
@@ -1842,8 +1842,8 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                           <button
                             className={`tl-time-btn${editingTime === slot.id ? " open" : ""}`}
                             style={{
-                              "--pill-bg": isCompleted ? "rgba(69,193,122,.15)" : isNowSlot ? `${domainColor || "var(--accent)"}33` : isPastSlot ? "var(--bg3)" : domainColor ? `${domainColor}22` : "var(--bg3)",
-                              "--pill-color": isCompleted ? "var(--green)" : isNowSlot ? (domainColor || "var(--accent)") : isPastSlot ? "var(--text3)" : domainColor || "var(--text3)",
+                              "--pill-bg": isCompleted ? "rgba(255,255,255,.06)" : isNowSlot ? "rgba(232,160,48,.2)" : isPastSlot ? "rgba(255,255,255,.06)" : "rgba(255,255,255,.1)",
+                              "--pill-color": isCompleted ? "rgba(255,255,255,.25)" : isNowSlot ? "var(--accent)" : isPastSlot ? "rgba(255,255,255,.25)" : "rgba(255,255,255,.55)",
                             }}
                             onClick={e => { e.stopPropagation(); setEditingTime(editingTime === slot.id ? null : slot.id); }}
                             title="Tap to reschedule"
@@ -2174,8 +2174,8 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                     <div className="tl-left">
                       <div className="tl-connector-top" />
                       <div className="tl-time" style={{
-                        background: allDone ? "rgba(69,193,122,.15)" : isNow ? "rgba(255,255,255,.1)" : isPast ? "var(--bg3)" : "var(--bg3)",
-                        color: allDone ? "var(--green)" : isNow ? "var(--text2)" : "var(--text3)",
+                        background: allDone ? "rgba(255,255,255,.06)" : isNow ? "rgba(232,160,48,.2)" : "rgba(255,255,255,.1)",
+                        color: allDone ? "rgba(255,255,255,.25)" : isNow ? "var(--accent)" : "rgba(255,255,255,.55)",
                       }}>{fmtTime(rb.startHour, rb.startMin)}</div>
                       <div className="tl-connector" />
                     </div>
@@ -2183,9 +2183,8 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                       <div className={["tl-card routine-pill", allDone ? "done-card" : "", isNow ? "now-card" : ""].filter(Boolean).join(" ")}>
                         <div style={{ display:"flex", alignItems:"center", gap:10, padding:"9px 14px" }} onClick={() => setExpandedId(isExp ? null : item.id)}>
                           <div style={{ flex:1, minWidth:0 }}>
-                            <div style={{ fontSize:13, fontWeight:600, color: allDone ? "var(--text3)" : "var(--text)", display:"flex", alignItems:"center", gap:6 }}>
+                            <div style={{ fontSize:13, fontWeight:600, color:"var(--text)", display:"flex", alignItems:"center", gap:6 }}>
                               {rb.title}
-                              {allDone && <span style={{ fontSize:10, color:"var(--green)", fontWeight:700 }}>✓</span>}
                             </div>
                           </div>
                           {isNow && <span className="tl-now-pill">Now</span>}
@@ -2360,43 +2359,43 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
 
           {/* END OF DAY */}
           {(data.todayPrefs?.showShutdown !== false) && (() => {
-            // Compute day stats
+            // Compute day stats using the same sources the timeline uses
             const todayStr = new Date().toDateString();
-            let dwBlocksDone = 0, dwBlocksTotal = 0, tasksDone = 0, tasksTotal = 0;
-            // Count deep work blocks
-            const todayDW = (data.deepWorkSlots || {})[new Date().toISOString().slice(0,10)] || [];
-            data.deepBlockDefaults?.forEach((def, i) => {
-              const saved = todayDW[i];
-              if (saved?.projectId) {
-                dwBlocksTotal++;
-                const proj = data.projects.find(p => p.id === saved.projectId);
-                const tids = saved.todayTasks;
-                if (Array.isArray(tids) && tids.length > 0) {
-                  const todayObjs = tids.map(id => proj?.tasks.find(t => t.id === id)).filter(Boolean);
-                  if (todayObjs.length > 0 && todayObjs.every(t => t.done)) dwBlocksDone++;
-                }
-              }
-            });
-            data.blocks?.forEach(b => {
-              if (b.projectId) {
-                const proj = data.projects.find(p => p.id === b.projectId);
-                if (proj) {
-                  const tids = b.todayTasks;
-                  if (Array.isArray(tids) && tids.length > 0) {
-                    tids.forEach(id => {
-                      const t = proj.tasks.find(t => t.id === id);
-                      if (t) { tasksTotal++; if (t.done) tasksDone++; }
-                    });
-                  }
-                }
-              }
-            });
+            const todayISO = new Date().toISOString().slice(0,10);
+
+            // DW blocks done = manual completions today (covers both regular blocks and DW slots)
+            // Also count blocks where all todayTasks are done even without manual completion
+            const allBlockIds = new Set([
+              ...(data.blocks || []).map(b => b.id),
+              ...((data.deepWorkSlots || {})[todayISO] || []).filter(s => s?.projectId).map(s => s.id),
+            ]);
+            const dwBlocksDone = manualCompleted.size; // manualCompleted is already filtered to today
+
+            // Tasks done today across all project blocks
+            let tasksDone = 0, tasksTotal = 0;
+            const countTasksForBlock = (projectId, todayTaskIds) => {
+              const proj = data.projects.find(p => p.id === projectId);
+              if (!proj) return;
+              const tids = Array.isArray(todayTaskIds) && todayTaskIds.length > 0
+                ? todayTaskIds : [];
+              tids.forEach(id => {
+                const t = proj.tasks.find(t => t.id === id);
+                if (t) { tasksTotal++; if (t.done) tasksDone++; }
+              });
+            };
+            (data.blocks || []).forEach(b => { if (b.projectId) countTasksForBlock(b.projectId, b.todayTasks); });
+            ((data.deepWorkSlots || {})[todayISO] || []).forEach(s => { if (s?.projectId) countTasksForBlock(s.projectId, s.todayTasks); });
             return (
               <>
                 <div className="sh"><span className="sh-label">End of Day</span></div>
                 {shutdownDone && (
                   <div style={{ margin:"0 16px 10px", background:"var(--bg2)", borderRadius:16, padding:"16px", border:"1px solid var(--border2)" }}>
-                    <div style={{ fontSize:13, fontWeight:700, color:"var(--text)", marginBottom:12 }}>✅ Shutdown Complete</div>
+                    <div style={{ fontSize:13, fontWeight:700, color:"var(--text)", marginBottom:12, display:"flex", alignItems:"center", gap:8 }}>
+                      <div style={{ width:18, height:18, borderRadius:"50%", background:"var(--green)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                        <span style={{ fontSize:9, color:"#fff", fontWeight:700 }}>✓</span>
+                      </div>
+                      Shutdown Complete
+                    </div>
                     <div style={{ display:"flex", gap:8 }}>
                       <div style={{ flex:1, background:"var(--bg3)", borderRadius:10, padding:"10px 12px", textAlign:"center" }}>
                         <div style={{ fontSize:22, fontWeight:800, color:"var(--accent)", lineHeight:1 }}>{dwBlocksDone}</div>
@@ -2415,7 +2414,9 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                 )}
                 {!shutdownDone && (
                   <div className="shutdown-row" style={{ opacity: isAfter4 ? 1 : 0.45 }} onClick={openShutdown}>
-                    <span className="sd-ico">🔒</span>
+                    <span className="sd-ico">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" strokeWidth="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                    </span>
                     <span className="sd-txt">Shutdown Ritual</span>
                     <span className="sd-arr">›</span>
                   </div>
@@ -3005,7 +3006,10 @@ function ProjectsScreen({ data, setData, openCategorize }) {
       <div className="scroll" style={{ paddingTop: 16 }} onClick={() => {}}>
         {data.inbox.length > 0 && (
           <>
-            <div className="reminder-section-label">📥 Reminders · tap to assign</div>
+            <div className="reminder-section-label" style={{ display:"flex", alignItems:"center", gap:6 }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M22 12h-6l-2 3H10l-2-3H2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              Reminders · tap to assign
+            </div>
             {data.inbox.map(item => (
               <div key={item.id} className="reminder-card">
                 <div className="reminder-card-dot" />
@@ -3199,9 +3203,10 @@ function PlanScreen({ data, setData, openAddBlock, onGoToSeason, lightMode, togg
       };
     }).filter(Boolean);
 
-    // How many filled DW slots exist? Empty = 3 - filled (min 0)
+    // How many filled DW slots exist? Empty = 3 - filled - real blocks (min 0)
     const filledCount = filledDWSlots.length;
-    const emptyCount = Math.max(0, 3 - filledCount);
+    const realCount = realBlocks.length;
+    const emptyCount = Math.max(0, 3 - filledCount - realCount);
 
     // Empty DW slots: use the deepSlots that are NOT filled, up to emptyCount
     const emptyDWSlots = deepSlots
@@ -3971,7 +3976,7 @@ function ThisSeasonCard({ data, setData, onGoToSeason }) {
         );
       })}
       {activeGoals.length === 0 && (
-        <div className="spc-empty">🎉 All season goals complete!</div>
+        <div className="spc-empty">All season goals complete!</div>
       )}
     </div>
   );
@@ -4021,7 +4026,7 @@ function SeasonScreen({ data, setData }) {
           <div className="sh-quarter">{getQuarterLabel()}</div>
           <div className="sh-title">
             {doneCount === seasonGoals.length && seasonGoals.length > 0
-              ? "Season complete 🎉"
+              ? "Season complete"
               : `${seasonGoals.length - doneCount} goal${seasonGoals.length - doneCount !== 1 ? "s" : ""} in motion`}
           </div>
           <div className="sh-sub">
@@ -4467,7 +4472,7 @@ function ShutdownSheet({ onClose, onComplete, alreadyDone, data, onAddBlock }) {
                   Tasks Completed Today
                 </div>
                 <div style={{ fontSize:22, fontWeight:700, color:"var(--text)", marginBottom:12 }}>
-                  {completedToday.length} task{completedToday.length !== 1 ? "s" : ""} done 🎉
+                  {completedToday.length} task{completedToday.length !== 1 ? "s" : ""} done
                 </div>
                 <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
                   {completedToday.map((t, i) => (
@@ -4502,14 +4507,14 @@ function ShutdownSheet({ onClose, onComplete, alreadyDone, data, onAddBlock }) {
 // ─── TIME-OF-DAY HINT ─────────────────────────────────────────────────────────
 function getTimeHint(hour, isAdmin) {
   if (isAdmin) {
-    if (hour < 12) return { icon: "⚠️", text: "Admin before noon uses your peak cognitive window — consider shifting to after 3pm.", tone: "warn" };
-    if (hour < 15) return { icon: "💡", text: "Early afternoon works for lighter admin — energy is good but not at its peak.", tone: "neutral" };
+    if (hour < 12) return { icon: "warn", text: "Admin before noon uses your peak cognitive window — consider shifting to after 3pm.", tone: "warn" };
+    if (hour < 15) return { icon: "info", text: "Early afternoon works for lighter admin — energy is good but not at its peak.", tone: "neutral" };
     return { icon: "✓", text: "After 3pm is ideal for admin and communication — your analytical peak has passed.", tone: "good" };
   }
   // deep work
-  if (hour < 12) return { icon: "🔥", text: "Before noon — your best window for deep analytical work. Neurochemicals are at peak.", tone: "good" };
-  if (hour < 15) return { icon: "💡", text: "Early afternoon — solid for creative or generative work. Less ideal for hard analysis.", tone: "neutral" };
-  return { icon: "⚠️", text: "After 3pm — cognitive resources are winding down. Better suited for admin than deep work.", tone: "warn" };
+  if (hour < 12) return { icon: "peak", text: "Before noon — your best window for deep analytical work. Neurochemicals are at peak.", tone: "good" };
+  if (hour < 15) return { icon: "info", text: "Early afternoon — solid for creative or generative work. Less ideal for hard analysis.", tone: "neutral" };
+  return { icon: "warn", text: "After 3pm — cognitive resources are winding down. Better suited for admin than deep work.", tone: "warn" };
 }
 
 // ─── ADD BLOCK SHEET ──────────────────────────────────────────────────────────
