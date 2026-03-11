@@ -336,8 +336,8 @@ const css = `
   .ph-sub{font-size:13px;color:var(--text2);margin-top:2px;}
 
   /* SECTION HEAD */
-  .sh{padding:14px 24px 8px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
-  .sh-label{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);}
+  .sh{padding:16px 20px 6px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
+  .sh-label{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);padding-left:8px;border-left:2px solid var(--border2);}
   .sh-btn{font-size:13px;color:var(--accent);font-weight:500;cursor:pointer;background:none;border:none;}
 
   /* CARD */
@@ -489,7 +489,7 @@ const css = `
   .now-marker-line{flex:1;height:1px;background:var(--accent);opacity:.4;}
   .now-marker-label{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);opacity:.7;white-space:nowrap;}
   /* clock */
-  .today-clock{font-size:28px;font-weight:700;color:var(--text);letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1;}
+  .today-clock{font-size:26px;font-weight:700;color:var(--text);letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1.1;}
   .today-clock-ampm{font-size:13px;font-weight:500;color:var(--text3);margin-left:4px;}
   .shutdown-row{margin:4px 16px 0;background:var(--bg2);border-radius:14px;padding:14px 18px;display:flex;align-items:center;gap:12px;cursor:pointer;}
   .sd-ico{font-size:17px;}
@@ -515,7 +515,7 @@ const css = `
 
   /* LOOSE TASKS */
   /* LOOSE ZONE — minimal tap-to-add */
-  .loose-zone{margin:0 16px 10px;min-height:72px;border-radius:14px;display:flex;flex-direction:column;position:relative;background:var(--bg2);}
+  .loose-zone{margin:0 16px 10px;min-height:72px;border-radius:14px;display:flex;flex-direction:column;position:relative;background:var(--bg2);border:1px solid var(--border2);}
   .loose-empty{flex:1;min-height:72px;display:flex;align-items:center;justify-content:center;color:var(--text3);opacity:.35;}
   .loose-split-bar{display:flex;min-height:56px;border-radius:14px;overflow:hidden;}
   .loose-split-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;color:var(--text3);font-size:13px;font-weight:500;opacity:.45;transition:opacity .15s,background .15s;border:none;background:none;font-family:'DM Sans',sans-serif;}
@@ -527,11 +527,11 @@ const css = `
   .loose-inline-input::placeholder{color:var(--text3);}
   .loose-add-more{display:flex;align-items:center;gap:6px;padding:8px 14px 12px;color:var(--text3);font-size:12px;cursor:pointer;opacity:.5;}
   .loose-add-more:active{opacity:1;}
-  .loose-section{margin:0 16px 10px;background:var(--bg2);border-radius:14px;overflow:hidden;}
+  .loose-section{margin:0 16px 10px;background:var(--bg2);border-radius:14px;overflow:hidden;border:1px solid var(--border2);}
   .loose-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px 8px;}
-  .loose-title{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text3);}
+  .loose-title{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);padding-left:8px;border-left:2px solid var(--border2);}
   .loose-count{font-size:11px;color:var(--text3);background:var(--bg3);border-radius:20px;padding:2px 8px;}
-  .loose-task-row{display:flex;align-items:center;gap:10px;padding:9px 16px;border-top:1px solid var(--border2);cursor:pointer;position:relative;}
+  .loose-task-row{display:flex;align-items:center;gap:10px;padding:11px 16px;border-top:1px solid var(--border2);cursor:pointer;position:relative;}
   .loose-task-row:hover{background:var(--bg3);}
   .loose-check{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;color:transparent;transition:all .15s;}
   .loose-check.done{background:var(--green);border-color:var(--green);color:#fff;}
@@ -572,8 +572,8 @@ const css = `
   .proj-card-badge{font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:3px 8px;border-radius:20px;flex-shrink:0;cursor:pointer;}
   .badge-active{background:var(--accent-s);color:var(--accent);}
   .badge-backlog{background:var(--bg3);color:var(--text3);}
-  .proj-bar-wrap{height:3px;background:var(--bg3);border-radius:2px;overflow:hidden;margin-bottom:6px;}
-  .proj-bar-fill{height:100%;border-radius:2px;transition:width .4s;}
+  .proj-bar-wrap{height:4px;background:var(--bg4);border-radius:2px;overflow:hidden;margin-bottom:6px;}
+  .proj-bar-fill{height:100%;border-radius:2px;transition:width .5s cubic-bezier(.4,0,.2,1);}
   .proj-card-meta{display:flex;justify-content:space-between;}
   .proj-card-tasks{font-size:11px;color:var(--text3);}
   .proj-card-pct{font-size:11px;font-weight:600;}
@@ -679,8 +679,11 @@ const css = `
 
 
   /* WEEK PLAN CARDS */
-  .week-card{margin:0 16px 8px;background:var(--bg2);border-radius:16px;overflow:hidden;}
+  .week-card{margin:0 16px 8px;background:var(--bg2);border-radius:16px;overflow:hidden;border:1px solid var(--border2);transition:opacity .2s;}
+  .week-card.past-day{opacity:0.55;}
+  .week-card.today-card{border-color:rgba(232,160,48,0.3);}
   .wc-head{padding:13px 18px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border2);}
+  .today-card .wc-head{background:rgba(232,160,48,0.05);}
   .wc-day{font-size:14px;font-weight:600;color:var(--text);}
   .wc-day.today{color:var(--accent);}
   .wc-date{font-size:12px;color:var(--text3);}
@@ -795,7 +798,8 @@ const css = `
   /* ── NAV ── */
   .nav{flex-shrink:0;height:78px;background:var(--bg);border-top:1px solid var(--border2);display:flex;align-items:flex-end;padding-bottom:10px;position:relative;z-index:25;overflow:visible;}
   .nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;padding-top:10px;}
-  .nav-ico{font-size:20px;line-height:1;color:var(--text3);transition:color .15s;}
+  .nav-ico{width:22px;height:22px;display:flex;align-items:center;justify-content:center;color:var(--text3);transition:color .15s;}
+  .nav-ico svg{width:22px;height:22px;display:block;color:inherit;}
   .nav-lbl{font-size:10px;font-weight:500;letter-spacing:.04em;color:var(--text3);text-transform:uppercase;transition:color .15s;}
   .nav-btn.on .nav-ico,.nav-btn.on .nav-lbl{color:var(--accent);}
   .nav-dot{position:absolute;top:8px;right:calc(50% - 14px);width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px rgba(232,160,48,.6);}
@@ -894,6 +898,52 @@ const css = `
 
 // ─── STATUS BAR (no time) ─────────────────────────────────────────────────────
 // ─── SHARED ICONS ─────────────────────────────────────────────────────────────
+
+function NavIcon({ id, active }) {
+  // Use currentColor so CSS on .nav-ico and .nav-btn.on controls the color
+  if (id === "today") return (
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.75"/>
+      <path d="M12 7.5V12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+      <path d="M12 12L15.5 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+      <circle cx="12" cy="12" r="1.25" fill="currentColor"/>
+    </svg>
+  );
+  if (id === "projects") return (
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="3.5" y="3.5" width="7" height="7" rx="2" stroke="currentColor" strokeWidth="1.75" fill={active ? "currentColor" : "none"} fillOpacity="0.15"/>
+      <rect x="13.5" y="3.5" width="7" height="7" rx="2" stroke="currentColor" strokeWidth="1.75"/>
+      <rect x="3.5" y="13.5" width="7" height="7" rx="2" stroke="currentColor" strokeWidth="1.75"/>
+      <rect x="13.5" y="13.5" width="7" height="7" rx="2" stroke="currentColor" strokeWidth="1.75" fill={active ? "currentColor" : "none"} fillOpacity="0.15"/>
+    </svg>
+  );
+  if (id === "plan") return (
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="3" y="5" width="18" height="16" rx="3" stroke="currentColor" strokeWidth="1.75"/>
+      {active && <rect x="3" y="5" width="18" height="5.5" rx="3" fill="currentColor" fillOpacity="0.2"/>}
+      <path d="M3 10h18" stroke="currentColor" strokeWidth="1.5"/>
+      <path d="M8 3v4M16 3v4" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"/>
+      <circle cx="8" cy="15" r="1.1" fill="currentColor"/>
+      <circle cx="12" cy="15" r="1.1" fill="currentColor"/>
+      <circle cx="16" cy="15" r="1.1" fill="currentColor" fillOpacity="0.4"/>
+    </svg>
+  );
+  if (id === "season") return (
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="12" cy="12" r="3.5" stroke="currentColor" strokeWidth="1.75" fill={active ? "currentColor" : "none"} fillOpacity="0.2"/>
+      <path d="M12 3.5V5.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"/>
+      <path d="M12 18.5V20.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"/>
+      <path d="M3.5 12H5.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"/>
+      <path d="M18.5 12H20.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"/>
+      <path d="M6.22 6.22L7.64 7.64" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"/>
+      <path d="M16.36 16.36L17.78 17.78" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"/>
+      <path d="M17.78 6.22L16.36 7.64" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"/>
+      <path d="M7.64 16.36L6.22 17.78" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"/>
+    </svg>
+  );
+  return null;
+}
+
 function GearIcon({ size = 17, color = "currentColor" }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
@@ -1275,28 +1325,32 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
 
       {/* HEADER */}
       {!focusMode && (
-        <div className="ph" style={{ paddingBottom: 12 }}>
+        <div className="ph" style={{ paddingBottom: 10, paddingTop: 10 }}>
+          {viewingTomorrow && (
+            <button onClick={() => setViewingTomorrow(false)} style={{ background:"none", border:"none", cursor:"pointer", padding:"0 0 8px", display:"flex", alignItems:"center", gap:4, color:"var(--text3)", fontFamily:"'DM Sans',sans-serif", fontSize:12, fontWeight:600 }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              Today
+            </button>
+          )}
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
             <div>
-              {viewingTomorrow && (
-                <button onClick={() => setViewingTomorrow(false)} style={{ background:"none", border:"none", cursor:"pointer", padding:"0 0 6px", display:"flex", alignItems:"center", gap:4, color:"var(--text3)", fontFamily:"'DM Sans',sans-serif", fontSize:12, fontWeight:600 }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  Today
-                </button>
-              )}
-              <div className="ph-eye">{days[viewDate.getDay()]}, {months[viewDate.getMonth()]} {viewDate.getDate()}</div>
-              <div style={{ display:"flex", alignItems:"baseline", gap:2, marginTop:2 }}>
-                {!viewingTomorrow && <><span className="today-clock">{clockH}:{clockM}</span><span className="today-clock-ampm">{clockAmpm}</span></>}
-                {viewingTomorrow && <span className="today-clock" style={{ fontSize:28 }}>Tomorrow</span>}
-              </div>
-              <div style={{ fontSize:13, color:"var(--text3)", marginTop:4 }}>
-                {viewingTomorrow
-                  ? `${timeline.length} block${timeline.length !== 1 ? "s" : ""} planned`
-                  : `${greeting}${name ? `, ${name}` : ""}.${currentItem ? ` You're in a block.` : nextItem ? ` Next up at ${fmtTime(nextItem.data.startHour, nextItem.data.startMin)}.` : " No more blocks today."}`
+              <div style={{ display:"flex", alignItems:"baseline", gap:6 }}>
+                {!viewingTomorrow
+                  ? <><span className="today-clock">{clockH}:{clockM}</span><span className="today-clock-ampm">{clockAmpm}</span></>
+                  : <span className="today-clock" style={{ fontSize:28 }}>Tomorrow</span>
                 }
+              </div>
+              <div style={{ fontSize:13, color:"var(--text2)", marginTop:2, fontWeight:500 }}>
+                {days[viewDate.getDay()]}, {months[viewDate.getMonth()]} {viewDate.getDate()}
               </div>
             </div>
             <button className="tab-gear" onClick={() => setShowTodaySettings(true)} onContextMenu={e => { e.preventDefault(); if(onSignOut) onSignOut(); }}><GearIcon size={20} /></button>
+          </div>
+          <div style={{ fontSize:12, color:"var(--text3)", marginTop:6 }}>
+            {viewingTomorrow
+              ? `${timeline.length} block${timeline.length !== 1 ? "s" : ""} planned`
+              : `${greeting}${name ? `, ${name}` : ""}.${currentItem ? ` You're in a block.` : nextItem ? ` Next up at ${fmtTime(nextItem.data.startHour, nextItem.data.startMin)}.` : " No more blocks today."}`
+            }
           </div>
         </div>
       )}
@@ -1565,11 +1619,13 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                         {isLateActive && countdownStr && !countdownExpired && (
                           <span className="tl-countdown">{countdownStr}</span>
                         )}
-                        {/* Gear icon when expanded */}
-                        {isExp && <button onClick={e => { e.stopPropagation(); setBlockMenuOpen(blockMenuOpen === blk.id ? null : blk.id); setBlockMenuMode(null); }}
-                            style={{ background:"none", border:"none", cursor:"pointer", padding:"4px 6px", color:"var(--text3)", lineHeight:1, borderRadius:8, flexShrink:0 }}>
-                            <GearIcon size={17} />
-                          </button>
+                        {/* Gear icon when expanded, chevron when collapsed */}
+                        {isExp
+                          ? <button onClick={e => { e.stopPropagation(); setBlockMenuOpen(blockMenuOpen === blk.id ? null : blk.id); setBlockMenuMode(null); }}
+                              style={{ background:"none", border:"none", cursor:"pointer", padding:"4px 6px", color:"var(--text3)", lineHeight:1, borderRadius:8, flexShrink:0 }}>
+                              <GearIcon size={17} />
+                            </button>
+                          : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ flexShrink:0, color:"var(--text3)", opacity:.4 }}><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                         }
                       </div>
                       {/* Inline tasks — shown on card face without expand */}
@@ -1845,11 +1901,13 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                               <div className="tl-meta">{domain?.name} · {slot.durationMin} min{relevantTasks.length > 0 ? ` · ${relevantDone}/${relevantTasks.length} today` : ""}</div>
                             </div>
                             {isNowSlot && !isExp && <span className="tl-now-pill">Now</span>}
-                            {/* Gear icon when expanded only */}
-                            {isExp && <button onClick={e => { e.stopPropagation(); setBlockMenuOpen(blockMenuOpen === slot.id ? null : slot.id); setBlockMenuMode(null); }}
-                                style={{ background:"none", border:"none", cursor:"pointer", padding:"4px 6px", color:"var(--text3)", lineHeight:1, borderRadius:8, flexShrink:0 }}>
-                                <GearIcon size={17} />
-                              </button>
+                            {/* Gear icon when expanded, chevron when collapsed */}
+                            {isExp
+                              ? <button onClick={e => { e.stopPropagation(); setBlockMenuOpen(blockMenuOpen === slot.id ? null : slot.id); setBlockMenuMode(null); }}
+                                  style={{ background:"none", border:"none", cursor:"pointer", padding:"4px 6px", color:"var(--text3)", lineHeight:1, borderRadius:8, flexShrink:0 }}>
+                                  <GearIcon size={17} />
+                                </button>
+                              : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ flexShrink:0, color:"var(--text3)", opacity:.4 }}><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                             }
                           </div>
                           {/* Inline tasks on card face */}
@@ -2150,7 +2208,7 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                           </div>
                           {isNow && <span className="tl-now-pill">Now</span>}
                           <span style={{ fontSize:11, color:"var(--text3)", fontWeight:500 }}>{doneCt}/{rb.tasks.length}</span>
-                          <span style={{ fontSize:12, color:"var(--text3)", transform: isExp ? "rotate(90deg)" : "none", transition:"transform .2s", display:"inline-block" }}>›</span>
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style={{ flexShrink:0, color:"var(--text3)", opacity:.45, transform: isExp ? "rotate(90deg)" : "rotate(0deg)", transition:"transform .2s" }}><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                         </div>
                         {isExp && (
                           <div style={{ padding:"4px 14px 10px", borderTop:"1px solid var(--border2)" }} onClick={e => e.stopPropagation()}>
@@ -2221,7 +2279,7 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                     {totalCount > 0 && doneCount === totalCount && (
                       <div className="tl-check-icon full" style={{ marginRight:4 }}><span style={{fontSize:10,color:"#fff",fontWeight:700}}>✓</span></div>
                     )}
-                    <span style={{ fontSize:13, color:"var(--text3)", marginLeft:4, transform: isExp ? "rotate(90deg)" : "none", transition:"transform .2s", display:"inline-block" }}>›</span>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style={{ flexShrink:0, color:"var(--text3)", opacity:.4, marginLeft:4, transform: isExp ? "rotate(90deg)" : "rotate(0deg)", transition:"transform .2s" }}><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                   </div>
 
                   {isExp && (
@@ -2360,30 +2418,38 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
             return (
               <>
                 <div className="sh"><span className="sh-label">End of Day</span></div>
-                {shutdownDone && (
-                  <div style={{ margin:"0 16px 10px", background:"var(--bg2)", borderRadius:16, padding:"16px", border:"1px solid var(--border2)" }}>
-                    <div style={{ fontSize:13, fontWeight:700, color:"var(--text)", marginBottom:12, display:"flex", alignItems:"center", gap:8 }}>
-                      <div style={{ width:18, height:18, borderRadius:"50%", background:"var(--green)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                        <span style={{ fontSize:9, color:"#fff", fontWeight:700 }}>✓</span>
+                {shutdownDone && (() => {
+                    const routinesDone = data.routineBlocks?.filter(rb => { const comp = (rb.completions||{})[todayStr]||{}; return rb.tasks.length > 0 && rb.tasks.every(t => comp[t.id]); }).length || 0;
+                    const totalRoutines = data.routineBlocks?.filter(rb => rb.tasks.length > 0).length || 0;
+                    const totalBlocks = (data.blocks||[]).filter(b=>b.dayOffset===0).length + ((data.deepWorkSlots||{})[todayISO]||[]).filter(s=>s?.projectId).length;
+                    const taskPct = tasksTotal > 0 ? Math.round((tasksDone/tasksTotal)*100) : 0;
+                    const statRows = [
+                      { label:"Deep Work", value:dwBlocksDone, total:Math.max(totalBlocks,dwBlocksDone), color:"var(--accent)" },
+                      { label:"Tasks", value:tasksDone, total:Math.max(tasksTotal,tasksDone,1), color:"var(--green)" },
+                      { label:"Routines", value:routinesDone, total:Math.max(totalRoutines,routinesDone,1), color:"#4BAABB" },
+                    ];
+                    return (
+                      <div style={{ margin:"0 16px 10px", background:"var(--bg2)", borderRadius:16, padding:"16px 18px", border:"1px solid rgba(69,193,122,0.2)" }}>
+                        <div style={{ fontSize:12, fontWeight:700, color:"var(--green)", marginBottom:14, display:"flex", alignItems:"center", gap:7, letterSpacing:".04em", textTransform:"uppercase" }}>
+                          <div style={{ width:16, height:16, borderRadius:"50%", background:"rgba(69,193,122,0.2)", border:"1.5px solid var(--green)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                            <span style={{ fontSize:8, color:"var(--green)", fontWeight:900 }}>✓</span>
+                          </div>
+                          Shutdown Complete
+                        </div>
+                        {statRows.map(({label,value,total,color}) => (
+                          <div key={label} style={{ marginBottom:10 }}>
+                            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:5 }}>
+                              <span style={{ fontSize:11, color:"var(--text3)", fontWeight:600, letterSpacing:".05em", textTransform:"uppercase" }}>{label}</span>
+                              <span style={{ fontSize:14, fontWeight:800, color, lineHeight:1 }}>{value}<span style={{ fontSize:10, fontWeight:500, color:"var(--text3)", marginLeft:2 }}>/{total}</span></span>
+                            </div>
+                            <div style={{ height:4, background:"var(--bg4)", borderRadius:3, overflow:"hidden" }}>
+                              <div style={{ height:"100%", width:`${total > 0 ? Math.round((value/total)*100) : 0}%`, background:color, borderRadius:3, opacity:0.8, transition:"width .6s cubic-bezier(.4,0,.2,1)" }} />
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                      Shutdown Complete
-                    </div>
-                    <div style={{ display:"flex", gap:8 }}>
-                      <div style={{ flex:1, background:"var(--bg3)", borderRadius:10, padding:"10px 12px", textAlign:"center" }}>
-                        <div style={{ fontSize:22, fontWeight:800, color:"var(--accent)", lineHeight:1 }}>{dwBlocksDone}</div>
-                        <div style={{ fontSize:10, color:"var(--text3)", marginTop:3, fontWeight:600, letterSpacing:".05em", textTransform:"uppercase" }}>DW Blocks</div>
-                      </div>
-                      <div style={{ flex:1, background:"var(--bg3)", borderRadius:10, padding:"10px 12px", textAlign:"center" }}>
-                        <div style={{ fontSize:22, fontWeight:800, color:"var(--green)", lineHeight:1 }}>{tasksDone}</div>
-                        <div style={{ fontSize:10, color:"var(--text3)", marginTop:3, fontWeight:600, letterSpacing:".05em", textTransform:"uppercase" }}>Tasks Done</div>
-                      </div>
-                      <div style={{ flex:1, background:"var(--bg3)", borderRadius:10, padding:"10px 12px", textAlign:"center" }}>
-                        <div style={{ fontSize:22, fontWeight:800, color:"var(--text2)", lineHeight:1 }}>{data.routineBlocks?.filter(rb => { const comp = (rb.completions||{})[todayStr]||{}; return rb.tasks.every(t => comp[t.id]); }).length || 0}</div>
-                        <div style={{ fontSize:10, color:"var(--text3)", marginTop:3, fontWeight:600, letterSpacing:".05em", textTransform:"uppercase" }}>Routines</div>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                    );
+                  })()}
                 {!shutdownDone && (
                   <div className="shutdown-row" style={{ opacity: isAfter4 ? 1 : 0.45 }} onClick={openShutdown}>
                     <span className="sd-ico">
@@ -2745,9 +2811,12 @@ function ProjectCard({ proj, domain, isExp, newTaskText,
                 onClick={e => { e.stopPropagation(); if (swipeX < 0) return; setDraftName(proj.name); setShowEdit(true); setTimeout(() => { nameInputRef.current?.focus(); nameInputRef.current?.select(); }, 60); }}
               >{proj.name || <span style={{color:"var(--text3)"}}>Untitled</span>}</span>
             )}
-            <span className={`proj-card-badge ${proj.status === "active" ? "badge-active" : "badge-backlog"}`} onClick={e => { e.stopPropagation(); onToggleStatus(e); }}>
-              {proj.status === "active" ? "Active" : "Backlog"}
-            </span>
+            <div style={{ display:"flex", alignItems:"center", gap:8, flexShrink:0 }}>
+              <span className={`proj-card-badge ${proj.status === "active" ? "badge-active" : "badge-backlog"}`} onClick={e => { e.stopPropagation(); onToggleStatus(e); }}>
+                {proj.status === "active" ? "Active" : "Backlog"}
+              </span>
+              {!showEdit && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ color:"var(--text3)", opacity:.4, transform: isExp ? "rotate(90deg)" : "rotate(0deg)", transition:"transform .2s", flexShrink:0 }}><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+            </div>
           </div>
           <div className="proj-bar-wrap">
             <div className="proj-bar-fill" style={{ width: `${pct}%`, background: domain?.color }} />
@@ -2840,7 +2909,7 @@ function RoutineBlockView({ routine, dateKey, data, setData, compact }) {
           </div>
         </div>
         <span className="routine-badge">Routine</span>
-        <span style={{ fontSize:13, color:"var(--text3)", marginLeft:4, transform: open ? "rotate(90deg)" : "none", transition:"transform .2s", display:"inline-block" }}>›</span>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style={{ flexShrink:0, color:"var(--text3)", opacity:.4, marginLeft:4, transform: open ? "rotate(90deg)" : "rotate(0deg)", transition:"transform .2s" }}><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
       </div>
       {open && (
         <div className="routine-tasks">
@@ -2939,7 +3008,10 @@ function ProjectsScreen({ data, setData, openCategorize }) {
       <StatusBar />
       <div className="ph">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <div className="ph-title">Projects</div>
+          <div>
+            <div className="ph-eye">Your Work</div>
+            <div className="ph-title">Projects</div>
+          </div>
           <button className="tab-gear" onClick={() => setShowManage(true)}><GearIcon size={20} /></button>
         </div>
         <div className="ph-sub">{activeCount} active · {projects.length - activeCount} in backlog</div>
@@ -3221,7 +3293,6 @@ function PlanScreen({ data, setData, openAddBlock, onGoToSeason, lightMode, togg
         </div>
       </div>
       <div className="scroll">
-        <ThisSeasonCard data={data} setData={setData} onGoToSeason={onGoToSeason} />
         <div className="sh" style={{ paddingTop: 8 }}><span className="sh-label">Schedule</span></div>
 
         {[0,1,2,3,4,5,6].map(offset => {
@@ -3229,12 +3300,17 @@ function PlanScreen({ data, setData, openAddBlock, onGoToSeason, lightMode, togg
           const dow = dayDate.getDay();
           const isWorkDay = workWeek.includes(dow);
           const isToday = offset === 0;
+          const isPastDay = !isToday && dayDate < today;
           const mergedRows = getMergedRows(offset);
           const dayDateStr = `${dayDate.getFullYear()}-${String(dayDate.getMonth()+1).padStart(2,"0")}-${String(dayDate.getDate()).padStart(2,"0")}`;
+          const dayDateKey = dayDate.toDateString();
+          const completedBlockIds = new Set(
+            (data.blockCompletions || []).filter(c => c.date === dayDateKey).map(c => c.blockId)
+          );
           const dayHasPickerOpen = wkDwPickerOpen && wkDwPickerOpen.startsWith(dayDateStr);
 
           return (
-            <div key={offset} className="week-card" style={dayHasPickerOpen ? { overflow:"visible" } : undefined}>
+            <div key={offset} className={["week-card", isToday ? "today-card" : "", isPastDay ? "past-day" : ""].filter(Boolean).join(" ")} style={dayHasPickerOpen ? { overflow:"visible" } : undefined}>
               <div className="wc-head">
                 <div style={{ display:"flex", alignItems:"center", gap:8 }}>
                   <span className={`wc-day ${isToday ? "today" : ""}`}>{days[dow]}</span>
@@ -3273,34 +3349,41 @@ function PlanScreen({ data, setData, openAddBlock, onGoToSeason, lightMode, togg
                   const domColor = domain?.color || null;
                   const cardKey = `real_${blk.id}`;
                   const isExpReal = wkDwPickerOpen === cardKey + "_exp";
+                  const isDone = completedBlockIds.has(blk.id);
+                  const isMissed = isPastDay && !isDone;
                   return (
-                    <div key={blk.id} style={{ padding: "6px 12px 2px" }}>
+                    <div key={blk.id} style={{ padding: "6px 12px 2px", opacity: isDone ? 0.38 : isMissed ? 0.55 : 1, filter: isDone ? "saturate(0.15)" : "none", transition: "opacity .2s" }}>
                       <div
                         style={{
                           background: "var(--bg3)",
-                          border: domColor ? `1px solid ${domColor}60` : "1px solid var(--border)",
-                          boxShadow: domColor ? `0 0 14px ${domColor}1a` : "none",
+                          border: isMissed ? "1px solid rgba(224,85,85,0.25)" : domColor ? `1px solid ${domColor}60` : "1px solid var(--border)",
+                          boxShadow: isDone || isMissed ? "none" : domColor ? `0 0 14px ${domColor}1a` : "none",
                           borderRadius: 12,
                           overflow: "hidden",
-                          cursor: "pointer",
+                          cursor: isPastDay ? "default" : "pointer",
                         }}
-                        onClick={() => setWkDwPickerOpen(isExpReal ? null : cardKey + "_exp")}
+                        onClick={() => !isPastDay && setWkDwPickerOpen(isExpReal ? null : cardKey + "_exp")}
                       >
                         <div style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 14px" }}>
                           <div style={{ width:3, borderRadius:2, alignSelf:"stretch", minHeight:36, background: domColor || "var(--bg4)", flexShrink:0 }} />
                           <div style={{ flex:1, minWidth:0 }}>
                             <div style={{ fontSize:10, fontWeight:700, letterSpacing:".08em", textTransform:"uppercase", color: domColor || "var(--accent)", marginBottom:2, opacity:.9 }}>Deep Work</div>
-                            <div style={{ fontSize:14, fontWeight:600, color:"var(--text)" }}>{proj?.name || blk.label || "Block"}</div>
+                            <div style={{ fontSize:14, fontWeight:600, color:"var(--text)", textDecoration: isMissed ? "line-through" : "none" }}>{proj?.name || blk.label || "Block"}</div>
                             <div style={{ fontSize:11, color:"var(--text3)", marginTop:3 }}>
                               {domain?.name} · {blk.durationMin} min · {fmtTime(blk.startHour, blk.startMin)}
                             </div>
                           </div>
                           <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                            <div style={{ fontSize:10, fontWeight:700, letterSpacing:".07em", textTransform:"uppercase", color: domColor || "var(--accent)", opacity:.8 }}>DW</div>
-                            <div style={{ fontSize:14, color:"var(--text3)", transform: isExpReal ? "rotate(90deg)" : "rotate(0deg)", transition:"transform .2s" }}>›</div>
+                            {isDone
+                              ? <div style={{ width:20, height:20, borderRadius:"50%", background:"rgba(69,193,122,0.2)", border:"1.5px solid rgba(69,193,122,0.5)", display:"flex", alignItems:"center", justifyContent:"center" }}><span style={{ fontSize:10, color:"#45C17A", fontWeight:800 }}>✓</span></div>
+                              : isMissed
+                                ? <div style={{ fontSize:10, fontWeight:700, letterSpacing:".05em", textTransform:"uppercase", color:"var(--red)", opacity:.7 }}>missed</div>
+                                : <><div style={{ fontSize:10, fontWeight:700, letterSpacing:".07em", textTransform:"uppercase", color: domColor || "var(--accent)", opacity:.8 }}>DW</div>
+                                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style={{ color:"var(--text3)", opacity:.45, transform: isExpReal ? "rotate(90deg)" : "rotate(0deg)", transition:"transform .2s" }}><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg></>
+                            }
                           </div>
                         </div>
-                        {isExpReal && (
+                        {isExpReal && !isPastDay && (
                           <div style={{ borderTop:"1px solid var(--border2)", padding:"10px 14px" }} onClick={e => e.stopPropagation()}>
                             <div style={{ display:"flex", gap:8 }}>
                               <button onClick={() => { deleteBlock(blk.id); setWkDwPickerOpen(null); }}
@@ -3345,34 +3428,42 @@ function PlanScreen({ data, setData, openAddBlock, onGoToSeason, lightMode, togg
                     setWkDwPickerTasks(st => { const n={...st}; delete n[cardKey]; return n; });
                   };
 
+                  const isDoneFilled = completedBlockIds.has(cardKey) ||
+                    (isPastDay && assignedTaskIds?.length > 0 && assignedTaskIds.every(id => proj2?.tasks?.find(t => t.id === id)?.done));
+                  const isMissedFilled = isPastDay && !isDoneFilled;
                   return (
-                    <div key={cardKey} style={{ padding: "6px 12px 2px" }}>
+                    <div key={cardKey} style={{ padding: "6px 12px 2px", opacity: isDoneFilled ? 0.38 : isMissedFilled ? 0.55 : 1, filter: isDoneFilled ? "saturate(0.15)" : "none", transition: "opacity .2s" }}>
                       <div
                         style={{
                           background: "var(--bg3)",
-                          border: domainColor2 ? `1px solid ${domainColor2}60` : "1px solid var(--border)",
-                          boxShadow: domainColor2 ? `0 0 14px ${domainColor2}1a` : "none",
+                          border: isMissedFilled ? "1px solid rgba(224,85,85,0.25)" : domainColor2 ? `1px solid ${domainColor2}60` : "1px solid var(--border)",
+                          boxShadow: isDoneFilled || isMissedFilled ? "none" : domainColor2 ? `0 0 14px ${domainColor2}1a` : "none",
                           borderRadius: 12,
                           overflow: "hidden",
-                          cursor: "pointer",
+                          cursor: isPastDay ? "default" : "pointer",
                         }}
-                        onClick={() => { setWkDwPickerOpen(isExpFilled ? null : cardKey + "_exp"); }}
+                        onClick={() => { if (!isPastDay) setWkDwPickerOpen(isExpFilled ? null : cardKey + "_exp"); }}
                       >
                         <div style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 14px" }}>
                           <div style={{ width:3, borderRadius:2, alignSelf:"stretch", minHeight:36, background: domainColor2 || "var(--bg4)", flexShrink:0 }} />
                           <div style={{ flex:1, minWidth:0 }}>
-                            <div style={{ fontSize:14, fontWeight:600, color:"var(--text)" }}>{proj2?.name || "—"}</div>
+                            <div style={{ fontSize:14, fontWeight:600, color:"var(--text)", textDecoration: isMissedFilled ? "line-through" : "none" }}>{proj2?.name || "—"}</div>
                             <div style={{ fontSize:11, color:"var(--text3)", marginTop:3 }}>
                               {domain2?.name} · {row.durationMin} min · {fmtTime(row.startHour, row.startMin)}
                               {assignedTaskIds?.length > 0 ? ` · ${assignedTaskIds.length} task${assignedTaskIds.length > 1 ? "s" : ""}` : ""}
                             </div>
                           </div>
                           <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                            <div style={{ fontSize:10, fontWeight:700, letterSpacing:".07em", textTransform:"uppercase", color: domainColor2 || "var(--accent)", opacity:.8 }}>DW</div>
-                            <div style={{ fontSize:14, color:"var(--text3)", transform: isExpFilled ? "rotate(90deg)" : "rotate(0deg)", transition:"transform .2s" }}>›</div>
+                            {isDoneFilled
+                              ? <div style={{ width:20, height:20, borderRadius:"50%", background:"rgba(69,193,122,0.2)", border:"1.5px solid rgba(69,193,122,0.5)", display:"flex", alignItems:"center", justifyContent:"center" }}><span style={{ fontSize:10, color:"#45C17A", fontWeight:800 }}>✓</span></div>
+                              : isMissedFilled
+                                ? <div style={{ fontSize:10, fontWeight:700, letterSpacing:".05em", textTransform:"uppercase", color:"var(--red)", opacity:.7 }}>missed</div>
+                                : <><div style={{ fontSize:10, fontWeight:700, letterSpacing:".07em", textTransform:"uppercase", color: domainColor2 || "var(--accent)", opacity:.8 }}>DW</div>
+                                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style={{ color:"var(--text3)", opacity:.45, transform: isExpFilled ? "rotate(90deg)" : "rotate(0deg)", transition:"transform .2s" }}><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg></>
+                            }
                           </div>
                         </div>
-                        {isExpFilled && (
+                        {isExpFilled && !isPastDay && (
                           <div style={{ borderTop:"1px solid var(--border2)" }} onClick={e => e.stopPropagation()}>
                             {projTasks3.length > 0 && (
                               <div style={{ padding:"10px 14px 4px" }}>
@@ -3930,10 +4021,8 @@ function SeasonScreen({ data, setData }) {
         <div className="ph-title">Season</div>
       </div>
       <div className="scroll">
-
         {/* Season hero */}
         <div className="season-hero">
-          <div className="sh-quarter">{getQuarterLabel()}</div>
           <div className="sh-title">
             {doneCount === seasonGoals.length && seasonGoals.length > 0
               ? "Season complete"
@@ -3942,7 +4031,9 @@ function SeasonScreen({ data, setData }) {
           <div className="sh-sub">
             {seasonGoals.length === 0
               ? "Set up to 4 big goals for this quarter."
-              : `${doneCount} of ${seasonGoals.length} complete`}
+              : doneCount === seasonGoals.length
+                ? `All ${seasonGoals.length} goals complete this quarter.`
+                : `${doneCount} of ${seasonGoals.length} complete · ${getQuarterLabel()}`}
           </div>
         </div>
 
@@ -5027,10 +5118,10 @@ function CategorizeSheet({ data, onClose, onCategorize, onDismiss }) {
 
 // ─── APP ──────────────────────────────────────────────────────────────────────
 const NAV_ITEMS = [
-  { id:"today",    ico:"◉", lbl:"Today"    },
-  { id:"projects", ico:"▦", lbl:"Projects" },
-  { id:"plan",     ico:"⬚", lbl:"Week"     },
-  { id:"season", ico:"◎", lbl:"Season" },
+  { id:"today",    lbl:"Today"    },
+  { id:"projects", lbl:"Projects" },
+  { id:"plan",     lbl:"Week"     },
+  { id:"season",   lbl:"Season"   },
 ];
 
 // ── Login Screen ─────────────────────────────────────────────────────────────
@@ -5199,7 +5290,7 @@ export default function App() {
             {NAV_ITEMS.slice(0,2).map(n => (
               <div key={n.id} className={`nav-btn ${tab===n.id?"on":""}`} onClick={()=>setTab(n.id)}>
                 {n.id === "projects" && data.inbox.length > 0 && <span className="nav-dot" />}
-                <span className="nav-ico">{n.ico}</span>
+                <span className="nav-ico"><NavIcon id={n.id} active={tab===n.id} /></span>
                 <span className="nav-lbl">{n.lbl}</span>
               </div>
             ))}
@@ -5218,7 +5309,7 @@ export default function App() {
             {/* Week + Season */}
             {NAV_ITEMS.slice(2).map(n => (
               <div key={n.id} className={`nav-btn ${tab===n.id?"on":""}`} onClick={()=>setTab(n.id)}>
-                <span className="nav-ico">{n.ico}</span>
+                <span className="nav-ico"><NavIcon id={n.id} active={tab===n.id} /></span>
                 <span className="nav-lbl">{n.lbl}</span>
               </div>
             ))}
