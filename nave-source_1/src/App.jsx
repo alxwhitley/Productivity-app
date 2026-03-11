@@ -111,7 +111,7 @@ function getRoutinesForDate(routineBlocks, date) {
 //   3. The rest of the app is unchanged
 // ═══════════════════════════════════════════════════════════════════════════
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 const STORAGE_KEY    = "nave_data_v1";       // new key — clean break from momentum_v2
 const THEME_KEY      = "nave_theme";
 
@@ -168,8 +168,18 @@ const MIGRATIONS = [
       return { ...FIELD_DEFAULTS, schemaVersion: 1 };
     }
   },
-  // Future migrations go here, e.g.:
-  // { version: 2, up: (data) => ({ ...data, newField: "default", schemaVersion: 2 }) },
+  // v2: clear todayTasks from all DW slots (force re-pick; old code set all tasks)
+  {
+    version: 2,
+    up: (data) => {
+      const deepWorkSlots = data.deepWorkSlots || {};
+      const cleared = {};
+      for (const [date, slots] of Object.entries(deepWorkSlots)) {
+        cleared[date] = slots.map(s => s ? { ...s, todayTasks: null } : s);
+      }
+      return { ...data, deepWorkSlots: cleared, schemaVersion: 2 };
+    }
+  },
 ];
 
 // ── Deep merge: add missing keys from defaults without touching existing ones ─
