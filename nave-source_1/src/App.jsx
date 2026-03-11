@@ -143,7 +143,7 @@ const FIELD_DEFAULTS = {
   emptyBlocks:    [],
   routineBlocks:  [],
   reviewData:     INITIAL_DATA.reviewData,
-  todayPrefs:     { name:"", showShutdown:true, defaultBlock:"9" },
+  todayPrefs:     { name:"", showShutdown:true, defaultBlock:"9", hideTimes:false },
   blockCompletions: [], // [{ blockId, date, durationMin }] — "I did this" / Done logs
   deepWorkTargets: { dailyHours: 4, weeklyHours: 20, maxDeepBlocks: 3 }, // user-configurable
   deepWorkSlots: {}, // { [dateStr]: [{ projectId, startHour, startMin, durationMin, todayTasks }] }
@@ -409,6 +409,11 @@ const css = `
   .tl-drag-handle span{display:block;width:14px;height:2px;background:var(--text3);border-radius:2px;}
   .tl-item.dragging{opacity:.4;border:1px dashed var(--border);}
   .tl-item.drag-over{border-top:2px solid var(--accent);}
+  /* No-times mode */
+  .tl-wrap.no-times{padding:0 16px;}
+  .tl-wrap.no-times .tl-item{padding-right:0;gap:0;}
+  .tl-wrap.no-times .tl-left{display:none;}
+  .tl-wrap.no-times .tl-item+.tl-item{margin-top:8px;}
 
   .tl-card{width:100%;background:var(--bg2);border-radius:14px;overflow:hidden;transition:opacity .2s,border-color .2s,box-shadow .2s,transform .25s;}
   .tl-card.done-card{opacity:.32;filter:saturate(0.1);}
@@ -1767,7 +1772,7 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
             </div>
           )}
 
-          <div className="tl-wrap" style={{ paddingTop: 4 }}>
+          <div className={`tl-wrap${data.todayPrefs?.hideTimes ? " no-times" : ""}`} style={{ paddingTop: 4 }}>
             {timeline.map((item, idx) => {
               const isPast = !viewingTomorrow && (item.mins + (item.data.durationMin || 60)) <= nowMins;
               const isNow = !viewingTomorrow && currentItem?.id === item.id;
@@ -5234,6 +5239,7 @@ function TodaySettingsSheet({ data, setData, onClose }) {
   const prefs = data.todayPrefs || {};
   const [name, setName]           = useState(prefs.name || "");
   const [showShutdown, setShowSD] = useState(prefs.showShutdown !== false);
+  const [hideTimes, setHideTimes] = useState(prefs.hideTimes === true);
   const [defaultBlock, setDefault] = useState(prefs.defaultBlock || "9");
   const targets = data.deepWorkTargets || { dailyHours: 4, weeklyHours: 20, maxDeepBlocks: 3 };
   const dwCount = (data.deepBlockDefaults || []).length;
@@ -5244,7 +5250,7 @@ function TodaySettingsSheet({ data, setData, onClose }) {
   const save = () => {
     setData(d => ({
       ...d,
-      todayPrefs: { name: name.trim(), showShutdown, defaultBlock },
+      todayPrefs: { name: name.trim(), showShutdown, defaultBlock, hideTimes },
       deepWorkTargets: { dailyHours: parseFloat(dailyHours)||4, weeklyHours: parseFloat(weeklyHours)||20, maxDeepBlocks: parseInt(maxDeepBlocks)||3 },
     }));
     onClose();
@@ -5307,6 +5313,17 @@ function TodaySettingsSheet({ data, setData, onClose }) {
               <div className="set-row-sub">Displays end-of-day ritual on Today tab</div>
             </div>
             <div className={`toggle-pill ${showShutdown ? "on" : ""}`} onClick={() => setShowSD(v => !v)}>
+              <div className="toggle-knob" />
+            </div>
+          </div>
+
+          <div className="set-section">Layout</div>
+          <div className="set-row">
+            <div>
+              <div className="set-row-label">Hide Time Column</div>
+              <div className="set-row-sub">Cards fill the full width — no fixed schedule</div>
+            </div>
+            <div className={`toggle-pill ${hideTimes ? "on" : ""}`} onClick={() => setHideTimes(v => !v)}>
               <div className="toggle-knob" />
             </div>
           </div>
