@@ -111,7 +111,7 @@ function getRoutinesForDate(routineBlocks, date) {
 //   3. The rest of the app is unchanged
 // ═══════════════════════════════════════════════════════════════════════════
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 const STORAGE_KEY    = "nave_data_v1";       // new key — clean break from momentum_v2
 const THEME_KEY      = "nave_theme";
 
@@ -146,6 +146,7 @@ const FIELD_DEFAULTS = {
   deepWorkSlots: {}, // { [dateStr]: [{ projectId, startHour, startMin, durationMin, todayTasks }] }
   todayLoosePicks: {}, // { [dateStr]: [looseTaskId, ...] } — tasks picked for today's loose block
   onboardingDone: false,
+  sessionLog: [], // [{ id, projectId, date, durationMin, note }]
 };
 
 // ── Migrations — run in order when schema version is behind ─────────────────
@@ -179,6 +180,16 @@ const MIGRATIONS = [
       }
       return { ...data, deepWorkSlots: cleared, schemaVersion: 2 };
     }
+  },
+  // v3: add mode field to all existing projects, initialize sessionLog
+  {
+    version: 3,
+    up: (data) => ({
+      ...data,
+      projects: (data.projects || []).map(p => ({ mode: "tasks", ...p })),
+      sessionLog: data.sessionLog || [],
+      schemaVersion: 3,
+    })
   },
 ];
 
@@ -599,6 +610,17 @@ const css = `
   .proj-bar-wrap{height:4px;background:var(--bg4);border-radius:2px;overflow:hidden;margin-bottom:6px;}
   .proj-bar-fill{height:100%;border-radius:2px;transition:width .5s cubic-bezier(.4,0,.2,1);}
   .proj-card-meta{display:flex;justify-content:space-between;}
+  /* Session mode */
+  .proj-session-bar-wrap{height:4px;background:var(--bg4);border-radius:2px;overflow:hidden;margin-bottom:6px;}
+  .proj-session-bar-fill{height:100%;border-radius:2px;opacity:0.7;transition:width .5s cubic-bezier(.4,0,.2,1);}
+  .proj-session-log{padding:8px 0 2px;}
+  .proj-session-log-item{display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid var(--border2);}
+  .proj-session-log-item:last-child{border-bottom:none;}
+  .proj-session-log-note{font-size:12px;color:var(--text2);flex:1;line-height:1.4;}
+  .proj-session-log-meta{font-size:10px;color:var(--text3);white-space:nowrap;padding-top:1px;}
+  .session-focus-input{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:13px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none;resize:none;box-sizing:border-box;line-height:1.4;}
+  .session-focus-input:focus{border-color:var(--accent);}
+  .session-focus-note{font-size:12px;color:var(--text3);font-style:italic;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .proj-card-tasks{font-size:11px;color:var(--text3);}
   .proj-card-pct{font-size:11px;font-weight:600;}
 
@@ -1219,6 +1241,14 @@ function NavIcon({ id, active }) {
   return null;
 }
 
+function WaveIcon({ size = 14, color = "currentColor" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={{ flexShrink:0 }}>
+      <path d="M2 12c1.5-4 3-6 4.5-6S9 9 10.5 12s3 6 4.5 6 3-3 4.5-6 3-6 4.5-6" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
 function GearIcon({ size = 17, color = "currentColor" }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
@@ -1447,6 +1477,22 @@ function TodayScreen({ data, setData, openShutdown, focusMode: focusModeprop, se
 
   const saveDWTodayTasks = (slotIndex, taskIds) =>
     mutateDWSlot(toISODate(), slotIndex, { todayTasks: taskIds.length > 0 ? taskIds : null });
+
+  const saveDWSessionNote = (slotIndex, note) =>
+    mutateDWSlot(toISODate(), slotIndex, { sessionNote: note || null });
+
+  const logSession = (projectId, durationMin, note) => {
+    setData(d => ({
+      ...d,
+      sessionLog: [...(d.sessionLog || []), {
+        id: uid(),
+        projectId,
+        date: toISODate(),
+        durationMin,
+        note: note || "",
+      }],
+    }));
+  };
 
   const markManualDone = (blockId, projectId, todayTaskIds) => {
     setData(d => {
@@ -1815,6 +1861,8 @@ function TodayScreen({ data, setData, openShutdown, focusMode: focusModeprop, se
 
                 // If filled — render as a full project card (reuse block logic)
                 if (isFilled) {
+                  const isSessionMode = proj?.mode === "sessions";
+                  const sessionNote = slot.sessionNote || null;
                   const blk = { id: slot.id, projectId: slot.projectId, startHour: slot.startHour, startMin: slot.startMin, durationMin: slot.durationMin, todayTasks: slot.todayTasks, _isDW: true, _dwSlotIndex: slot.slotIndex };
                   const doneTasks = proj?.tasks.filter(t=>t.done).length || 0;
                   const totalTasks = proj?.tasks.length || 0;
@@ -1822,7 +1870,9 @@ function TodayScreen({ data, setData, openShutdown, focusMode: focusModeprop, se
                   const hasTodayTasks = Array.isArray(todayTaskIds) && todayTaskIds.length > 0;
                   const relevantTasks = hasTodayTasks ? todayTaskIds.map(id => proj?.tasks.find(t => t.id === id)).filter(Boolean) : [];
                   const relevantDone = relevantTasks.filter(t => t.done).length;
-                  const allTasksDone = relevantTasks.length > 0 && relevantDone === relevantTasks.length;
+                  const allTasksDone = isSessionMode
+                    ? manualCompleted.has(slot.id)
+                    : (relevantTasks.length > 0 && relevantDone === relevantTasks.length);
                   const isPastSlot = (slot.startHour * 60 + slot.startMin + slot.durationMin) <= nowMins;
                   const isCompleted = allTasksDone;
                   const cardBorder = domainColor ? `1px solid ${domainColor}60` : undefined;
@@ -1877,7 +1927,7 @@ function TodayScreen({ data, setData, openShutdown, focusMode: focusModeprop, se
                             <div style={{ flex:1, minWidth:0 }}>
                               <div style={{ fontSize:10, fontWeight:700, letterSpacing:".08em", textTransform:"uppercase", color: domainColor || "var(--accent)", marginBottom:3, opacity:.9 }}>Deep Work</div>
                               <div className="tl-name">{proj.name}</div>
-                              <div className="tl-meta">{domain?.name} · {slot.durationMin} min{relevantTasks.length > 0 ? ` · ${relevantDone}/${relevantTasks.length} today` : ""}</div>
+                              <div className="tl-meta" style={{ display:"flex", alignItems:"center", gap:5 }}>{isSessionMode && <WaveIcon size={11} color={domainColor || "var(--blue)"} />}{domain?.name} · {slot.durationMin} min{!isSessionMode && relevantTasks.length > 0 ? ` · ${relevantDone}/${relevantTasks.length} today` : ""}{isSessionMode && sessionNote ? <span style={{ fontStyle:"italic", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:140 }}> · {sessionNote}</span> : ""}</div>
                             </div>
                             {isNowSlot && !isExp && <span className="tl-now-pill">Now</span>}
                             {/* Gear icon when expanded, chevron when collapsed */}
@@ -1890,7 +1940,16 @@ function TodayScreen({ data, setData, openShutdown, focusMode: focusModeprop, se
                             }
                           </div>
                           {/* Inline tasks on card face */}
-                          {!isExp && !isCompleted && relevantTasks.length > 0 && (() => {
+                          {!isExp && !isCompleted && (() => {
+                            if (isSessionMode) {
+                              if (!sessionNote) return null;
+                              return (
+                                <div style={{ padding:"0 14px 10px", borderTop:"1px solid var(--border2)" }} onClick={e => e.stopPropagation()}>
+                                  <div style={{ fontSize:12, color:"var(--text3)", fontStyle:"italic", lineHeight:1.4 }}>{sessionNote}</div>
+                                </div>
+                              );
+                            }
+                            if (relevantTasks.length === 0) return null;
                             const visibleTasks = relevantTasks.slice(0, 3);
                             const hiddenCount = relevantTasks.length - visibleTasks.length;
                             return (
@@ -1914,6 +1973,51 @@ function TodayScreen({ data, setData, openShutdown, focusMode: focusModeprop, se
                             const todayTaskIds = slot.todayTasks;
                             const hasPicked = Array.isArray(todayTaskIds) && todayTaskIds.length > 0;
                             const isPicking = pickerState?.blockId === slot.id;
+
+                            // SESSION MODE — focus note input
+                            if (isSessionMode) {
+                              const [noteDraft, setNoteDraft] = [slot.sessionNote || "", (v) => saveDWSessionNote(slot.slotIndex, v)];
+                              const hasNote = !!(slot.sessionNote && slot.sessionNote.trim());
+                              const projSessions = (data.sessionLog || []).filter(s => s.projectId === proj.id);
+                              return (
+                                <div className="tl-tasks" onClick={e => e.stopPropagation()}>
+                                  <div style={{ marginBottom:10 }}>
+                                    <div style={{ fontSize:11, fontWeight:700, color:"var(--text3)", letterSpacing:".05em", textTransform:"uppercase", marginBottom:6, display:"flex", alignItems:"center", gap:5 }}>
+                                      <WaveIcon size={11} color="var(--blue)" /> Session Focus
+                                    </div>
+                                    <textarea
+                                      className="session-focus-input"
+                                      placeholder="What will you push on this session?"
+                                      rows={2}
+                                      value={slot.sessionNote || ""}
+                                      onChange={e => saveDWSessionNote(slot.slotIndex, e.target.value)}
+                                      onClick={e => e.stopPropagation()}
+                                    />
+                                    {projSessions.length > 0 && (
+                                      <div style={{ fontSize:11, color:"var(--text3)", marginTop:4 }}>{projSessions.length} session{projSessions.length !== 1 ? "s" : ""} logged on this project</div>
+                                    )}
+                                  </div>
+                                  <div style={{ display:"flex", gap:8 }} onClick={e => e.stopPropagation()}>
+                                    <button
+                                      className="tl-start-btn"
+                                      style={{ opacity: hasNote ? 1 : 0.4, cursor: hasNote ? "pointer" : "default" }}
+                                      onClick={e => { e.stopPropagation(); if (!hasNote) return; setFocusBlockId(slot.id); setFocusMode(true); }}
+                                    >Start →</button>
+                                    <button
+                                      className="tl-start-btn"
+                                      style={{ background:"rgba(69,193,122,.12)", color:"var(--green)", borderColor:"rgba(69,193,122,.3)", opacity: hasNote ? 1 : 0.4, cursor: hasNote ? "pointer" : "default" }}
+                                      onClick={e => {
+                                        e.stopPropagation();
+                                        if (!hasNote) return;
+                                        logSession(proj.id, slot.durationMin, slot.sessionNote);
+                                        markManualDone(slot.id, proj.id, null);
+                                      }}
+                                    >I did this ✓</button>
+                                  </div>
+                                  {!hasNote && <div style={{ fontSize:11, color:"var(--text3)", marginTop:6, textAlign:"center" }}>Enter your session focus to start</div>}
+                                </div>
+                              );
+                            }
 
                             // PICKER MODE
                             if (isPicking) {
@@ -2740,7 +2844,9 @@ const PROJ_COLORS = DOMAIN_COLORS;
 
 function ProjectCard({ proj, domain, isExp, newTaskText,
   onToggleExpand, onToggleStatus, onDelete, onEditSave,
-  onToggleTask, onDeleteTask, onSaveTask, onNewTaskChange, onAddTask, autoFocus }) {
+  onToggleTask, onDeleteTask, onSaveTask, onNewTaskChange, onAddTask, autoFocus,
+  sessionLog, onModeToggle }) {
+  const isSessionMode = proj.mode === "sessions";
   const [addingTask, setAddingTask] = useState(false);
   const taskInputRef = useRef(null);
   const nameInputRef = useRef(null);
@@ -2836,21 +2942,75 @@ function ProjectCard({ proj, domain, isExp, newTaskText,
               {!showEdit && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ color:"var(--text3)", opacity:.4, transform: isExp ? "rotate(90deg)" : "rotate(0deg)", transition:"transform .2s", flexShrink:0 }}><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
             </div>
           </div>
-          <div className="proj-bar-wrap">
-            <div className="proj-bar-fill" style={{ width: `${pct}%`, background: domain?.color }} />
-          </div>
-          <div className="proj-card-meta">
-            <span className="proj-card-tasks">{proj.tasks.filter(t => t.done).length} of {proj.tasks.length} tasks</span>
-            <span className="proj-card-pct" style={{ color: proj.status === "active" ? domain?.color : "var(--text3)" }}>{pct}%</span>
-          </div>
+          {isSessionMode ? (() => {
+            const projSessions = (sessionLog || []).filter(s => s.projectId === proj.id);
+            const weekStart = new Date(); weekStart.setDate(weekStart.getDate() - weekStart.getDay()); weekStart.setHours(0,0,0,0);
+            const weekSessions = projSessions.filter(s => new Date(s.date) >= weekStart);
+            const weekMins = weekSessions.reduce((a,s) => a + (s.durationMin||0), 0);
+            const weekHrs = (weekMins/60).toFixed(1);
+            const weekTarget = 10; // soft weekly hours target for session projects
+            const barPct = Math.min((weekMins/60) / weekTarget * 100, 100);
+            return (
+              <>
+                <div className="proj-session-bar-wrap">
+                  <div className="proj-session-bar-fill" style={{ width:`${barPct}%`, background: domain?.color || "var(--blue)" }} />
+                </div>
+                <div className="proj-card-meta">
+                  <span className="proj-card-tasks">{projSessions.length} sessions total · {weekHrs}h this week</span>
+                  <WaveIcon size={13} color={proj.status === "active" ? (domain?.color || "var(--blue)") : "var(--text3)"} />
+                </div>
+              </>
+            );
+          })() : (
+            <>
+              <div className="proj-bar-wrap">
+                <div className="proj-bar-fill" style={{ width: `${pct}%`, background: domain?.color }} />
+              </div>
+              <div className="proj-card-meta">
+                <span className="proj-card-tasks">{proj.tasks.filter(t => t.done).length} of {proj.tasks.length} tasks</span>
+                <span className="proj-card-pct" style={{ color: proj.status === "active" ? domain?.color : "var(--text3)" }}>{pct}%</span>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
 
 
-      {/* Tasks */}
+      {/* Tasks / Session Log */}
       {isExp && (
         <div className="proj-tasks-expand">
+          {isSessionMode ? (() => {
+            const projSessions = (sessionLog || []).filter(s => s.projectId === proj.id).slice().reverse();
+            const recent = projSessions.slice(0, 5);
+            return (
+              <>
+                {/* Mode toggle */}
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"2px 0 10px", borderBottom:"1px solid var(--border2)", marginBottom:8 }}>
+                  <span style={{ fontSize:11, color:"var(--text3)", fontWeight:600, letterSpacing:".05em", textTransform:"uppercase", display:"flex", alignItems:"center", gap:5 }}>
+                    <WaveIcon size={12} color="var(--blue)" /> Session Mode
+                  </span>
+                  <button onClick={e => { e.stopPropagation(); onModeToggle(); }} style={{ background:"none", border:"1px solid var(--border)", borderRadius:6, padding:"3px 8px", fontSize:11, color:"var(--text3)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
+                    Switch to Tasks
+                  </button>
+                </div>
+                {recent.length === 0 ? (
+                  <div style={{ fontSize:12, color:"var(--text3)", padding:"8px 0", textAlign:"center" }}>No sessions logged yet.</div>
+                ) : (
+                  <div className="proj-session-log">
+                    {recent.map(s => (
+                      <div key={s.id} className="proj-session-log-item">
+                        <div style={{ width:6, height:6, borderRadius:"50%", background: domain?.color || "var(--blue)", flexShrink:0, marginTop:5 }} />
+                        <span className="proj-session-log-note">{s.note || <span style={{fontStyle:"italic",opacity:.5}}>No note</span>}</span>
+                        <span className="proj-session-log-meta">{s.date} · {s.durationMin}m</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            );
+          })() : (
+          <>
           {proj.tasks.map(t => (
             <SwipeTask
               key={t.id}
@@ -2892,6 +3052,15 @@ function ProjectCard({ proj, domain, isExp, newTaskText,
           )}
 
           {/* Work Now button removed — blocks are deep work slots only */}
+          {/* Mode toggle for task mode */}
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 0 2px", borderTop:"1px solid var(--border2)", marginTop:4 }}>
+            <span style={{ fontSize:11, color:"var(--text3)" }}>Task-based mode</span>
+            <button onClick={e => { e.stopPropagation(); onModeToggle(); }} style={{ background:"none", border:"1px solid var(--border)", borderRadius:6, padding:"3px 8px", fontSize:11, color:"var(--text3)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
+              Switch to Sessions
+            </button>
+          </div>
+        </>
+        )}
         </div>
       )}
     </div>
@@ -3100,6 +3269,8 @@ function ProjectsScreen({ data, setData, openCategorize }) {
             domain={domains.find(d => d.id === proj.domainId)}
             isExp={!collapsedProjs.has(proj.id)}
             newTaskText={newTaskText[proj.id] || ""}
+            sessionLog={data.sessionLog || []}
+            onModeToggle={() => setData(d => ({ ...d, projects: d.projects.map(p => p.id === proj.id ? { ...p, mode: p.mode === "sessions" ? "tasks" : "sessions" } : p) }))}
             onToggleExpand={() => setCollapsedProjs(s => { const n = new Set(s); n.has(proj.id) ? n.delete(proj.id) : n.add(proj.id); return n; })}
             onToggleStatus={e => toggleStatus(proj.id, e)}
             onDelete={() => deleteProject(proj.id)}
@@ -4131,6 +4302,40 @@ function SeasonScreen({ data, setData }) {
               </div>
               <div style={{ fontSize:10, color:"var(--text3)", marginTop:6, textAlign:"right" }}>Daily target: {dailyTarget}h · Weekly: {weeklyTarget}h</div>
             </div>
+          );
+        })()}
+
+        {/* Session projects — season summary */}
+        {(() => {
+          const sessionProjects = (data.projects || []).filter(p => p.mode === "sessions");
+          if (sessionProjects.length === 0) return null;
+          const sessionLog = data.sessionLog || [];
+          const quarterStart = new Date(); quarterStart.setMonth(Math.floor(quarterStart.getMonth()/3)*3, 1); quarterStart.setHours(0,0,0,0);
+          return (
+            <>
+              <div className="sh"><span className="sh-label">Session Work</span></div>
+              <div style={{ margin:"0 16px 16px", background:"var(--bg2)", borderRadius:14, border:"1px solid var(--border2)", overflow:"hidden" }}>
+                {sessionProjects.map((p, i) => {
+                  const domain = (data.domains||[]).find(d => d.id === p.domainId);
+                  const projSessions = sessionLog.filter(s => s.projectId === p.id && new Date(s.date) >= quarterStart);
+                  const totalMins = projSessions.reduce((a,s) => a + (s.durationMin||0), 0);
+                  const totalHrs = (totalMins/60).toFixed(1);
+                  return (
+                    <div key={p.id} style={{ padding:"12px 16px", borderBottom: i < sessionProjects.length-1 ? "1px solid var(--border2)" : "none" }}>
+                      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:4 }}>
+                        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                          <div style={{ width:8, height:8, borderRadius:"50%", background: domain?.color || "var(--blue)", flexShrink:0 }} />
+                          <span style={{ fontSize:13, fontWeight:600, color:"var(--text)" }}>{p.name}</span>
+                          <WaveIcon size={12} color={domain?.color || "var(--blue)"} />
+                        </div>
+                        <span style={{ fontSize:12, fontWeight:700, color: domain?.color || "var(--blue)" }}>{totalHrs}h</span>
+                      </div>
+                      <div style={{ fontSize:11, color:"var(--text3)" }}>{projSessions.length} session{projSessions.length !== 1 ? "s" : ""} this season · {domain?.name}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           );
         })()}
 
