@@ -1776,7 +1776,7 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
         <div style={{ fontSize:12, color:"var(--text3)", marginTop:6 }}>
           {viewingTomorrow
             ? `${timeline.length} block${timeline.length !== 1 ? "s" : ""} planned`
-            : `${greeting}${name ? `, ${name}` : ""}.${currentItem ? ` You're in a block.` : nextItem ? ` Next up at ${fmtTime(nextItem.data.startHour, nextItem.data.startMin)}.` : " No more blocks today."}`
+            : `${greeting}${name ? `, ${name}` : ""}.`
           }
         </div>
       </div>
@@ -1905,7 +1905,7 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                   });
 
                   return (
-                    <div key={slot.id} data-blockid={slot.id} style={{ flex: isExp ? 3 : 0.6, minHeight:0, borderRadius:18, background: isExp ? "var(--bg2)" : "var(--bg2)", border: isExp ? "1.5px solid rgba(255,255,255,.18)" : "1.5px dashed rgba(255,255,255,.1)", overflow:"hidden", display:"flex", flexDirection:"column", opacity: isPast && !isExp ? 0.35 : 1, transition:"flex .35s cubic-bezier(.4,0,.2,1), border-color .2s, opacity .2s", cursor:"pointer" }}
+                    <div key={slot.id} data-blockid={slot.id} style={{ flex: isExp ? 3 : 0.6, minHeight:0, borderRadius:18, background: isExp ? "var(--bg2)" : "var(--bg2)", border: isExp ? "1.5px solid rgba(255,255,255,.18)" : "1.5px dashed rgba(255,255,255,.1)", overflow:"hidden", display:"flex", flexDirection:"column", opacity: 1, transition:"flex .35s cubic-bezier(.4,0,.2,1), border-color .2s", cursor:"pointer" }}
                       onClick={() => setExpandedId(isExp ? null : slot.id)}
                     >
                       {!isExp ? (
@@ -1981,7 +1981,7 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                 const expandedShadow = domainColor ? `0 0 40px ${domainColor}30, 0 0 0 1px ${domainColor}20` : "0 0 20px rgba(255,255,255,.06)";
                 return (
                   <div key={slot.id} data-blockid={slot.id}
-                    style={{ flex: isExp ? 3 : (currentItem && !isExp ? 0.8 : 1), minHeight:0, borderRadius:18, background: isExp ? expandedBg : cardBg, border: isExp ? expandedBorder : cardBorder, boxShadow: isExp ? expandedShadow : cardShadow, overflow:"hidden", display:"flex", flexDirection:"column", opacity: isPast && !isCompleted && !isExp ? 0.55 : 1, transition:"flex .35s cubic-bezier(.4,0,.2,1), opacity .2s, border-color .2s, background .2s, box-shadow .2s", "--domain-color": domainColor || "transparent", position:"relative" }}
+                    style={{ flex: isExp ? 3 : (currentItem && !isExp ? 0.8 : 1), minHeight:0, borderRadius:18, background: isExp ? expandedBg : cardBg, border: isExp ? expandedBorder : cardBorder, boxShadow: isExp ? expandedShadow : cardShadow, overflow:"hidden", display:"flex", flexDirection:"column", opacity: 1, transition:"flex .35s cubic-bezier(.4,0,.2,1), opacity .2s, border-color .2s, background .2s, box-shadow .2s", "--domain-color": domainColor || "transparent", position:"relative" }}
                     onClick={() => setExpandedId(isExp ? null : slot.id)}
                   >
                     {/* Colour stripe */}
@@ -2036,10 +2036,12 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                           </div>
                         ) : isSessionMode ? (
                           <div style={{ display:"flex", gap:8 }}>
-                            <button className="tl-start-btn" style={{ ...(isRunning ? { background:"rgba(224,85,85,.12)", color:"var(--red)", borderColor:"rgba(224,85,85,.3)" } : {}) }}
-                              onClick={e => { e.stopPropagation(); isRunning ? setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }) : startBlock(slot.id); }}>
-                              {isRunning ? "Stop ■" : "Start →"}
-                            </button>
+                            {isNow && (
+                              <button className="tl-start-btn" style={{ ...(isRunning ? { background:"rgba(224,85,85,.12)", color:"var(--red)", borderColor:"rgba(224,85,85,.3)" } : {}) }}
+                                onClick={e => { e.stopPropagation(); isRunning ? setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }) : startBlock(slot.id); }}>
+                                {isRunning ? "Stop ■" : "Start →"}
+                              </button>
+                            )}
                             <button className="tl-start-btn" style={{ background:"rgba(69,193,122,.12)", color:"var(--green)", borderColor:"rgba(69,193,122,.3)" }}
                               onClick={e => { e.stopPropagation(); logSession(proj.id, slot.durationMin, null); setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }); markManualDone(slot.id, proj.id, null); }}>
                               I did this ✓
@@ -2093,10 +2095,12 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                               </div>
                             ))}
                             <div style={{ display:"flex", gap:8, marginTop:10 }}>
-                              <button className="tl-start-btn" style={{ ...(isRunning ? { background:"rgba(224,85,85,.12)", color:"var(--red)", borderColor:"rgba(224,85,85,.3)" } : {}) }}
-                                onClick={e => { e.stopPropagation(); isRunning ? setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }) : startBlock(slot.id); }}>
-                                {isRunning ? "Stop ■" : "Start →"}
-                              </button>
+                              {isNow && (
+                                <button className="tl-start-btn" style={{ ...(isRunning ? { background:"rgba(224,85,85,.12)", color:"var(--red)", borderColor:"rgba(224,85,85,.3)" } : {}) }}
+                                  onClick={e => { e.stopPropagation(); isRunning ? setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }) : startBlock(slot.id); }}>
+                                  {isRunning ? "Stop ■" : "Start →"}
+                                </button>
+                              )}
                               <button className="tl-start-btn" style={{ background:"rgba(69,193,122,.12)", color:"var(--green)", borderColor:"rgba(69,193,122,.3)" }}
                                 onClick={e => { e.stopPropagation(); setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }); markManualDone(slot.id, proj.id, slot.todayTasks); }}>
                                 I did this ✓
@@ -2105,19 +2109,21 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                           </>
                         ) : (
                           <>
-                            <div style={{ fontSize:13, color:"var(--text3)", marginBottom:10 }}>No tasks picked for today.</div>
+                            <div style={{ fontSize:13, color:"var(--text3)", marginBottom:10 }}>No tasks picked yet.</div>
                             <div style={{ display:"flex", gap:8 }}>
-                              <button className="tl-start-btn" style={{ ...(isRunning ? { background:"rgba(224,85,85,.12)", color:"var(--red)", borderColor:"rgba(224,85,85,.3)" } : {}) }}
-                                onClick={e => { e.stopPropagation(); isRunning ? setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }) : startBlock(slot.id); }}>
-                                {isRunning ? "Stop ■" : "Start →"}
-                              </button>
-                              <button className="tl-start-btn" style={{ background:"rgba(69,193,122,.12)", color:"var(--green)", borderColor:"rgba(69,193,122,.3)" }}
-                                onClick={e => { e.stopPropagation(); setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }); markManualDone(slot.id, proj.id, slot.todayTasks); }}>
-                                I did this ✓
-                              </button>
                               <button className="tl-start-btn"
                                 onClick={e => { e.stopPropagation(); setPickerState({ blockId: slot.id, projectId: proj.id, selected: new Set(), newText: "" }); }}>
                                 Pick tasks
+                              </button>
+                              {isNow && (
+                                <button className="tl-start-btn" style={{ ...(isRunning ? { background:"rgba(224,85,85,.12)", color:"var(--red)", borderColor:"rgba(224,85,85,.3)" } : {}) }}
+                                  onClick={e => { e.stopPropagation(); isRunning ? setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }) : startBlock(slot.id); }}>
+                                  {isRunning ? "Stop ■" : "Start →"}
+                                </button>
+                              )}
+                              <button className="tl-start-btn" style={{ background:"rgba(69,193,122,.12)", color:"var(--green)", borderColor:"rgba(69,193,122,.3)" }}
+                                onClick={e => { e.stopPropagation(); setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }); markManualDone(slot.id, proj.id, slot.todayTasks); }}>
+                                I did this ✓
                               </button>
                             </div>
                           </>
