@@ -1363,6 +1363,8 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
 
   // pickerState: { blockId, projectId, selected: Set<taskId>, newText }
   const [pickerState, setPickerState] = useState(null);
+  const [dwAddingTask, setDwAddingTask] = useState(null); // slotId currently adding task
+  const [dwNewTaskText, setDwNewTaskText] = useState("");
   const [editingTaskId, setEditingTaskId] = useState(null); // { taskId, projectId, text }
   // manualCompleted derived from persisted data (today's date only)
   const todayStr = new Date().toDateString();
@@ -1999,9 +2001,43 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                                   ) : (
                                     <div style={{ fontSize:13, color:"var(--text3)", padding:"8px 0 12px" }}>No open tasks — assigning project only.</div>
                                   )}
-                                  <button className="dw-confirm-btn" style={{ marginTop:12, width:"100%" }} onClick={confirmAssign}>
-                                    ✓ Assign{curSelTasks.length > 0 ? ` · ${curSelTasks.length} task${curSelTasks.length!==1?"s":""}` : ""}
-                                  </button>
+                                  {/* Quick add task inline */}
+                                  {dwAddingTask === slot.id && (
+                                    <div style={{ marginTop:10, display:"flex", gap:6 }}>
+                                      <input autoFocus
+                                        style={{ flex:1, background:"var(--bg3)", border:"1px solid var(--border)", borderRadius:8, padding:"8px 10px", color:"var(--text)", fontSize:13, fontFamily:"'DM Sans',sans-serif", outline:"none", boxSizing:"border-box" }}
+                                        placeholder="Task name…"
+                                        value={dwNewTaskText}
+                                        onChange={e => setDwNewTaskText(e.target.value)}
+                                        onKeyDown={e => {
+                                          if (e.key === "Enter") {
+                                            const txt = dwNewTaskText.trim();
+                                            if (txt) { const newId = addTaskToProject(selProjId, txt); togglePT(newId); }
+                                            setDwNewTaskText(""); setDwAddingTask(null);
+                                          }
+                                          if (e.key === "Escape") { setDwAddingTask(null); setDwNewTaskText(""); }
+                                        }} />
+                                      <button onClick={() => {
+                                          const txt = dwNewTaskText.trim();
+                                          if (txt) { const newId = addTaskToProject(selProjId, txt); togglePT(newId); }
+                                          setDwNewTaskText(""); setDwAddingTask(null);
+                                        }}
+                                        style={{ background:"var(--bg3)", border:"1px solid var(--border)", borderRadius:8, padding:"8px 12px", color:"var(--text2)", fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:"'DM Sans',sans-serif", flexShrink:0 }}>
+                                        Add
+                                      </button>
+                                      <button onClick={() => { setDwAddingTask(null); setDwNewTaskText(""); }}
+                                        style={{ background:"none", border:"none", color:"var(--text3)", fontSize:18, cursor:"pointer", padding:"0 6px", lineHeight:1 }}>×</button>
+                                    </div>
+                                  )}
+                                  <div style={{ marginTop:12, display:"flex", gap:8 }}>
+                                    <button style={{ flex:1, background:"var(--bg3)", border:"1px solid var(--border)", borderRadius:10, padding:"10px 12px", fontSize:13, fontWeight:600, color: dwAddingTask === slot.id ? "var(--accent)" : "var(--text2)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", transition:"color .15s" }}
+                                      onClick={() => { setDwAddingTask(dwAddingTask === slot.id ? null : slot.id); setDwNewTaskText(""); }}>
+                                      + Add Task
+                                    </button>
+                                    <button className="dw-confirm-btn" style={{ flex:1, padding:"10px 12px" }} onClick={confirmAssign}>
+                                      ✓ Assign{curSelTasks.length > 0 ? ` · ${curSelTasks.length} task${curSelTasks.length!==1?"s":""}` : ""}
+                                    </button>
+                                  </div>
                                 </>
                               );
                             })()
@@ -2042,10 +2078,34 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                         </div>
                         <div style={{ fontSize: isNow && !isExp ? 20 : 15, fontWeight:800, color: isCompleted ? "var(--text3)" : "var(--text)", letterSpacing:"-.02em", lineHeight:1.15, overflow:"hidden", textOverflow:"ellipsis", whiteSpace: isExp ? "normal" : "nowrap" }}>{proj.name}</div>
                         {!isExp && (
-                          <div style={{ fontSize:11, color:"var(--text3)", marginTop:3 }}>
-                            {domain?.name}{data.todayPrefs?.hideTimes ? "" : ` · ${fmtTime(slot.startHour, slot.startMin)}`} · {slot.durationMin} min
-                            {!isSessionMode && hasTodayTasks ? ` · ${relevantDone}/${relevantTasks.length}` : ""}
-                          </div>
+                          <>
+                            <div style={{ fontSize:11, color:"var(--text3)", marginTop:3 }}>
+                              {domain?.name}{data.todayPrefs?.hideTimes ? "" : ` · ${fmtTime(slot.startHour, slot.startMin)}`} · {slot.durationMin} min
+                              {!isSessionMode && hasTodayTasks ? ` · ${relevantDone}/${relevantTasks.length}` : ""}
+                            </div>
+                            {!isSessionMode && !isCompleted && (() => {
+                              if (!hasTodayTasks) return (
+                                <div style={{ marginTop:8, fontSize:12, color:"var(--text3)", opacity:.5, fontStyle:"italic" }}>Assign tasks</div>
+                              );
+                              const preview = relevantTasks.slice(0, 3);
+                              const hidden = relevantTasks.length - 3;
+                              return (
+                                <div style={{ marginTop:8, display:"flex", flexDirection:"column", gap:5 }}>
+                                  {preview.map(t => (
+                                    <div key={t.id} style={{ display:"flex", alignItems:"center", gap:7 }}>
+                                      <div style={{ width:13, height:13, borderRadius:3, border: t.done ? "none" : `1.5px solid ${domainColor ? domainColor+"60" : "var(--border)"}`, background: t.done ? (domainColor||"var(--green)") : "transparent", flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                                        {t.done && <span style={{ fontSize:7, color:"#000", fontWeight:900 }}>✓</span>}
+                                      </div>
+                                      <span style={{ fontSize:12, color: t.done ? "var(--text3)" : "var(--text2)", textDecoration: t.done ? "line-through" : "none", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{t.text}</span>
+                                    </div>
+                                  ))}
+                                  {hidden > 0 && (
+                                    <div style={{ fontSize:11, color:"var(--text3)", opacity:.6, paddingLeft:20 }}>+{hidden} more</div>
+                                  )}
+                                </div>
+                              );
+                            })()}
+                          </>
                         )}
                       </div>
                       {isCompleted && !isExp && <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
