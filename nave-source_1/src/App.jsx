@@ -862,6 +862,11 @@ const css = `
   .ib-title{font-size:14px;font-weight:700;color:#000;line-height:1.2;}
   .ib-sub{font-size:12px;color:rgba(0,0,0,.6);margin-top:2px;}
   .ib-arrow{font-size:18px;color:rgba(0,0,0,.5);}
+  .reminder-card{margin:0 16px 8px;background:rgba(232,160,48,.12);border:1px solid rgba(232,160,48,.35);border-radius:14px;padding:13px 16px;display:flex;align-items:flex-start;gap:10px;}
+  .reminder-card-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0;margin-top:5px;}
+  .reminder-card-text{flex:1;font-size:14px;color:var(--text);font-weight:500;line-height:1.4;}
+  .reminder-card-assign{background:var(--accent);color:#000;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;flex-shrink:0;}
+  .reminder-section-label{margin:0 16px 6px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);opacity:.8;}
   .inbox-swipe-wrap{position:relative;overflow:hidden;border-radius:12px;margin-bottom:8px;}
   .inbox-action-left{position:absolute;left:0;top:0;bottom:0;width:90px;background:var(--green);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;border-radius:12px;}
   .inbox-action-right{position:absolute;right:0;top:0;bottom:0;width:90px;background:var(--red);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;border-radius:12px;}
@@ -957,13 +962,12 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
   const [dragId, setDragId] = useState(null);
   const [dragOverId, setDragOverId] = useState(null);
   const swipeState = useRef({});
-  const [revealedBlockId, setRevealedBlockId] = useState(null);
+  const [revealedBlockId] = useState(null); // kept for compatibility, unused
   const [dwPickerOpen, setDwPickerOpen] = useState(null); // slotId of open picker
   const [dwPickerStep, setDwPickerStep] = useState({}); // { [slotId]: "project" | "confirm" }
   const [dwPickerProj, setDwPickerProj] = useState({}); // { [slotId]: projectId }
   const [dwPickerTime, setDwPickerTime] = useState({}); // { [slotId]: { startHour, startMin, durationMin } }
 
-  const REVEAL_WIDTH = 188; // width of two action buttons
 
   const rescheduleToTomorrow = (blockId) => {
     setData(d => ({ ...d, blocks: d.blocks.map(b => b.id === blockId ? { ...b, dayOffset: (b.dayOffset || 0) + 1 } : b) }));
@@ -1018,64 +1022,6 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
     setDragId(null); setDragOverId(null);
   };
 
-  const onSwipeTouchStart = (e, blockId) => {
-    // Don't intercept touches on the action buttons themselves
-    if (e.target.closest(".tl-swipe-action-btn")) return;
-    const touch = e.touches[0];
-    swipeState.current[blockId] = {
-      startX: touch.clientX,
-      startY: touch.clientY,
-      swiping: false,
-      startOffset: revealedBlockId === blockId ? -REVEAL_WIDTH : 0
-    };
-  };
-  const onSwipeTouchMove = (e, blockId) => {
-    if (e.target.closest(".tl-swipe-action-btn")) return;
-    const s = swipeState.current[blockId];
-    if (!s) return;
-    const touch = e.touches[0];
-    const dx = touch.clientX - s.startX;
-    const dy = touch.clientY - s.startY;
-    if (!s.swiping && Math.abs(dy) > Math.abs(dx) + 3) { delete swipeState.current[blockId]; return; }
-    if (!s.swiping && Math.abs(dx) > 6) { s.swiping = true; }
-    if (!s.swiping) return;
-    e.preventDefault();
-    const raw = s.startOffset + dx;
-    const clamped = Math.min(8, Math.max(-REVEAL_WIDTH, raw));
-    s.currentOffset = clamped;
-    // Find card element via wrap's data attribute
-    const wrap = e.currentTarget;
-    const card = wrap.querySelector(".tl-swipe-card");
-    if (card) { card.style.transition = "none"; card.style.transform = `translateX(${clamped}px)`; }
-  };
-  const onSwipeTouchEnd = (e, blockId) => {
-    if (e.target.closest(".tl-swipe-action-btn")) return;
-    const s = swipeState.current[blockId];
-    if (!s) return;
-    delete swipeState.current[blockId];
-    const wrap = e.currentTarget;
-    const card = wrap.querySelector(".tl-swipe-card");
-    if (!s.swiping) {
-      // just a tap — close if revealed
-      if (revealedBlockId === blockId) { setRevealedBlockId(null); if(card){card.style.transition="";card.style.transform="translateX(0)";} }
-      return;
-    }
-    const offset = s.currentOffset || 0;
-    if (card) card.style.transition = "";
-    if (offset < -REVEAL_WIDTH / 2) {
-      if (card) card.style.transform = `translateX(-${REVEAL_WIDTH}px)`;
-      setRevealedBlockId(blockId);
-    } else {
-      if (card) card.style.transform = "translateX(0)";
-      setRevealedBlockId(null);
-    }
-  };
-  const closeReveal = (blockId, wrap) => {
-    if (revealedBlockId !== blockId) return;
-    const card = wrap?.querySelector(".tl-swipe-card");
-    if (card) { card.style.transition = ""; card.style.transform = "translateX(0)"; }
-    setRevealedBlockId(null);
-  };
   const [newTaskText, setNewTaskText] = useState({});
   const [tick, setTick] = useState(0);
   // lateStarted: { [blockId]: { startedAt: ISO string } }
@@ -1616,21 +1562,8 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                       } />
                       <div className="tl-connector" />
                     </div>
-                    <div className="tl-swipe-wrap"
-                      onTouchStart={e => onSwipeTouchStart(e, blk.id)}
-                      onTouchMove={e => onSwipeTouchMove(e, blk.id)}
-                      onTouchEnd={e => onSwipeTouchEnd(e, blk.id)}
-                    >
-                      {/* Revealed action buttons — shown when swiped left */}
-                      {!isCompleted && (
-                        <div className="tl-swipe-actions">
-                          <button className="tl-swipe-action-btn tomorrow" style={{ width:"100%" }} onPointerUp={e => { e.stopPropagation(); rescheduleToTomorrow(blk.id); }}>
-                            <span className="tl-swipe-action-ico">→</span>
-                            <span className="tl-swipe-action-lbl">Tomorrow</span>
-                          </button>
-                        </div>
-                      )}
-                      <div className={`tl-swipe-card ${cardClass}`} data-blockid={blk.id} style={{ "--domain-color": domainCardColor + "50" }}>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div className={`tl-card ${cardClass}`} data-blockid={blk.id} style={{ "--domain-color": domainCardColor + "50" }}>
                       {/* Conflict warning */}
                       {showConflict && (
                         <div className="tl-conflict-warn">
@@ -1640,7 +1573,7 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                           <button onClick={e => { e.stopPropagation(); setConflictWarning(null); }} style={{ background:"var(--bg3)", color:"var(--text3)", border:"none", borderRadius:6, padding:"3px 8px", fontSize:10, cursor:"pointer", fontFamily:"'DM Sans',sans-serif", flexShrink:0 }}>Cancel</button>
                         </div>
                       )}
-                      <div className="tl-card-head" onClick={() => { if (revealedBlockId === blk.id) return; if (blockMenuOpen === blk.id) { setBlockMenuOpen(null); setBlockMenuMode(null); return; } setExpandedId(isExp ? null : item.id); if (isExp) { setBlockMenuOpen(null); setBlockMenuMode(null); } }}>
+                      <div className="tl-card-head" onClick={() => { if (blockMenuOpen === blk.id) { setBlockMenuOpen(null); setBlockMenuMode(null); return; } setExpandedId(isExp ? null : item.id); if (isExp) { setBlockMenuOpen(null); setBlockMenuMode(null); } }}>
                         <div className="tl-stripe" style={{ background: domain?.color || "var(--bg4)" }} />
                         <div className="tl-info">
                           <div style={{ fontSize:10, fontWeight:700, letterSpacing:".08em", textTransform:"uppercase", color: domain?.color || "var(--accent)", marginBottom:2, opacity:.9 }}>Deep Work</div>
@@ -1916,22 +1849,11 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                         </div>
                         <div className="tl-connector" />
                       </div>
-                      <div className="tl-swipe-wrap"
-                        onTouchStart={e => onSwipeTouchStart(e, slot.id)}
-                        onTouchMove={e => onSwipeTouchMove(e, slot.id)}
-                        onTouchEnd={e => onSwipeTouchEnd(e, slot.id)}
-                      >
-                        {/* Swipe actions — Tomorrow only */}
-                        <div className="tl-swipe-actions">
-                          <button className="tl-swipe-action-btn tomorrow" style={{ width:"100%" }} onPointerUp={e => { e.stopPropagation(); clearDWSlot(slot.slotIndex); setRevealedBlockId(null); }}>
-                            <span className="tl-swipe-action-ico">→</span>
-                            <span className="tl-swipe-action-lbl">Tomorrow</span>
-                          </button>
-                        </div>
-                        <div className={`tl-swipe-card tl-card${isExp ? " active-card" : ""}`}
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div className={`tl-card${isExp ? " active-card" : ""}`}
                           data-blockid={slot.id}
                           style={{ border: cardBorder, boxShadow: cardShadow }}
-                          onClick={() => { if (revealedBlockId === slot.id) return; if (blockMenuOpen === slot.id) { setBlockMenuOpen(null); setBlockMenuMode(null); return; } setExpandedId(isExp ? null : slot.id); if (isExp) { setBlockMenuOpen(null); setBlockMenuMode(null); } }}
+                          onClick={() => { if (blockMenuOpen === slot.id) { setBlockMenuOpen(null); setBlockMenuMode(null); return; } setExpandedId(isExp ? null : slot.id); if (isExp) { setBlockMenuOpen(null); setBlockMenuMode(null); } }}
                         >
                           <div className="tl-card-head" style={{ padding:"15px 14px" }}>
                             <div className="tl-stripe" style={{ background: domainColor || "var(--bg4)" }} />
@@ -2995,14 +2917,16 @@ function ProjectsScreen({ data, setData, openCategorize }) {
 
       <div className="scroll" style={{ paddingTop: 16 }} onClick={() => {}}>
         {data.inbox.length > 0 && (
-          <div className="inbox-banner" onClick={openCategorize}>
-            <span className="ib-icon">📥</span>
-            <div className="ib-info">
-              <div className="ib-title">Categorize {data.inbox.length} item{data.inbox.length !== 1 ? "s" : ""}</div>
-              <div className="ib-sub">Tap to assign them to projects</div>
-            </div>
-            <span className="ib-arrow">›</span>
-          </div>
+          <>
+            <div className="reminder-section-label">📥 Reminders · tap to assign</div>
+            {data.inbox.map(item => (
+              <div key={item.id} className="reminder-card">
+                <div className="reminder-card-dot" />
+                <div className="reminder-card-text">{item.text}</div>
+                <button className="reminder-card-assign" onClick={e => { e.stopPropagation(); openCategorize(); }}>Assign →</button>
+              </div>
+            ))}
+          </>
         )}
 
 
@@ -3282,24 +3206,48 @@ function PlanScreen({ data, setData, openAddBlock, onGoToSeason, lightMode, togg
                   const blk = row.block;
                   const proj = blk.projectId ? getProject(blk.projectId) : null;
                   const domain = proj ? getDomain(proj.domainId) : null;
-                  const isEditingThis = editingBlockId === blk.id;
+                  const domColor = domain?.color || null;
+                  const cardKey = `real_${blk.id}`;
+                  const isExpReal = wkDwPickerOpen === cardKey + "_exp";
                   return (
-                    <SwipeRow key={blk.id} onDelete={() => deleteBlock(blk.id)}>
-                      <div style={{ background: "var(--bg2)" }}>
-                        <div className="blk-swipe-content" onClick={() => setEditingBlockId(isEditingThis ? null : blk.id)}>
-                          <span className="wcb-time">{fmtRange(blk.startHour, blk.startMin, blk.durationMin)}</span>
-                          <div className="wcb-stripe" style={{ background: domain?.color || "var(--bg4)" }} />
-                          <div className="wcb-info">
-                            <div className="wcb-proj">{proj?.name || blk.label}</div>
-                            <div className="wcb-meta">{domain ? `${domain.name} · ` : ""}{blk.durationMin} min</div>
+                    <div key={blk.id} style={{ padding: "6px 12px 2px" }}>
+                      <div
+                        style={{
+                          background: "var(--bg3)",
+                          border: domColor ? `1px solid ${domColor}60` : "1px solid var(--border)",
+                          boxShadow: domColor ? `0 0 14px ${domColor}1a` : "none",
+                          borderRadius: 12,
+                          overflow: "hidden",
+                          cursor: "pointer",
+                        }}
+                        onClick={() => setWkDwPickerOpen(isExpReal ? null : cardKey + "_exp")}
+                      >
+                        <div style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 14px" }}>
+                          <div style={{ width:3, borderRadius:2, alignSelf:"stretch", minHeight:36, background: domColor || "var(--bg4)", flexShrink:0 }} />
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ fontSize:10, fontWeight:700, letterSpacing:".08em", textTransform:"uppercase", color: domColor || "var(--accent)", marginBottom:2, opacity:.9 }}>Deep Work</div>
+                            <div style={{ fontSize:14, fontWeight:600, color:"var(--text)" }}>{proj?.name || blk.label || "Block"}</div>
+                            <div style={{ fontSize:11, color:"var(--text3)", marginTop:3 }}>
+                              {domain?.name} · {blk.durationMin} min · {fmtTime(blk.startHour, blk.startMin)}
+                            </div>
                           </div>
-                          <span style={{ fontSize:13, color:"var(--text3)" }}>›</span>
+                          <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                            <div style={{ fontSize:10, fontWeight:700, letterSpacing:".07em", textTransform:"uppercase", color: domColor || "var(--accent)", opacity:.8 }}>DW</div>
+                            <div style={{ fontSize:14, color:"var(--text3)", transform: isExpReal ? "rotate(90deg)" : "rotate(0deg)", transition:"transform .2s" }}>›</div>
+                          </div>
                         </div>
-                        {isEditingThis && (
-                          <BlockEditPanel blk={blk} data={data} onSave={changes => updateBlock(blk.id, changes)} onDelete={() => { deleteBlock(blk.id); setEditingBlockId(null); }} />
+                        {isExpReal && (
+                          <div style={{ borderTop:"1px solid var(--border2)", padding:"10px 14px" }} onClick={e => e.stopPropagation()}>
+                            <div style={{ display:"flex", gap:8 }}>
+                              <button onClick={() => { deleteBlock(blk.id); setWkDwPickerOpen(null); }}
+                                style={{ flex:1, background:"rgba(224,85,85,.1)", color:"var(--red)", border:"none", borderRadius:8, padding:"9px", fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
+                                Clear slot
+                              </button>
+                            </div>
+                          </div>
                         )}
                       </div>
-                    </SwipeRow>
+                    </div>
                   );
                 }
 
