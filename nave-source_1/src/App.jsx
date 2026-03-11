@@ -952,7 +952,8 @@ function SwipeRow({ onDelete, children, className = "" }) {
 function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: focusModeprop, setFocusMode: setFocusModeApp, onSignOut }) {
   const [showTodaySettings, setShowTodaySettings] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
-  const [swapBlockId, setSwapBlockId] = useState(null);
+  const [blockMenuOpen, setBlockMenuOpen] = useState(null); // blockId with gear menu open
+  const [blockMenuMode, setBlockMenuMode] = useState(null); // null | "project"
   const [dragId, setDragId] = useState(null);
   const [dragOverId, setDragOverId] = useState(null);
   const swipeState = useRef({});
@@ -1084,6 +1085,7 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
   const [focusBlockId, setFocusBlockId] = useState(null);
   // pickerState: { blockId, projectId, selected: Set<taskId>, newText }
   const [pickerState, setPickerState] = useState(null);
+  const [editingTaskId, setEditingTaskId] = useState(null); // { taskId, projectId, text }
   // manualCompleted derived from persisted data (today's date only)
   const todayStr = new Date().toDateString();
   const manualCompleted = new Set(
@@ -1122,6 +1124,16 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
       p.id === projectId ? { ...p, tasks: p.tasks.map(t => t.id === taskId ? { ...t, done: !t.done, doneAt: !t.done ? new Date().toISOString() : null } : t) } : p
     )
   }));
+
+  const updateTaskText = (projectId, taskId, newText) => {
+    if (!newText.trim()) return;
+    setData(d => ({
+      ...d, projects: d.projects.map(p =>
+        p.id === projectId ? { ...p, tasks: p.tasks.map(t => t.id === taskId ? { ...t, text: newText.trim() } : t) } : p
+      )
+    }));
+    setEditingTaskId(null);
+  };
 
   const addTask = (projectId) => {
     const text = (newTaskText[projectId] || "").trim();
@@ -1176,6 +1188,17 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
 
   const rescheduleBlock = (blockId, newHour, newMin) => {
     setData(d => ({ ...d, blocks: d.blocks.map(b => b.id === blockId ? { ...b, startHour: newHour, startMin: newMin } : b) }));
+    setEditingTime(null);
+  };
+
+  const rescheduleDWSlot = (slotIndex, newHour, newMin) => {
+    const dateKeyISO2 = (() => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}-${String(t.getDate()).padStart(2,"0")}`; })();
+    setData(prev => {
+      const existing = [...((prev.deepWorkSlots || {})[dateKeyISO2] || [])];
+      while (existing.length <= slotIndex) existing.push({});
+      existing[slotIndex] = { ...existing[slotIndex], startHour: newHour, startMin: newMin };
+      return { ...prev, deepWorkSlots: { ...(prev.deepWorkSlots || {}), [dateKeyISO2]: existing } };
+    });
     setEditingTime(null);
   };
 
@@ -1601,18 +1624,7 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                       {/* Revealed action buttons — shown when swiped left */}
                       {!isCompleted && (
                         <div className="tl-swipe-actions">
-                          <button className="tl-swipe-action-btn swap" onPointerUp={e => {
-                            e.stopPropagation();
-                            // Snap card back before showing swap panel
-                            const card = e.currentTarget.closest(".tl-swipe-wrap")?.querySelector(".tl-swipe-card");
-                            if (card) { card.style.transition = ""; card.style.transform = "translateX(0)"; }
-                            setRevealedBlockId(null);
-                            setSwapBlockId(swapBlockId === blk.id ? null : blk.id);
-                          }}>
-                            <span className="tl-swipe-action-ico">⇄</span>
-                            <span className="tl-swipe-action-lbl">Swap</span>
-                          </button>
-                          <button className="tl-swipe-action-btn tomorrow" onPointerUp={e => { e.stopPropagation(); rescheduleToTomorrow(blk.id); }}>
+                          <button className="tl-swipe-action-btn tomorrow" style={{ width:"100%" }} onPointerUp={e => { e.stopPropagation(); rescheduleToTomorrow(blk.id); }}>
                             <span className="tl-swipe-action-ico">→</span>
                             <span className="tl-swipe-action-lbl">Tomorrow</span>
                           </button>
@@ -1628,7 +1640,7 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                           <button onClick={e => { e.stopPropagation(); setConflictWarning(null); }} style={{ background:"var(--bg3)", color:"var(--text3)", border:"none", borderRadius:6, padding:"3px 8px", fontSize:10, cursor:"pointer", fontFamily:"'DM Sans',sans-serif", flexShrink:0 }}>Cancel</button>
                         </div>
                       )}
-                      <div className="tl-card-head" onClick={() => { if (revealedBlockId === blk.id || swapBlockId === blk.id) return; setExpandedId(isExp ? null : item.id); }}>
+                      <div className="tl-card-head" onClick={() => { if (revealedBlockId === blk.id) return; if (blockMenuOpen === blk.id) { setBlockMenuOpen(null); setBlockMenuMode(null); return; } setExpandedId(isExp ? null : item.id); if (isExp) { setBlockMenuOpen(null); setBlockMenuMode(null); } }}>
                         <div className="tl-stripe" style={{ background: domain?.color || "var(--bg4)" }} />
                         <div className="tl-info">
                           <div style={{ fontSize:10, fontWeight:700, letterSpacing:".08em", textTransform:"uppercase", color: domain?.color || "var(--accent)", marginBottom:2, opacity:.9 }}>Deep Work</div>
@@ -1655,23 +1667,22 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                         {isLateActive && countdownStr && !countdownExpired && (
                           <span className="tl-countdown">{countdownStr}</span>
                         )}
-                        {/* Done: green check — tappable to toggle */}
                         {isCompleted && (
-                          <div
-                            className="tl-check-icon full"
-                            onClick={e => { e.stopPropagation(); unmarkManualDone(blk.id, proj?.id, blk.todayTasks); }}
-                            style={{ cursor:"pointer" }}
-                            title="Tap to unmark"
-                          >
+                          <div className="tl-check-icon full" onClick={e => { e.stopPropagation(); unmarkManualDone(blk.id, proj?.id, blk.todayTasks); }} style={{ cursor:"pointer" }} title="Tap to unmark">
                             <span style={{fontSize:10,color:"#fff",fontWeight:700}}>✓</span>
                           </div>
                         )}
-                        {/* Missed (past, not done): tappable empty circle — tap to mark complete */}
                         {isMissedAndNotStarted && !isExp && (
                           <div className="tl-check-icon missed" onClick={e => { e.stopPropagation(); markManualDone(blk.id, proj?.id, blk.todayTasks); }} style={{ cursor:"pointer" }} />
                         )}
-
-                        <span style={{ fontSize:13, color:"var(--text3)", marginLeft:4, transform: isExp ? "rotate(90deg)" : "none", transition:"transform .2s", display:"inline-block" }}>›</span>
+                        {/* Dur pill collapsed / gear icon expanded */}
+                        {!isExp
+                          ? <div className="tl-dur">{blk.durationMin}m</div>
+                          : <button onClick={e => { e.stopPropagation(); setBlockMenuOpen(blockMenuOpen === blk.id ? null : blk.id); setBlockMenuMode(null); }}
+                              style={{ background:"none", border:"none", cursor:"pointer", padding:"4px 6px", color:"var(--text3)", lineHeight:1, borderRadius:8, flexShrink:0 }}>
+                              <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.92c.04-.36.07-.72.07-1.08s-.03-.73-.07-1.08l2.32-1.82c.21-.16.27-.46.13-.7l-2.2-3.81a.55.55 0 0 0-.67-.24l-2.74 1.1c-.57-.44-1.18-.81-1.86-1.08l-.42-2.9A.55.55 0 0 0 14 2h-4a.55.55 0 0 0-.54.46l-.42 2.9c-.68.27-1.3.64-1.86 1.08L4.44 5.35a.54.54 0 0 0-.67.24L1.57 9.4c-.14.24-.08.54.13.7l2.32 1.82C3.98 12.27 3.95 12.63 3.95 13s.03.73.07 1.08L1.7 15.9c-.21.16-.27.46-.13.7l2.2 3.81c.13.24.43.32.67.24l2.74-1.1c.57.44 1.18.81 1.86 1.08l.42 2.9c.08.28.29.47.54.47h4c.25 0 .46-.19.54-.46l.42-2.9c.68-.27 1.3-.64 1.86-1.08l2.74 1.1c.24.09.54 0 .67-.24l2.2-3.81c.14-.24.08-.54-.13-.7l-2.32-1.82Z" fill="currentColor"/></svg>
+                            </button>
+                        }
                       </div>
                       {isExp && proj && (() => {
                         const todayTaskIds = blk.todayTasks;
@@ -1744,13 +1755,28 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                         // TASKS PICKED — show only today's tasks
                         const todayTaskObjs = todayTaskIds.map(id => proj.tasks.find(t => t.id === id)).filter(Boolean);
                         return (
-                          <div className="tl-tasks">
+                          <div className="tl-tasks" onClick={e => e.stopPropagation()}>
                             {todayTaskObjs.map(t => (
-                              <div key={t.id} className="tl-task-row">
+                              <div key={t.id} className="tl-task-row" onClick={e => e.stopPropagation()}>
                                 <div className={`tl-check ${t.done ? "done" : ""}`} onClick={e => { e.stopPropagation(); toggleTask(proj.id, t.id); }}>
                                   {t.done && <span style={{fontSize:9,color:"#fff",fontWeight:700}}>✓</span>}
                                 </div>
-                                <span className={`tl-task-txt ${t.done ? "done" : ""}`}>{t.text}</span>
+                                {editingTaskId?.taskId === t.id ? (
+                                  <input
+                                    autoFocus
+                                    style={{ flex:1, background:"var(--bg3)", border:"1px solid var(--border)", borderRadius:6, padding:"3px 8px", fontSize:13, color:"var(--text)", fontFamily:"'DM Sans',sans-serif", outline:"none" }}
+                                    value={editingTaskId.text}
+                                    onChange={e => setEditingTaskId(prev => ({ ...prev, text: e.target.value }))}
+                                    onBlur={() => updateTaskText(proj.id, t.id, editingTaskId.text)}
+                                    onKeyDown={e => { if (e.key === "Enter") updateTaskText(proj.id, t.id, editingTaskId.text); if (e.key === "Escape") setEditingTaskId(null); }}
+                                    onClick={e => e.stopPropagation()}
+                                  />
+                                ) : (
+                                  <span className={`tl-task-txt ${t.done ? "done" : ""}`}
+                                    onClick={e => { e.stopPropagation(); if (!t.done) setEditingTaskId({ taskId: t.id, projectId: proj.id, text: t.text }); }}>
+                                    {t.text}
+                                  </span>
+                                )}
                               </div>
                             ))}
                             {/* Edit picks link */}
@@ -1784,26 +1810,41 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                         );
                       })()}
                     </div>
-                    {/* Swap panel — outside swipe-wrap so it's not clipped */}
-                    {swapBlockId === blk.id && (
-                      <div style={{ marginLeft:68, paddingRight:16, marginTop:-4, marginBottom:6 }}>
-                        <div style={{ background:"var(--bg3)", borderRadius:"0 0 12px 12px", padding:8, border:"1px solid var(--border)", borderTop:"none" }}>
-                          <div style={{ fontSize:11, color:"var(--text3)", fontWeight:600, letterSpacing:".06em", textTransform:"uppercase", marginBottom:4, padding:"0 4px" }}>Choose project</div>
-                          {data.projects.filter(p => p.status === "active" && p.id !== proj?.id).map(p => {
-                            const d2 = data.domains?.find(d => d.id === p.domainId);
-                            return (
-                              <button key={p.id} onClick={() => {
-                                setData(d => ({ ...d, blocks: d.blocks.map(b => b.id === blk.id ? { ...b, projectId: p.id, todayTasks: undefined } : b) }));
-                                setSwapBlockId(null);
-                                setRevealedBlockId(null);
-                                const el = document.querySelector(`[data-blockid="${blk.id}"]`);
-                                if (el) { el.style.transition=""; el.style.transform = "translateX(0)"; }
-                              }} style={{ background:"none", border:"none", textAlign:"left", padding:"9px 10px", borderRadius:8, cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontSize:14, color:"var(--text)", display:"flex", alignItems:"center", gap:10, width:"100%" }}>
-                                <span style={{ width:9, height:9, borderRadius:"50%", background: d2?.color || "var(--text3)", flexShrink:0, display:"inline-block" }} />
-                                {p.name}
+                    {/* Gear menu — outside swipe-wrap */}
+                    {blockMenuOpen === blk.id && (
+                      <div style={{ marginLeft:68, paddingRight:16, marginTop:-6, marginBottom:6 }} onClick={e => e.stopPropagation()}>
+                        <div style={{ background:"var(--bg3)", borderRadius:"0 0 14px 14px", border:"1px solid var(--border)", borderTop:"none", overflow:"hidden" }}>
+                          {blockMenuMode === "project" ? (
+                            <>
+                              <button onClick={() => setBlockMenuMode(null)} style={{ display:"flex", alignItems:"center", gap:6, width:"100%", background:"none", border:"none", borderBottom:"1px solid var(--border2)", padding:"10px 14px", fontSize:11, fontWeight:700, color:"var(--text3)", letterSpacing:".06em", textTransform:"uppercase", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
+                                ‹ Change project
                               </button>
-                            );
-                          })}
+                              {data.projects.filter(p => p.status === "active" && p.id !== proj?.id).map(p => {
+                                const d2 = data.domains?.find(d => d.id === p.domainId);
+                                return (
+                                  <button key={p.id} onClick={() => {
+                                    setData(d => ({ ...d, blocks: d.blocks.map(b => b.id === blk.id ? { ...b, projectId: p.id, todayTasks: undefined } : b) }));
+                                    setBlockMenuOpen(null); setBlockMenuMode(null);
+                                  }} style={{ background:"none", border:"none", textAlign:"left", padding:"11px 14px", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontSize:14, color:"var(--text)", display:"flex", alignItems:"center", gap:10, width:"100%" }}>
+                                    <span style={{ width:9, height:9, borderRadius:"50%", background: d2?.color || "var(--text3)", flexShrink:0, display:"inline-block" }} />
+                                    {p.name}
+                                  </button>
+                                );
+                              })}
+                            </>
+                          ) : (
+                            <>
+                              <button onClick={() => setBlockMenuMode("project")} style={{ display:"flex", alignItems:"center", gap:10, width:"100%", background:"none", border:"none", borderBottom:"1px solid var(--border2)", padding:"13px 14px", fontSize:14, color:"var(--text)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
+                                <span style={{ fontSize:16 }}>⇄</span> Change project
+                              </button>
+                              <button onClick={() => { rescheduleToTomorrow(blk.id); setBlockMenuOpen(null); setBlockMenuMode(null); setExpandedId(null); }} style={{ display:"flex", alignItems:"center", gap:10, width:"100%", background:"none", border:"none", borderBottom:"1px solid var(--border2)", padding:"13px 14px", fontSize:14, color:"var(--text)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
+                                <span style={{ fontSize:16 }}>→</span> Push to tomorrow
+                              </button>
+                              <button onClick={() => { setData(d => ({ ...d, blocks: d.blocks.filter(b => b.id !== blk.id) })); setBlockMenuOpen(null); setBlockMenuMode(null); setExpandedId(null); }} style={{ display:"flex", alignItems:"center", gap:10, width:"100%", background:"none", border:"none", padding:"13px 14px", fontSize:14, color:"var(--red)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
+                                <span style={{ fontSize:16 }}>✕</span> Clear slot
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
                     )}
@@ -1847,7 +1888,32 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                   return (
                     <div key={slot.id} className="tl-item" style={{ opacity: isPastSlot && !isCompleted ? 0.5 : 1 }}>
                       <div className="tl-left">
-                        <span className="tl-time-btn" style={{ fontSize:10 }} onClick={e => { e.stopPropagation(); }}>{fmt(slot.startHour, slot.startMin)}</span>
+                        <div className="time-pick-wrap">
+                          <button
+                            className={`tl-time-btn${editingTime === slot.id ? " open" : ""}`}
+                            onClick={e => { e.stopPropagation(); setEditingTime(editingTime === slot.id ? null : slot.id); }}
+                            title="Tap to reschedule"
+                          >
+                            {fmt(slot.startHour, slot.startMin)}
+                          </button>
+                          {editingTime === slot.id && (() => {
+                            const slots2 = [];
+                            for (let h = 8; h <= 22; h++) for (let m of [0, 30]) { if (h === 22 && m === 30) continue; slots2.push({ h, m }); }
+                            const currentIdx = slots2.findIndex(s => s.h === slot.startHour && s.m === slot.startMin);
+                            return (
+                              <div className="time-popover" onClick={e => e.stopPropagation()}>
+                                <div className="time-popover-inner" ref={el => { if (el && currentIdx >= 0) el.scrollTop = currentIdx * 35; }}>
+                                  {slots2.map(({h, m}) => (
+                                    <div key={`${h}-${m}`} className={`time-slot${h === slot.startHour && m === slot.startMin ? " current" : ""}`}
+                                      onClick={() => rescheduleDWSlot(slot.slotIndex, h, m)}>
+                                      {fmtTime(h, m)}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
                         <div className="tl-connector" />
                       </div>
                       <div className="tl-swipe-wrap"
@@ -1855,19 +1921,9 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                         onTouchMove={e => onSwipeTouchMove(e, slot.id)}
                         onTouchEnd={e => onSwipeTouchEnd(e, slot.id)}
                       >
-                        {/* Swipe actions */}
+                        {/* Swipe actions — Tomorrow only */}
                         <div className="tl-swipe-actions">
-                          <button className="tl-swipe-action-btn swap" onPointerUp={e => {
-                            e.stopPropagation();
-                            const card = e.currentTarget.closest(".tl-swipe-wrap")?.querySelector(".tl-swipe-card");
-                            if (card) { card.style.transition = ""; card.style.transform = "translateX(0)"; }
-                            setRevealedBlockId(null);
-                            setSwapBlockId(swapBlockId === slot.id ? null : slot.id);
-                          }}>
-                            <span className="tl-swipe-action-ico">⇄</span>
-                            <span className="tl-swipe-action-lbl">Swap</span>
-                          </button>
-                          <button className="tl-swipe-action-btn tomorrow" onPointerUp={e => { e.stopPropagation(); clearDWSlot(slot.slotIndex); setRevealedBlockId(null); }}>
+                          <button className="tl-swipe-action-btn tomorrow" style={{ width:"100%" }} onPointerUp={e => { e.stopPropagation(); clearDWSlot(slot.slotIndex); setRevealedBlockId(null); }}>
                             <span className="tl-swipe-action-ico">→</span>
                             <span className="tl-swipe-action-lbl">Tomorrow</span>
                           </button>
@@ -1875,7 +1931,7 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                         <div className={`tl-swipe-card tl-card${isExp ? " active-card" : ""}`}
                           data-blockid={slot.id}
                           style={{ border: cardBorder, boxShadow: cardShadow }}
-                          onClick={() => { if (revealedBlockId === slot.id || swapBlockId === slot.id) return; setExpandedId(isExp ? null : slot.id); }}
+                          onClick={() => { if (revealedBlockId === slot.id) return; if (blockMenuOpen === slot.id) { setBlockMenuOpen(null); setBlockMenuMode(null); return; } setExpandedId(isExp ? null : slot.id); if (isExp) { setBlockMenuOpen(null); setBlockMenuMode(null); } }}
                         >
                           <div className="tl-card-head" style={{ padding:"15px 14px" }}>
                             <div className="tl-stripe" style={{ background: domainColor || "var(--bg4)" }} />
@@ -1884,10 +1940,17 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                               <div className="tl-name">{proj.name}</div>
                               <div className="tl-meta">{domain?.name} · {slot.durationMin} min{relevantTasks.length > 0 ? ` · ${relevantDone}/${relevantTasks.length} today` : ""}</div>
                             </div>
-                            <div className="tl-dur">{slot.durationMin}m</div>
-                            <div style={{ width:26, height:26, borderRadius:"50%", border:`1.5px solid ${isCompleted ? "var(--green)" : "var(--border)"}`, background: isCompleted ? "var(--green)" : "transparent", display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, color:"#fff", flexShrink:0 }}>
-                              {isCompleted ? "✓" : ""}
-                            </div>
+                            {isCompleted && (
+                              <div style={{ width:20, height:20, borderRadius:"50%", background:"var(--green)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:9, color:"#fff", flexShrink:0 }}>✓</div>
+                            )}
+                            {/* Dur pill collapsed / gear expanded */}
+                            {!isExp
+                              ? <div className="tl-dur">{slot.durationMin}m</div>
+                              : <button onClick={e => { e.stopPropagation(); setBlockMenuOpen(blockMenuOpen === slot.id ? null : slot.id); setBlockMenuMode(null); }}
+                                  style={{ background:"none", border:"none", cursor:"pointer", padding:"4px 6px", color:"var(--text3)", lineHeight:1, borderRadius:8, flexShrink:0 }}>
+                                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.92c.04-.36.07-.72.07-1.08s-.03-.73-.07-1.08l2.32-1.82c.21-.16.27-.46.13-.7l-2.2-3.81a.55.55 0 0 0-.67-.24l-2.74 1.1c-.57-.44-1.18-.81-1.86-1.08l-.42-2.9A.55.55 0 0 0 14 2h-4a.55.55 0 0 0-.54.46l-.42 2.9c-.68.27-1.3.64-1.86 1.08L4.44 5.35a.54.54 0 0 0-.67.24L1.57 9.4c-.14.24-.08.54.13.7l2.32 1.82C3.98 12.27 3.95 12.63 3.95 13s.03.73.07 1.08L1.7 15.9c-.21.16-.27.46-.13.7l2.2 3.81c.13.24.43.32.67.24l2.74-1.1c.57.44 1.18.81 1.86 1.08l.42 2.9c.08.28.29.47.54.47h4c.25 0 .46-.19.54-.46l.42-2.9c.68-.27 1.3-.64 1.86-1.08l2.74 1.1c.24.09.54 0 .67-.24l2.2-3.81c.14-.24.08-.54-.13-.7l-2.32-1.82Z" fill="currentColor"/></svg>
+                                </button>
+                            }
                           </div>
                           {isExp && (() => {
                             const todayTaskIds = slot.todayTasks;
@@ -1957,8 +2020,6 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                                     <button className="tl-start-btn" onClick={e => { e.stopPropagation(); setFocusBlockId(slot.id); setFocusMode(true); }}>Start →</button>
                                     <button className="tl-start-btn" style={{ background:"rgba(69,193,122,.12)", color:"var(--green)", borderColor:"rgba(69,193,122,.3)" }}
                                       onClick={e => { e.stopPropagation(); markManualDone(slot.id, proj.id, slot.todayTasks); }}>I did this ✓</button>
-                                    <button className="tl-start-btn" style={{ background:"rgba(224,85,85,.1)", color:"var(--red)", borderColor:"rgba(224,85,85,.25)", marginLeft:"auto" }}
-                                      onClick={e => { e.stopPropagation(); clearDWSlot(slot.slotIndex); setExpandedId(null); }}>Clear slot</button>
                                   </div>
                                 </div>
                               );
@@ -1967,13 +2028,28 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                             // TASKS PICKED — show today's tasks
                             const todayTaskObjs = todayTaskIds.map(id => proj.tasks.find(t => t.id === id)).filter(Boolean);
                             return (
-                              <div className="tl-tasks">
+                              <div className="tl-tasks" onClick={e => e.stopPropagation()}>
                                 {todayTaskObjs.map(t => (
-                                  <div key={t.id} className="tl-task-row">
+                                  <div key={t.id} className="tl-task-row" onClick={e => e.stopPropagation()}>
                                     <div className={`tl-check ${t.done ? "done" : ""}`} onClick={e => { e.stopPropagation(); toggleTask(proj.id, t.id); }}>
                                       {t.done && <span style={{fontSize:9,color:"#fff",fontWeight:700}}>✓</span>}
                                     </div>
-                                    <span className={`tl-task-txt ${t.done ? "done" : ""}`}>{t.text}</span>
+                                    {editingTaskId?.taskId === t.id ? (
+                                      <input
+                                        autoFocus
+                                        style={{ flex:1, background:"var(--bg3)", border:"1px solid var(--border)", borderRadius:6, padding:"3px 8px", fontSize:13, color:"var(--text)", fontFamily:"'DM Sans',sans-serif", outline:"none" }}
+                                        value={editingTaskId.text}
+                                        onChange={e => setEditingTaskId(prev => ({ ...prev, text: e.target.value }))}
+                                        onBlur={() => updateTaskText(proj.id, t.id, editingTaskId.text)}
+                                        onKeyDown={e => { if (e.key === "Enter") updateTaskText(proj.id, t.id, editingTaskId.text); if (e.key === "Escape") setEditingTaskId(null); }}
+                                        onClick={e => e.stopPropagation()}
+                                      />
+                                    ) : (
+                                      <span className={`tl-task-txt ${t.done ? "done" : ""}`}
+                                        onClick={e => { e.stopPropagation(); if (!t.done) setEditingTaskId({ taskId: t.id, projectId: proj.id, text: t.text }); }}>
+                                        {t.text}
+                                      </span>
+                                    )}
                                   </div>
                                 ))}
                                 <div style={{ paddingTop:8, borderTop:"1px solid var(--border2)", marginTop:4 }} onClick={e => e.stopPropagation()}>
@@ -1986,32 +2062,46 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                                   <button className="tl-start-btn" onClick={e => { e.stopPropagation(); setFocusBlockId(slot.id); setFocusMode(true); }}>Start →</button>
                                   <button className="tl-start-btn" style={{ background:"rgba(69,193,122,.12)", color:"var(--green)", borderColor:"rgba(69,193,122,.3)" }}
                                     onClick={e => { e.stopPropagation(); markManualDone(slot.id, proj.id, slot.todayTasks); }}>I did this ✓</button>
-                                  <button className="tl-start-btn" style={{ background:"rgba(224,85,85,.1)", color:"var(--red)", borderColor:"rgba(224,85,85,.25)", marginLeft:"auto" }}
-                                    onClick={e => { e.stopPropagation(); clearDWSlot(slot.slotIndex); setExpandedId(null); }}>Clear slot</button>
                                 </div>
                               </div>
                             );
                           })()}
                         </div>
-                        {/* Swap panel */}
-                        {swapBlockId === slot.id && (
-                          <div style={{ marginTop:-4, marginBottom:6 }}>
-                            <div style={{ background:"var(--bg3)", borderRadius:"0 0 12px 12px", padding:8, border:"1px solid var(--border)", borderTop:"none" }}>
-                              <div style={{ fontSize:11, color:"var(--text3)", fontWeight:600, letterSpacing:".06em", textTransform:"uppercase", marginBottom:4, padding:"0 4px" }}>Choose project</div>
-                              {data.projects.filter(p => p.status === "active" && p.id !== slot.projectId).map(p => {
-                                const d2 = data.domains?.find(d => d.id === p.domainId);
-                                return (
-                                  <button key={p.id} onClick={() => {
-                                    saveDWSlot(slot.id, slot.slotIndex, p.id, slot.startHour, slot.startMin, slot.durationMin, null);
-                                    setSwapBlockId(null); setRevealedBlockId(null);
-                                    const el = document.querySelector(`[data-blockid="${slot.id}"]`);
-                                    if (el) { el.style.transition=""; el.style.transform="translateX(0)"; }
-                                  }} style={{ background:"none", border:"none", textAlign:"left", padding:"9px 10px", borderRadius:8, cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontSize:14, color:"var(--text)", display:"flex", alignItems:"center", gap:10, width:"100%" }}>
-                                    <span style={{ width:9, height:9, borderRadius:"50%", background: d2?.color || "var(--text3)", flexShrink:0, display:"inline-block" }} />
-                                    {p.name}
+                        {/* Gear menu — outside swipe-card */}
+                        {blockMenuOpen === slot.id && (
+                          <div style={{ marginTop:-6, marginBottom:6 }} onClick={e => e.stopPropagation()}>
+                            <div style={{ background:"var(--bg3)", borderRadius:"0 0 14px 14px", border:"1px solid var(--border)", borderTop:"none", overflow:"hidden" }}>
+                              {blockMenuMode === "project" ? (
+                                <>
+                                  <button onClick={() => setBlockMenuMode(null)} style={{ display:"flex", alignItems:"center", gap:6, width:"100%", background:"none", border:"none", borderBottom:"1px solid var(--border2)", padding:"10px 14px", fontSize:11, fontWeight:700, color:"var(--text3)", letterSpacing:".06em", textTransform:"uppercase", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
+                                    ‹ Change project
                                   </button>
-                                );
-                              })}
+                                  {data.projects.filter(p => p.status === "active" && p.id !== slot.projectId).map(p => {
+                                    const d2 = data.domains?.find(d => d.id === p.domainId);
+                                    return (
+                                      <button key={p.id} onClick={() => {
+                                        saveDWSlot(slot.id, slot.slotIndex, p.id, slot.startHour, slot.startMin, slot.durationMin, null);
+                                        setBlockMenuOpen(null); setBlockMenuMode(null);
+                                      }} style={{ background:"none", border:"none", textAlign:"left", padding:"11px 14px", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontSize:14, color:"var(--text)", display:"flex", alignItems:"center", gap:10, width:"100%" }}>
+                                        <span style={{ width:9, height:9, borderRadius:"50%", background: d2?.color || "var(--text3)", flexShrink:0, display:"inline-block" }} />
+                                        {p.name}
+                                      </button>
+                                    );
+                                  })}
+                                </>
+                              ) : (
+                                <>
+                                  <button onClick={() => setBlockMenuMode("project")} style={{ display:"flex", alignItems:"center", gap:10, width:"100%", background:"none", border:"none", borderBottom:"1px solid var(--border2)", padding:"13px 14px", fontSize:14, color:"var(--text)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
+                                    <span style={{ fontSize:16 }}>⇄</span> Change project
+                                  </button>
+                                  <button onClick={() => { clearDWSlot(slot.slotIndex); setBlockMenuOpen(null); setBlockMenuMode(null); setExpandedId(null); }} style={{ display:"flex", alignItems:"center", gap:10, width:"100%", background:"none", border:"none", borderBottom:"1px solid var(--border2)", padding:"13px 14px", fontSize:14, color:"var(--text)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
+                                    <span style={{ fontSize:16 }}>→</span> Push to tomorrow
+                                  </button>
+                                  <button onClick={() => { clearDWSlot(slot.slotIndex); setBlockMenuOpen(null); setBlockMenuMode(null); setExpandedId(null); }} style={{ display:"flex", alignItems:"center", gap:10, width:"100%", background:"none", border:"none", padding:"13px 14px", fontSize:14, color:"var(--red)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
+                                    <span style={{ fontSize:16 }}>✕</span> Clear slot
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </div>
                         )}
