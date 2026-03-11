@@ -1925,7 +1925,15 @@ function TodayScreen({ data, setData, openShutdown, focusMode: focusModeprop, se
                           <div className="tl-card-head" style={{ padding:"15px 14px" }}>
                             <div className="tl-stripe" style={{ background: domainColor || "var(--bg4)" }} />
                             <div style={{ flex:1, minWidth:0 }}>
-                              <div style={{ fontSize:10, fontWeight:700, letterSpacing:".08em", textTransform:"uppercase", color: domainColor || "var(--accent)", marginBottom:3, opacity:.9 }}>Deep Work</div>
+                              <div style={{ display:"flex", alignItems:"center", gap:5, marginBottom:3 }}>
+                              <div style={{ width:16, height:16, borderRadius:"50%", background:`${domainColor || "var(--accent)"}22`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                                {isSessionMode
+                                  ? <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke={domainColor || "var(--accent)"} strokeWidth="2"/><path d="M12 8v4l2.5 2.5" stroke={domainColor || "var(--accent)"} strokeWidth="2" strokeLinecap="round"/><path d="M16.5 7.5A6 6 0 1 1 9 7" stroke={domainColor || "var(--accent)"} strokeWidth="2" strokeLinecap="round"/><path d="M9 4v3h3" stroke={domainColor || "var(--accent)"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                  : <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke={domainColor || "var(--accent)"} strokeWidth="2"/><path d="M9 12l2 2 4-4" stroke={domainColor || "var(--accent)"} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                }
+                              </div>
+                              <span style={{ fontSize:10, fontWeight:700, letterSpacing:".08em", textTransform:"uppercase", color: domainColor || "var(--accent)", opacity:.9 }}>{isSessionMode ? "Session" : "Deep Work"}</span>
+                            </div>
                               <div className="tl-name">{proj.name}</div>
                               <div className="tl-meta" style={{ display:"flex", alignItems:"center", gap:5 }}>{isSessionMode && <WaveIcon size={11} color={domainColor || "var(--blue)"} />}{domain?.name} · {slot.durationMin} min{!isSessionMode && relevantTasks.length > 0 ? ` · ${relevantDone}/${relevantTasks.length} today` : ""}{isSessionMode && sessionNote ? <span style={{ fontStyle:"italic", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:140 }}> · {sessionNote}</span> : ""}</div>
                             </div>
@@ -2857,7 +2865,7 @@ function ProjectCard({ proj, domain, isExp, newTaskText,
   const [draftName, setDraftName] = useState(proj.name);
   const [draftColor, setDraftColor] = useState(domain?.color || PROJ_COLORS[0]);
   const startX = useRef(null);
-  // Two-button reveal: Edit(amber) 80px + Delete(red) 80px = 160px total
+  // Two-button reveal: Session toggle(blue) 80px + Delete(red) 80px = 160px
   const MAX = 160; const SNAP = 60;
 
   const onTouchStart = e => { startX.current = e.touches[0].clientX; };
@@ -2872,14 +2880,7 @@ function ProjectCard({ proj, domain, isExp, newTaskText,
     startX.current = null;
   };
 
-  const handleEdit = (e) => {
-    e.stopPropagation();
-    setDraftName(proj.name);
-    setDraftColor(domain?.color || PROJ_COLORS[0]);
-    setShowEdit(true);
-    setSwipeX(0);
-    setTimeout(() => nameInputRef.current?.focus(), 60);
-  };
+
 
   useEffect(() => {
     if (autoFocus) {
@@ -2898,10 +2899,14 @@ function ProjectCard({ proj, domain, isExp, newTaskText,
     <div style={{ margin: "0 16px 8px", borderRadius: 14, background: "var(--bg2)", overflow: "hidden" }}>
       {/* Header — swipeable */}
       <div style={{ position: "relative", overflow: "hidden", borderRadius: isExp || showEdit ? "14px 14px 0 0" : 14 }}>
-        {/* Action bg: Edit + Delete */}
+        {/* Action bg: Session toggle + Delete */}
         <div style={{ position: "absolute", inset: 0, display: "flex", justifyContent: "flex-end" }}>
-          <div style={{ width: 80, background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }} onClick={handleEdit}>
-            <span style={{ color: "#000", fontSize: 12, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase" }}>Edit</span>
+          <div style={{ width: 80, background: "var(--blue)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, cursor: "pointer" }} onClick={e => { e.stopPropagation(); onModeToggle(); setSwipeX(0); }}>
+            {isSessionMode
+              ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#fff" strokeWidth="1.8"/><path d="M9 12l2 2 4-4" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              : <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#fff" strokeWidth="1.8"/><path d="M12 8v4l2.5 2.5" stroke="#fff" strokeWidth="2" strokeLinecap="round"/><path d="M16.5 7.5A6 6 0 1 1 9 7" stroke="#fff" strokeWidth="1.8" strokeLinecap="round"/><path d="M9 4v3h3" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            }
+            <span style={{ color: "#fff", fontSize: 11, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase" }}>{isSessionMode ? "Tasks" : "Session"}</span>
           </div>
           <div style={{ width: 80, background: "var(--red)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }} onClick={onDelete}>
             <span style={{ color: "#fff", fontSize: 12, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase" }}>Delete</span>
@@ -2917,7 +2922,13 @@ function ProjectCard({ proj, domain, isExp, newTaskText,
           onClick={() => { if (swipeX < 0) { setSwipeX(0); return; } onToggleExpand(); }}
         >
           <div className="proj-card-top">
-            <div className="proj-card-stripe" style={{ background: domain?.color, opacity: proj.status === "active" ? 1 : 0.35 }} />
+            {/* Mode icon replaces stripe */}
+            <div style={{ width:32, height:32, borderRadius:"50%", background: `${domain?.color || "var(--text3)"}18`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, opacity: proj.status === "active" ? 1 : 0.4 }}>
+              {isSessionMode
+                ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke={domain?.color || "var(--text3)"} strokeWidth="1.8"/><path d="M12 8v4l2.5 2.5" stroke={domain?.color || "var(--text3)"} strokeWidth="1.8" strokeLinecap="round"/><path d="M16.5 7.5A6 6 0 1 1 9 7" stroke={domain?.color || "var(--text3)"} strokeWidth="1.8" strokeLinecap="round"/><path d="M9 4v3h3" stroke={domain?.color || "var(--text3)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                : <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke={domain?.color || "var(--text3)"} strokeWidth="1.8"/><path d="M9 12l2 2 4-4" stroke={domain?.color || "var(--text3)"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              }
+            </div>
             {showEdit ? (
               <input
                 ref={nameInputRef}
@@ -2985,14 +2996,9 @@ function ProjectCard({ proj, domain, isExp, newTaskText,
             const recent = projSessions.slice(0, 5);
             return (
               <>
-                {/* Mode toggle */}
-                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"2px 0 10px", borderBottom:"1px solid var(--border2)", marginBottom:8 }}>
-                  <span style={{ fontSize:11, color:"var(--text3)", fontWeight:600, letterSpacing:".05em", textTransform:"uppercase", display:"flex", alignItems:"center", gap:5 }}>
-                    <WaveIcon size={12} color="var(--blue)" /> Session Mode
-                  </span>
-                  <button onClick={e => { e.stopPropagation(); onModeToggle(); }} style={{ background:"none", border:"1px solid var(--border)", borderRadius:6, padding:"3px 8px", fontSize:11, color:"var(--text3)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
-                    Switch to Tasks
-                  </button>
+                <div style={{ display:"flex", alignItems:"center", gap:5, padding:"2px 0 10px", borderBottom:"1px solid var(--border2)", marginBottom:8 }}>
+                  <WaveIcon size={12} color="var(--blue)" />
+                  <span style={{ fontSize:11, color:"var(--text3)", fontWeight:600, letterSpacing:".05em", textTransform:"uppercase" }}>Session Mode</span>
                 </div>
                 {recent.length === 0 ? (
                   <div style={{ fontSize:12, color:"var(--text3)", padding:"8px 0", textAlign:"center" }}>No sessions logged yet.</div>
@@ -3052,13 +3058,7 @@ function ProjectCard({ proj, domain, isExp, newTaskText,
           )}
 
           {/* Work Now button removed — blocks are deep work slots only */}
-          {/* Mode toggle for task mode */}
-          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 0 2px", borderTop:"1px solid var(--border2)", marginTop:4 }}>
-            <span style={{ fontSize:11, color:"var(--text3)" }}>Task-based mode</span>
-            <button onClick={e => { e.stopPropagation(); onModeToggle(); }} style={{ background:"none", border:"1px solid var(--border)", borderRadius:6, padding:"3px 8px", fontSize:11, color:"var(--text3)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
-              Switch to Sessions
-            </button>
-          </div>
+
         </>
         )}
         </div>
@@ -3127,6 +3127,7 @@ function ProjectsScreen({ data, setData, openCategorize }) {
   const [newTaskText, setNewTaskText] = useState({});
   const [showManage, setShowManage] = useState(false);
   const [newProjId, setNewProjId] = useState(null);
+  const [pendingModeProj, setPendingModeProj] = useState(null); // { id, name, domainId } — awaiting mode pick
 
   const domainProjects = projects.filter(p => p.domainId === activeDomain);
   const domain = domains.find(d => d.id === activeDomain);
@@ -3187,10 +3188,19 @@ function ProjectsScreen({ data, setData, openCategorize }) {
   };
 
   const addProject = () => {
-    const newProj = { id: uid(), domainId: activeDomain, name: "", status: "backlog", tasks: [] };
+    // Stage project — wait for mode picker before creating
+    setPendingModeProj({ id: uid(), domainId: activeDomain, name: "", status: "backlog", tasks: [] });
+  };
+
+  const confirmNewProject = (mode) => {
+    if (!pendingModeProj) return;
+    const newProj = { ...pendingModeProj, mode };
     setData(d => ({ ...d, projects: [...d.projects, newProj] }));
     setNewProjId(newProj.id);
+    setPendingModeProj(null);
   };
+
+  const cancelNewProject = () => setPendingModeProj(null);
 
   return (
     <div className="screen active">
@@ -3261,6 +3271,42 @@ function ProjectsScreen({ data, setData, openCategorize }) {
         )}
 
 
+
+        {/* Mode picker — appears inline when adding a new project */}
+        {pendingModeProj && (
+          <div style={{ margin:"0 16px 8px", borderRadius:14, background:"var(--bg2)", border:"1px solid var(--border)", padding:"16px" }}>
+            <div style={{ fontSize:12, fontWeight:700, color:"var(--text3)", letterSpacing:".06em", textTransform:"uppercase", marginBottom:12, textAlign:"center" }}>How will you work on this?</div>
+            <div style={{ display:"flex", gap:10 }}>
+              {/* Tasks option */}
+              <button
+                onClick={() => confirmNewProject("tasks")}
+                style={{ flex:1, background:"var(--bg3)", border:"1px solid var(--border)", borderRadius:12, padding:"14px 10px", cursor:"pointer", textAlign:"left", fontFamily:"'DM Sans',sans-serif" }}
+              >
+                <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
+                  <div style={{ width:24, height:24, borderRadius:"50%", background:`${domain?.color || "var(--accent)"}18`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke={domain?.color || "var(--accent)"} strokeWidth="2"/><path d="M9 12l2 2 4-4" stroke={domain?.color || "var(--accent)"} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  </div>
+                  <span style={{ fontSize:13, fontWeight:700, color:"var(--text)" }}>Tasks</span>
+                </div>
+                <div style={{ fontSize:11, color:"var(--text3)", lineHeight:1.4 }}>Discrete work with a clear finish line. Build a list, check things off, measure progress.</div>
+              </button>
+              {/* Sessions option */}
+              <button
+                onClick={() => confirmNewProject("sessions")}
+                style={{ flex:1, background:"var(--bg3)", border:"1px solid var(--border)", borderRadius:12, padding:"14px 10px", cursor:"pointer", textAlign:"left", fontFamily:"'DM Sans',sans-serif" }}
+              >
+                <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
+                  <div style={{ width:24, height:24, borderRadius:"50%", background:`${domain?.color || "var(--accent)"}18`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke={domain?.color || "var(--accent)"} strokeWidth="2"/><path d="M12 8v4l2.5 2.5" stroke={domain?.color || "var(--accent)"} strokeWidth="1.8" strokeLinecap="round"/><path d="M16.5 7.5A6 6 0 1 1 9 7" stroke={domain?.color || "var(--accent)"} strokeWidth="1.8" strokeLinecap="round"/><path d="M9 4v3h3" stroke={domain?.color || "var(--accent)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  </div>
+                  <span style={{ fontSize:13, fontWeight:700, color:"var(--text)" }}>Sessions</span>
+                </div>
+                <div style={{ fontSize:11, color:"var(--text3)", lineHeight:1.4 }}>Craft work that compounds over time. Show up, push it forward, log the hours.</div>
+              </button>
+            </div>
+            <button onClick={cancelNewProject} style={{ marginTop:10, width:"100%", background:"none", border:"none", fontSize:12, color:"var(--text3)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", padding:"4px 0" }}>Cancel</button>
+          </div>
+        )}
 
         {domainProjects.map(proj => (
           <ProjectCard
