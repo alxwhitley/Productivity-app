@@ -362,12 +362,10 @@ const css = `
   /* TIMELINE */
   .tl-wrap{margin:0;padding:0 16px 0 0;display:flex;flex-direction:column;gap:0;}
   .tl-item{display:flex;gap:10px;position:relative;padding-right:16px;align-items:flex-start;}
-  .tl-left{display:flex;flex-direction:column;align-items:center;width:68px;flex-shrink:0;padding-left:16px;}
-  .tl-time{font-size:11px;color:var(--text3);font-variant-numeric:tabular-nums;white-space:nowrap;padding-top:14px;font-weight:500;}
-  .tl-line-wrap{display:flex;flex-direction:column;align-items:center;flex:1;width:100%;}
-  .tl-dot{width:8px;height:8px;border-radius:50%;background:var(--border);flex-shrink:0;margin-top:18px;transition:background .2s;}
-  .tl-dot.now{background:var(--accent);box-shadow:0 0 0 3px rgba(232,160,48,.2);}
-  .tl-dot.done{background:var(--green);}
+  .tl-left{display:flex;flex-direction:column;align-items:center;width:56px;flex-shrink:0;padding-left:12px;}
+  .tl-connector-top{width:1px;height:18px;background:var(--border2);flex-shrink:0;}
+  .tl-pill{font-size:9px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;padding:3px 6px;cursor:pointer;background:var(--pill-bg,var(--bg3));color:var(--pill-color,var(--text3));border:none;border-radius:20px;font-family:'DM Sans',sans-serif;text-align:center;transition:all .15s;-webkit-tap-highlight-color:transparent;letter-spacing:.02em;flex-shrink:0;}
+  .tl-pill.static{cursor:default;}
   .tl-connector{width:1px;flex:1;min-height:8px;background:var(--border2);}
 
   .tl-swipe-wrap{position:relative;border-radius:14px;margin:8px 0 6px;touch-action:pan-y;overflow:hidden;flex:1;min-width:0;}
@@ -455,9 +453,9 @@ const css = `
   .lt-empty{font-size:12px;color:var(--text3);padding:12px 14px;font-style:italic;}
   /* TIME PICKER POPOVER */
   .time-pick-wrap{position:relative;display:inline-block;}
-  .tl-time-btn{font-size:10px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;padding:3px 8px;margin-top:14px;cursor:pointer;background:var(--time-pill-bg,var(--bg3));color:var(--time-pill-color,var(--text3));border:none;border-radius:20px;font-family:'DM Sans',sans-serif;text-align:center;transition:all .15s;-webkit-tap-highlight-color:transparent;letter-spacing:.02em;}
-  .tl-time-btn:hover,.tl-time-btn.open{filter:brightness(1.2);}
-  .tl-time{font-size:10px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;padding:3px 8px;margin-top:14px;background:var(--bg3);color:var(--text3);border-radius:20px;text-align:center;letter-spacing:.02em;}
+  .tl-time-btn{font-size:9px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;padding:3px 6px;cursor:pointer;background:var(--pill-bg,var(--bg3));color:var(--pill-color,var(--text3));border:none;border-radius:20px;font-family:'DM Sans',sans-serif;text-align:center;transition:all .15s;-webkit-tap-highlight-color:transparent;letter-spacing:.02em;}
+  .tl-time-btn:hover,.tl-time-btn.open{filter:brightness(1.3);}
+  .tl-time{font-size:9px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;padding:3px 6px;background:var(--bg3);color:var(--text3);border-radius:20px;text-align:center;letter-spacing:.02em;}
   .time-popover{position:absolute;left:50%;transform:translateX(-50%);top:calc(100% + 4px);background:var(--bg2);border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:50;overflow:hidden;width:96px;}
   .time-popover-inner{max-height:200px;overflow-y:auto;overscroll-behavior:contain;}
   .time-slot{padding:9px 12px;font-size:12px;font-variant-numeric:tabular-nums;color:var(--text2);cursor:pointer;text-align:center;transition:background .1s;}
@@ -1509,8 +1507,12 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                     onDragEnd={() => { setDragId(null); setDragOverId(null); }}
                   >
                     <div className="tl-left">
+                      <div className="tl-connector-top" />
                       {isLateActive ? (
-                        <div className="tl-time" style={{ background:`${domain?.color || "var(--accent)"}22`, color: domain?.color || "var(--accent)" }}>
+                        <div className="tl-time" style={{
+                          background: `${domain?.color || "var(--accent)"}33`,
+                          color: domain?.color || "var(--accent)",
+                        }}>
                           {fmtTime(new Date(lateInfo.startedAt).getHours(), new Date(lateInfo.startedAt).getMinutes())}
                         </div>
                       ) : (
@@ -1518,8 +1520,8 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                           <button
                             className={`tl-time-btn${editingTime === blk.id ? " open" : ""}`}
                             style={{
-                              "--time-pill-bg": isCompleted ? "var(--bg3)" : (isNow || isLateActive) ? `${domain?.color || "var(--accent)"}33` : isPast ? "var(--bg3)" : domain?.color ? `${domain.color}22` : "var(--bg3)",
-                              "--time-pill-color": isCompleted ? "var(--text3)" : (isNow || isLateActive) ? (domain?.color || "var(--accent)") : isPast ? "var(--text3)" : domain?.color || "var(--text3)",
+                              "--pill-bg": isCompleted ? "rgba(69,193,122,.15)" : (isNow || isLateActive) ? `${domain?.color || "var(--accent)"}33` : isPast ? "var(--bg3)" : isMissedAndNotStarted ? `${domain?.color || "rgba(255,255,255,.1)"}22` : domain?.color ? `${domain.color}22` : "var(--bg3)",
+                              "--pill-color": isCompleted ? "var(--green)" : (isNow || isLateActive) ? (domain?.color || "var(--accent)") : isPast ? "var(--text3)" : isMissedAndNotStarted ? (domain?.color || "var(--text3)") : domain?.color || "var(--text3)",
                             }}
                             onClick={e => { e.stopPropagation(); setEditingTime(editingTime === blk.id ? null : blk.id); }}
                             title="Tap to reschedule"
@@ -1562,12 +1564,6 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                           })()}
                         </div>
                       )}
-                      <div className={`tl-dot ${dotState}`} style={
-                        isCompleted ? { background:"var(--green)", opacity:.45 } :
-                        isMissedAndNotStarted ? { background: domain?.color ? domain.color + "99" : "var(--border)" } :
-                        isUpcoming ? { background: domain?.color ? domain.color + "88" : "var(--border)" } :
-                        undefined
-                      } />
                       <div className="tl-connector" />
                     </div>
                     <div style={{ flex:1, minWidth:0, margin:"8px 0 6px" }}>
@@ -1608,18 +1604,11 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                         {isLateActive && countdownStr && !countdownExpired && (
                           <span className="tl-countdown">{countdownStr}</span>
                         )}
-                        {isCompleted && (
-                          <div className="tl-check-icon full" onClick={e => { e.stopPropagation(); unmarkManualDone(blk.id, proj?.id, blk.todayTasks); }} style={{ cursor:"pointer" }} title="Tap to unmark">
-                            <span style={{fontSize:10,color:"#fff",fontWeight:700}}>✓</span>
-                          </div>
-                        )}
-                        {/* Dur pill collapsed / gear icon expanded */}
-                        {!isExp
-                          ? <div className="tl-dur">{blk.durationMin}m</div>
-                          : <button onClick={e => { e.stopPropagation(); setBlockMenuOpen(blockMenuOpen === blk.id ? null : blk.id); setBlockMenuMode(null); }}
-                              style={{ background:"none", border:"none", cursor:"pointer", padding:"4px 6px", color:"var(--text3)", lineHeight:1, borderRadius:8, flexShrink:0 }}>
-                              <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.92c.04-.36.07-.72.07-1.08s-.03-.73-.07-1.08l2.32-1.82c.21-.16.27-.46.13-.7l-2.2-3.81a.55.55 0 0 0-.67-.24l-2.74 1.1c-.57-.44-1.18-.81-1.86-1.08l-.42-2.9A.55.55 0 0 0 14 2h-4a.55.55 0 0 0-.54.46l-.42 2.9c-.68.27-1.3.64-1.86 1.08L4.44 5.35a.54.54 0 0 0-.67.24L1.57 9.4c-.14.24-.08.54.13.7l2.32 1.82C3.98 12.27 3.95 12.63 3.95 13s.03.73.07 1.08L1.7 15.9c-.21.16-.27.46-.13.7l2.2 3.81c.13.24.43.32.67.24l2.74-1.1c.57.44 1.18.81 1.86 1.08l.42 2.9c.08.28.29.47.54.47h4c.25 0 .46-.19.54-.46l.42-2.9c.68-.27 1.3-.64 1.86-1.08l2.74 1.1c.24.09.54 0 .67-.24l2.2-3.81c.14-.24.08-.54-.13-.7l-2.32-1.82Z" fill="currentColor"/></svg>
-                            </button>
+                        {/* Gear icon when expanded */}
+                        {isExp && <button onClick={e => { e.stopPropagation(); setBlockMenuOpen(blockMenuOpen === blk.id ? null : blk.id); setBlockMenuMode(null); }}
+                            style={{ background:"none", border:"none", cursor:"pointer", padding:"4px 6px", color:"var(--text3)", lineHeight:1, borderRadius:8, flexShrink:0 }}>
+                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.92c.04-.36.07-.72.07-1.08s-.03-.73-.07-1.08l2.32-1.82c.21-.16.27-.46.13-.7l-2.2-3.81a.55.55 0 0 0-.67-.24l-2.74 1.1c-.57-.44-1.18-.81-1.86-1.08l-.42-2.9A.55.55 0 0 0 14 2h-4a.55.55 0 0 0-.54.46l-.42 2.9c-.68.27-1.3.64-1.86 1.08L4.44 5.35a.54.54 0 0 0-.67.24L1.57 9.4c-.14.24-.08.54.13.7l2.32 1.82C3.98 12.27 3.95 12.63 3.95 13s.03.73.07 1.08L1.7 15.9c-.21.16-.27.46-.13.7l2.2 3.81c.13.24.43.32.67.24l2.74-1.1c.57.44 1.18.81 1.86 1.08l.42 2.9c.08.28.29.47.54.47h4c.25 0 .46-.19.54-.46l.42-2.9c.68-.27 1.3-.64 1.86-1.08l2.74 1.1c.24.09.54 0 .67-.24l2.2-3.81c.14-.24.08-.54-.13-.7l-2.32-1.82Z" fill="currentColor"/></svg>
+                          </button>
                         }
                       </div>
                       {/* Inline tasks — shown on card face without expand */}
@@ -1848,12 +1837,13 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                   return (
                     <div key={slot.id} className="tl-item" style={{ opacity: isPastSlot && !isCompleted ? 0.5 : 1 }}>
                       <div className="tl-left">
+                        <div className="tl-connector-top" />
                         <div className="time-pick-wrap">
                           <button
                             className={`tl-time-btn${editingTime === slot.id ? " open" : ""}`}
                             style={{
-                              "--time-pill-bg": isCompleted ? "var(--bg3)" : isNowSlot ? `${domainColor || "var(--accent)"}33` : isPastSlot ? "var(--bg3)" : domainColor ? `${domainColor}22` : "var(--bg3)",
-                              "--time-pill-color": isCompleted ? "var(--text3)" : isNowSlot ? (domainColor || "var(--accent)") : isPastSlot ? "var(--text3)" : domainColor || "var(--text3)",
+                              "--pill-bg": isCompleted ? "rgba(69,193,122,.15)" : isNowSlot ? `${domainColor || "var(--accent)"}33` : isPastSlot ? "var(--bg3)" : domainColor ? `${domainColor}22` : "var(--bg3)",
+                              "--pill-color": isCompleted ? "var(--green)" : isNowSlot ? (domainColor || "var(--accent)") : isPastSlot ? "var(--text3)" : domainColor || "var(--text3)",
                             }}
                             onClick={e => { e.stopPropagation(); setEditingTime(editingTime === slot.id ? null : slot.id); }}
                             title="Tap to reschedule"
@@ -1894,16 +1884,11 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                               <div className="tl-meta">{domain?.name} · {slot.durationMin} min{relevantTasks.length > 0 ? ` · ${relevantDone}/${relevantTasks.length} today` : ""}</div>
                             </div>
                             {isNowSlot && !isExp && <span className="tl-now-pill">Now</span>}
-                            {isCompleted && (
-                              <div className="tl-check-icon full"><span style={{fontSize:10,color:"#fff",fontWeight:700}}>✓</span></div>
-                            )}
-                            {/* Dur pill collapsed / gear expanded */}
-                            {!isExp
-                              ? <div className="tl-dur">{slot.durationMin}m</div>
-                              : <button onClick={e => { e.stopPropagation(); setBlockMenuOpen(blockMenuOpen === slot.id ? null : slot.id); setBlockMenuMode(null); }}
-                                  style={{ background:"none", border:"none", cursor:"pointer", padding:"4px 6px", color:"var(--text3)", lineHeight:1, borderRadius:8, flexShrink:0 }}>
-                                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.92c.04-.36.07-.72.07-1.08s-.03-.73-.07-1.08l2.32-1.82c.21-.16.27-.46.13-.7l-2.2-3.81a.55.55 0 0 0-.67-.24l-2.74 1.1c-.57-.44-1.18-.81-1.86-1.08l-.42-2.9A.55.55 0 0 0 14 2h-4a.55.55 0 0 0-.54.46l-.42 2.9c-.68.27-1.3.64-1.86 1.08L4.44 5.35a.54.54 0 0 0-.67.24L1.57 9.4c-.14.24-.08.54.13.7l2.32 1.82C3.98 12.27 3.95 12.63 3.95 13s.03.73.07 1.08L1.7 15.9c-.21.16-.27.46-.13.7l2.2 3.81c.13.24.43.32.67.24l2.74-1.1c.57.44 1.18.81 1.86 1.08l.42 2.9c.08.28.29.47.54.47h4c.25 0 .46-.19.54-.46l.42-2.9c.68-.27 1.3-.64 1.86-1.08l2.74 1.1c.24.09.54 0 .67-.24l2.2-3.81c.14-.24.08-.54-.13-.7l-2.32-1.82Z" fill="currentColor"/></svg>
-                                </button>
+                            {/* Gear icon when expanded only */}
+                            {isExp && <button onClick={e => { e.stopPropagation(); setBlockMenuOpen(blockMenuOpen === slot.id ? null : slot.id); setBlockMenuMode(null); }}
+                                style={{ background:"none", border:"none", cursor:"pointer", padding:"4px 6px", color:"var(--text3)", lineHeight:1, borderRadius:8, flexShrink:0 }}>
+                                <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.92c.04-.36.07-.72.07-1.08s-.03-.73-.07-1.08l2.32-1.82c.21-.16.27-.46.13-.7l-2.2-3.81a.55.55 0 0 0-.67-.24l-2.74 1.1c-.57-.44-1.18-.81-1.86-1.08l-.42-2.9A.55.55 0 0 0 14 2h-4a.55.55 0 0 0-.54.46l-.42 2.9c-.68.27-1.3.64-1.86 1.08L4.44 5.35a.54.54 0 0 0-.67.24L1.57 9.4c-.14.24-.08.54.13.7l2.32 1.82C3.98 12.27 3.95 12.63 3.95 13s.03.73.07 1.08L1.7 15.9c-.21.16-.27.46-.13.7l2.2 3.81c.13.24.43.32.67.24l2.74-1.1c.57.44 1.18.81 1.86 1.08l.42 2.9c.08.28.29.47.54.47h4c.25 0 .46-.19.54-.46l.42-2.9c.68-.27 1.3-.64 1.86-1.08l2.74 1.1c.24.09.54 0 .67-.24l2.2-3.81c.14-.24.08-.54-.13-.7l-2.32-1.82Z" fill="currentColor"/></svg>
+                              </button>
                             }
                           </div>
                           {/* Inline tasks on card face */}
@@ -2082,7 +2067,8 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                 return (
                   <div key={slot.id} className="tl-item">
                     <div className="tl-left">
-                      <span className="tl-time" style={{ fontSize:10 }}>{fmt(slot.startHour, slot.startMin)}</span>
+                      <div className="tl-connector-top" />
+                      <span className="tl-time">{fmt(slot.startHour, slot.startMin)}</span>
                       <div className="tl-connector" />
                     </div>
                     <div style={{ flex:1, minWidth:0, paddingRight:0, marginTop:8, marginBottom:6 }}>
@@ -2186,11 +2172,11 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                     onDragEnd={() => { setDragId(null); setDragOverId(null); }}
                   >
                     <div className="tl-left">
+                      <div className="tl-connector-top" />
                       <div className="tl-time" style={{
-                        background: allDone ? "var(--bg3)" : isNow ? "rgba(255,255,255,.1)" : isPast ? "var(--bg3)" : "var(--bg3)",
-                        color: allDone ? "var(--text3)" : isNow ? "var(--text2)" : "var(--text3)",
+                        background: allDone ? "rgba(69,193,122,.15)" : isNow ? "rgba(255,255,255,.1)" : isPast ? "var(--bg3)" : "var(--bg3)",
+                        color: allDone ? "var(--green)" : isNow ? "var(--text2)" : "var(--text3)",
                       }}>{fmtTime(rb.startHour, rb.startMin)}</div>
-                      <div className={`tl-dot ${isNow ? "now" : isPast ? "done" : ""}`} />
                       <div className="tl-connector" />
                     </div>
                     <div style={{ flex:1, minWidth:0, margin:"6px 0 4px" }}>
@@ -2230,7 +2216,7 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
             {timeline.length > 0 && (
               <div className="tl-item">
                 <div className="tl-left">
-                  <div className="tl-dot" style={{ opacity:.3, marginTop:0 }} />
+                  <div style={{ width:1, height:12, background:"var(--border2)", opacity:.3 }} />
                 </div>
                 <div style={{ flex:1 }} />
               </div>
