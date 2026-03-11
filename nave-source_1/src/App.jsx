@@ -43,11 +43,7 @@ const INITIAL_DATA = {
       { id: "t18", text: "Real ID",                       done: false },
     ]},
   ],
-  blocks: [
-    { id: "b1", projectId: "podcast",    startHour: 9,  startMin: 0,  durationMin: 90, dayOffset: 0 },
-    { id: "b3", projectId: "freelance",  startHour: 13, startMin: 0,  durationMin: 90, dayOffset: 0 },
-    { id: "b5", projectId: "socialmedia",startHour: 9,  startMin: 0,  durationMin: 90, dayOffset: 1 },
-  ],
+  blocks: [],
   inbox: [],
   looseTasks: [], // [{id, domainId, text, done, doneAt}]
   weekIntention: "Ship Podcast episode. At least one Freelance deliverable. Get Church Social Media unblocked.",
@@ -1230,7 +1226,7 @@ function StatusBar() {
 
 
 // ─── TODAY SCREEN ─────────────────────────────────────────────────────────────
-function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: focusModeprop, setFocusMode: setFocusModeApp, onSignOut, jumpToBlock, onClearJump }) {
+function TodayScreen({ data, setData, openShutdown, focusMode: focusModeprop, setFocusMode: setFocusModeApp, onSignOut, jumpToBlock, onClearJump }) {
   const [showTodaySettings, setShowTodaySettings] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
   const [celebratingId, setCelebratingId] = useState(null);
@@ -1587,9 +1583,8 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
     allCandidates.push({ i, def, saved, isFilled: !!saved.projectId });
   }
 
-  // Regular blocks (from data.blocks) also count toward the cap
-  const regularBlockCount = viewBlocks.length;
-  const dwCapRemaining = Math.max(0, maxDeepBlocks - regularBlockCount);
+  // Regular blocks (from data.blocks) also count toward the cap — REMOVED, only DW + routine blocks exist now
+  const dwCapRemaining = maxDeepBlocks;
 
   // Enforce cap: all filled slots count toward the remaining budget, empties fill the remainder
   const filledCandidates = allCandidates.filter(c => c.isFilled);
@@ -1610,19 +1605,9 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
   }));
 
   const timeline = [
-    ...viewBlocks.map(b => ({ type: "block", id: b.id, mins: b.startHour * 60 + b.startMin, data: b })),
     ...viewRoutines.map(r => ({ type: "routine", id: r.id, mins: r.startHour * 60 + r.startMin, data: r })),
     ...todayDWSlots.map(s => ({ type: "deepwork", id: s.id, mins: s.startHour * 60 + s.startMin, data: s })),
   ].sort((a, b) => a.mins - b.mins);
-
-  // Prime window — first project block of the day, if it starts between 6am–11am
-  const firstProjectItem = timeline.find(item => item.type === "block");
-  const primeWindowBlockId = (() => {
-    if (!firstProjectItem) return null;
-    const startMins = firstProjectItem.mins;
-    // Only flag as prime window if it's a morning block (6am=360 to 11am=660)
-    return startMins >= 360 && startMins <= 660 ? firstProjectItem.id : null;
-  })();
 
   // Find the "current" block — started and not yet ended
   const currentItem = timeline.find(item => {
@@ -1783,7 +1768,6 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
           {timeline.length === 0 && (
             <div style={{ margin:"16px", padding:"20px", background:"var(--bg2)", borderRadius:14, textAlign:"center" }}>
               <div style={{ fontSize:13, color:"var(--text3)" }}>No blocks scheduled today.</div>
-              <button onClick={openAddBlock} style={{ marginTop:10, background:"var(--accent)", color:"#000", border:"none", borderRadius:8, padding:"8px 16px", fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>+ Add Block</button>
             </div>
           )}
 
@@ -1792,399 +1776,6 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
               const isPast = !viewingTomorrow && (item.mins + (item.data.durationMin || 60)) <= nowMins;
               const isNow = !viewingTomorrow && currentItem?.id === item.id;
               const isExp = expandedId === item.id;
-
-              // Project block
-              if (item.type === "block") {
-                const blk = item.data;
-                const proj = blk.projectId ? getProject(blk.projectId) : null;
-                const domain = proj ? getDomain(proj.domainId) : null;
-                const doneTasks = proj?.tasks.filter(t=>t.done).length || 0;
-                const totalTasks = proj?.tasks.length || 0;
-                // For completion indicator: use todayTasks if set, else all tasks
-                const todayTaskIds = blk.todayTasks;
-                const hasTodayTasks = Array.isArray(todayTaskIds) && todayTaskIds.length > 0;
-                const relevantTasks = hasTodayTasks
-                  ? todayTaskIds.map(id => proj?.tasks.find(t => t.id === id)).filter(Boolean)
-                  : (proj?.tasks || []);
-                const relevantDone = relevantTasks.filter(t => t.done).length;
-                const allTasksDone = relevantTasks.length > 0 && relevantDone === relevantTasks.length;
-
-                // Late start state
-                const lateInfo = lateStarted[blk.id];
-                const isLateActive = !!lateInfo;
-
-                // Countdown for late-started or current block
-                let countdownStr = null;
-                let countdownExpired = false;
-                if (isLateActive || isNow) {
-                  const startMs = isLateActive
-                    ? new Date(lateInfo.startedAt).getTime()
-                    : new Date(now.getFullYear(), now.getMonth(), now.getDate(), blk.startHour, blk.startMin).getTime();
-                  const elapsedSec = Math.floor((Date.now() - startMs) / 1000);
-                  const totalSec = blk.durationMin * 60;
-                  const remSec = totalSec - elapsedSec;
-                  if (remSec <= 0) {
-                    countdownExpired = true;
-                    countdownStr = "Done";
-                  } else {
-                    const rm = Math.floor(remSec / 60);
-                    const rs = remSec % 60;
-                    countdownStr = `${rm}:${rs.toString().padStart(2,"0")}`;
-                  }
-                }
-
-                // Completion indicator — manual, timer-expired, or time-window-passed
-                const isManualDone = manualCompleted.has(blk.id);
-                const isCompleted = isManualDone || countdownExpired;
-                const isPastUnworked = isPast && !isNow && !isLateActive && !isManualDone;
-                const isMissedAndNotStarted = isPastUnworked;
-                const dotState = isLateActive || isNow ? "now" : isCompleted ? "done" : "";
-                const isUpcoming = !isNow && !isLateActive && !isMissedAndNotStarted && !isManualDone && !countdownExpired && !isPast;
-                const domainCardColor = domain?.color || "rgba(255,255,255,.18)";
-
-                // Three clear states (when not active/expanded):
-                // 1. done-card   — past + completed → greyed out, green check
-                // 2. missed-card — past + not completed → colored border, empty circle
-                // 3. upcoming-card — future → domain-colored border (unchanged)
-                const cardClass = [
-                  "tl-card",
-                  isCompleted && !isExp ? "done-card" : "",
-                  isMissedAndNotStarted && !isExp ? "missed-card" : "",
-                  (isNow || isLateActive) ? "now-card" : "",
-                  isExp ? "active-card" : "",
-                  isUpcoming && !isExp ? "upcoming-card" : "",
-                ].filter(Boolean).join(" ");
-
-                const showConflict = conflictWarning?.id === blk.id;
-
-                return (
-                  <div
-                    key={item.id}
-                    className={["tl-item", dragId===blk.id?"dragging":"", dragOverId===blk.id?"drag-over":""].filter(Boolean).join(" ")}
-                    draggable={!isCompleted && !isNow && !isLateActive}
-                    onDragStart={e => handleDragStart(e, blk.id)}
-                    onDragOver={e => handleDragOver(e, blk.id)}
-                    onDrop={e => handleDrop(e, blk.id)}
-                    onDragEnd={() => { setDragId(null); setDragOverId(null); }}
-                  >
-                    <div className="tl-left">
-                      <div className="tl-connector-top" />
-                      {isLateActive ? (
-                        <div className="tl-time" style={{
-                          background: `${domain?.color || "var(--accent)"}33`,
-                          color: domain?.color || "var(--accent)",
-                        }}>
-                          {fmtTime(new Date(lateInfo.startedAt).getHours(), new Date(lateInfo.startedAt).getMinutes())}
-                        </div>
-                      ) : (
-                        <div className="time-pick-wrap">
-                          <button
-                            className={`tl-time-btn${editingTime === blk.id ? " open" : ""}`}
-                            style={{
-                              "--pill-bg": isCompleted ? "rgba(255,255,255,.06)" : (isNow || isLateActive) ? "rgba(232,160,48,.2)" : isPast ? "rgba(255,255,255,.06)" : "rgba(255,255,255,.1)",
-                              "--pill-color": isCompleted ? "rgba(255,255,255,.25)" : (isNow || isLateActive) ? "var(--accent)" : isPast ? "rgba(255,255,255,.25)" : "rgba(255,255,255,.55)",
-                            }}
-                            onClick={e => { e.stopPropagation(); setEditingTime(editingTime === blk.id ? null : blk.id); }}
-                            title="Tap to reschedule"
-                          >
-                            {fmtTime(blk.startHour, blk.startMin)}
-                          </button>
-                          {editingTime === blk.id && (() => {
-                            // Full range 8am–10pm, scroll anchored to current time on open
-                            const slots = [];
-                            for (let h = 8; h <= 22; h++) {
-                              for (let m of [0, 30]) {
-                                if (h === 22 && m === 30) continue;
-                                slots.push({ h, m });
-                              }
-                            }
-                            const currentIdx = slots.findIndex(s => s.h === blk.startHour && s.m === blk.startMin);
-                            return (
-                              <div className="time-popover" onClick={e => e.stopPropagation()}>
-                                <div className="time-popover-inner" ref={el => {
-                                  if (el && currentIdx >= 0) {
-                                    // Scroll so current time is at top
-                                    el.scrollTop = currentIdx * 35;
-                                  }
-                                }}>
-                                  {slots.map(({h, m}) => {
-                                    const isCurrent = h === blk.startHour && m === blk.startMin;
-                                    return (
-                                      <div
-                                        key={`${h}-${m}`}
-                                        className={`time-slot${isCurrent ? " current" : ""}`}
-                                        onClick={() => rescheduleBlock(blk.id, h, m)}
-                                      >
-                                        {fmtTime(h, m)}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      )}
-                      <div className="tl-connector" />
-                    </div>
-                    <div style={{ flex:1, minWidth:0, margin:"8px 0 6px" }}>
-                      <div className={`tl-card ${cardClass}`} data-blockid={blk.id} style={{ "--domain-color": domainCardColor + "50" }}>
-                      {/* Conflict warning */}
-                      {showConflict && (
-                        <div className="tl-conflict-warn">
-                          <span>⚠️</span>
-                          <span>Overlaps with <strong>{conflictWarning.conflictName}</strong>. Start anyway?</span>
-                          <button onClick={e => { e.stopPropagation(); setConflictWarning(null); setLateStarted(prev => ({ ...prev, [blk.id]: { startedAt: new Date().toISOString() } })); setFocusBlockId(blk.id); setFocusMode(true); }} style={{ marginLeft:"auto", background:"var(--accent)", color:"#000", border:"none", borderRadius:6, padding:"3px 9px", fontSize:10, fontWeight:700, cursor:"pointer", fontFamily:"'DM Sans',sans-serif", flexShrink:0 }}>Start</button>
-                          <button onClick={e => { e.stopPropagation(); setConflictWarning(null); }} style={{ background:"var(--bg3)", color:"var(--text3)", border:"none", borderRadius:6, padding:"3px 8px", fontSize:10, cursor:"pointer", fontFamily:"'DM Sans',sans-serif", flexShrink:0 }}>Cancel</button>
-                        </div>
-                      )}
-                      <div className="tl-card-head" onClick={() => { if (blockMenuOpen === blk.id) { setBlockMenuOpen(null); setBlockMenuMode(null); return; } setExpandedId(isExp ? null : item.id); if (isExp) { setBlockMenuOpen(null); setBlockMenuMode(null); } }}>
-                        <div className="tl-stripe" style={{ background: domain?.color || "var(--bg4)" }} />
-                        <div className="tl-info">
-                          <div style={{ fontSize:10, fontWeight:700, letterSpacing:".08em", textTransform:"uppercase", color: domain?.color || "var(--accent)", marginBottom:2, opacity:.9 }}>Deep Work</div>
-                          <div className="tl-name">{proj?.name || blk.label || "Block"}</div>
-                          <div className="tl-meta">
-                            {domain ? `${domain.name} · ` : ""}{blk.durationMin} min
-                            {(() => {
-                              const tids = blk.todayTasks;
-                              if (Array.isArray(tids) && tids.length > 0) {
-                                const todayObjs = tids.map(id => proj?.tasks.find(t => t.id === id)).filter(Boolean);
-                                const doneToday = todayObjs.filter(t => t.done).length;
-                                return ` · ${doneToday}/${todayObjs.length} today`;
-                              }
-                              return totalTasks > 0 ? ` · ${doneTasks}/${totalTasks} tasks` : "";
-                            })()}
-                            {isLateActive ? ` · Started ${fmtTime(new Date(lateInfo.startedAt).getHours(), new Date(lateInfo.startedAt).getMinutes())}` : ""}
-                          </div>
-                        </div>
-                        {/* Right side indicators */}
-                        {isNow && !isLateActive && <span className="tl-now-pill">Now</span>}
-                        {!isNow && !isCompleted && !isMissedAndNotStarted && primeWindowBlockId === blk.id && (
-                          <span className="tl-prime-pill">Prime Window</span>
-                        )}
-                        {isLateActive && countdownStr && !countdownExpired && (
-                          <span className="tl-countdown">{countdownStr}</span>
-                        )}
-                        {/* Gear icon when expanded, chevron when collapsed */}
-                        {isExp
-                          ? <button onClick={e => { e.stopPropagation(); setBlockMenuOpen(blockMenuOpen === blk.id ? null : blk.id); setBlockMenuMode(null); }}
-                              className={`gear-btn-inline${blockMenuOpen === blk.id ? " open" : ""}`}>
-                              <GearIcon size={17} />
-                            </button>
-                          : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ flexShrink:0, color:"var(--text3)", opacity:.4 }}><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                        }
-                      </div>
-                      {/* Inline tasks — shown on card face without expand */}
-                      {!isExp && !isCompleted && (() => {
-                        const tids = blk.todayTasks;
-                        if (!Array.isArray(tids) || tids.length === 0) return null;
-                        const todayObjs = tids.map(id => proj?.tasks.find(t => t.id === id)).filter(Boolean);
-                        if (todayObjs.length === 0) return null;
-                        return (
-                          <div style={{ padding:"0 14px 10px", borderTop:"1px solid var(--border2)" }} onClick={e => e.stopPropagation()}>
-                            {todayObjs.map(t => (
-                              <div key={t.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"5px 0", cursor:"pointer" }}
-                                onClick={() => toggleTask(proj.id, t.id)}>
-                                <div className={`tl-check ${t.done ? "done" : ""}`} style={{ width:16, height:16, flexShrink:0 }}>
-                                  {t.done && <span style={{fontSize:8,color:"#fff",fontWeight:700}}>✓</span>}
-                                </div>
-                                <span className={`tl-task-txt ${t.done ? "done" : ""}`} style={{ fontSize:12 }}>{t.text}</span>
-                              </div>
-                            ))}
-                          </div>
-                        );
-                      })()}
-                      {isExp && proj && (() => {
-                        const todayTaskIds = blk.todayTasks;
-                        const hasPicked = Array.isArray(todayTaskIds) && todayTaskIds.length > 0;
-                        const isPicking = pickerState?.blockId === blk.id;
-
-                        // PICKER MODE — choosing what to work on today
-                        if (isPicking) {
-                          const ps = pickerState;
-                          const confirmPick = () => {
-                            let finalIds = [...ps.selected];
-                            if (ps.newText.trim()) {
-                              const newId = addTaskToProject(proj.id, ps.newText.trim());
-                              finalIds.push(newId);
-                            }
-                            saveTodayTasks(blk.id, finalIds);
-                            setPickerState(null);
-                          };
-                          return (
-                            <div className="picker-wrap" onClick={e => e.stopPropagation()}>
-                              <div className="picker-heading">What are you working on today?</div>
-                              {proj.tasks.filter(t => !t.done).map(t => {
-                                const checked = ps.selected.has(t.id);
-                                return (
-                                  <div key={t.id} className="picker-task" onClick={() => {
-                                    setPickerState(prev => {
-                                      const s = new Set(prev.selected);
-                                      checked ? s.delete(t.id) : s.add(t.id);
-                                      return { ...prev, selected: s };
-                                    });
-                                  }}>
-                                    <div className={`picker-box ${checked ? "checked" : ""}`} />
-                                    <span className="picker-task-txt">{t.text}</span>
-                                  </div>
-                                );
-                              })}
-                              <div className="picker-add">
-                                <input className="picker-input" placeholder="Add a new task…"
-                                  value={ps.newText}
-                                  onChange={e => setPickerState(prev => ({ ...prev, newText: e.target.value }))}
-                                  onKeyDown={e => { if (e.key === "Enter" && ps.newText.trim()) confirmPick(); }}
-                                />
-                              </div>
-                              <button className="picker-confirm"
-                                disabled={ps.selected.size === 0 && !ps.newText.trim()}
-                                onClick={confirmPick}>
-                                {ps.selected.size + (ps.newText.trim() ? 1 : 0) > 0
-                                  ? `Focus on ${ps.selected.size + (ps.newText.trim() ? 1 : 0)} task${ps.selected.size + (ps.newText.trim() ? 1 : 0) > 1 ? "s" : ""} today`
-                                  : "Select at least one task"}
-                              </button>
-                            </div>
-                          );
-                        }
-
-                        // NO TASKS PICKED YET — show prompt
-                        if (!hasPicked) {
-                          return (
-                            <div className="tl-tasks" onClick={e => e.stopPropagation()}>
-                              <div style={{ padding:"4px 0 10px", textAlign:"center" }}>
-                                <div style={{ fontSize:12, color:"var(--text3)", marginBottom:10 }}>What are you working on today?</div>
-                                <button onClick={() => setPickerState({ blockId: blk.id, projectId: proj.id, selected: new Set(), newText: "" })}
-                                  style={{ background:"var(--bg3)", border:"1px solid var(--border)", borderRadius:8, padding:"7px 16px", fontSize:12, fontWeight:600, color:"var(--text2)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
-                                  Pick tasks
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        }
-
-                        // TASKS PICKED — show only today's tasks
-                        const todayTaskObjs = todayTaskIds.map(id => proj.tasks.find(t => t.id === id)).filter(Boolean);
-                        const firstUncheckedId = todayTaskObjs.find(t => !t.done)?.id;
-                        return (
-                          <div className="tl-tasks" onClick={e => e.stopPropagation()}>
-                            {todayTaskObjs.map(t => {
-                              const isNext = isNow && !t.done && t.id === firstUncheckedId;
-                              const isBouncing = recentlyChecked.has(t.id);
-                              return (
-                              <div key={t.id} className={`tl-task-row${isNext ? " next-action" : ""}${isBouncing ? " flash" : ""}`} onClick={e => e.stopPropagation()}>
-                                <div className={`tl-check${t.done ? " done" : ""}${isBouncing ? " bouncing" : ""}`} onClick={e => { e.stopPropagation(); toggleTask(proj.id, t.id); }}>
-                                  {t.done && <span style={{fontSize:9,color:"#fff",fontWeight:700}}>✓</span>}
-                                </div>
-                                {editingTaskId?.taskId === t.id ? (
-                                  <input
-                                    autoFocus
-                                    style={{ flex:1, background:"var(--bg3)", border:"1px solid var(--border)", borderRadius:6, padding:"3px 8px", fontSize:13, color:"var(--text)", fontFamily:"'DM Sans',sans-serif", outline:"none" }}
-                                    value={editingTaskId.text}
-                                    onChange={e => setEditingTaskId(prev => ({ ...prev, text: e.target.value }))}
-                                    onBlur={() => updateTaskText(proj.id, t.id, editingTaskId.text)}
-                                    onKeyDown={e => { if (e.key === "Enter") updateTaskText(proj.id, t.id, editingTaskId.text); if (e.key === "Escape") setEditingTaskId(null); }}
-                                    onClick={e => e.stopPropagation()}
-                                  />
-                                ) : (
-                                  <span className={`tl-task-txt ${t.done ? "done" : ""}`}
-                                    onClick={e => { e.stopPropagation(); if (!t.done) setEditingTaskId({ taskId: t.id, projectId: proj.id, text: t.text }); }}>
-                                    {t.text}
-                                  </span>
-                                )}
-                              </div>
-                              );
-                            })}
-                            {/* Edit picks link */}
-                            <div style={{ paddingTop:8, borderTop:"1px solid var(--border2)", marginTop:4 }} onClick={e => e.stopPropagation()}>
-                              <button onClick={() => setPickerState({ blockId: blk.id, projectId: proj.id, selected: new Set(todayTaskIds), newText: "" })}
-                                style={{ background:"none", border:"none", fontSize:11, color:"var(--text3)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", padding:0 }}>
-                                ✎ Change today's tasks
-                              </button>
-                            </div>
-                            {/* Action buttons */}
-                            {!isCompleted && (
-                              <div style={{ display:"flex", gap:8, marginTop:10 }} onClick={e => e.stopPropagation()}>
-                                {/* "I did this" — log as done without timer */}
-                                {!isLateActive && (
-                                  <button onClick={() => markManualDone(blk.id, proj?.id, blk.todayTasks)}
-                                    style={{ flex:1, background:"var(--bg3)", border:"1px solid var(--border)", borderRadius:10, padding:"9px", fontSize:12, fontWeight:600, color:"var(--text2)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
-                                    I did this ✓
-                                  </button>
-                                )}
-                                {/* Start timer → focus mode */}
-                                {!isLateActive && (
-                                  <button onClick={() => startBlock(blk.id)}
-                                    style={{ flex:1, background:"var(--accent)", border:"none", borderRadius:10, padding:"9px", fontSize:12, fontWeight:700, color:"#000", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
-                                    Start →
-                                  </button>
-                                )}
-                              </div>
-                            )}
-
-                          </div>
-                        );
-                      })()}
-                        {/* Completion celebration overlay */}
-                        {celebratingId === blk.id && (
-                          <div className="block-celebrate" onClick={e => e.stopPropagation()}>
-                            <div className="block-celebrate-burst">
-                              {["🟢","✦","✦","🟢","✦","✦","🟢"].map((s,i) => (
-                                <span key={i} className="celebrate-particle" style={{ "--i": i }}>{s}</span>
-                              ))}
-                            </div>
-                            <div className="block-celebrate-label">Block complete</div>
-                          </div>
-                        )}
-                        {/* Inline management panel — inside tl-card */}
-                        <div className={`blk-mgmt-panel${blockMenuOpen === blk.id ? " open" : ""}`} onClick={e => e.stopPropagation()}>
-                          <div className="blk-mgmt-inner">
-                            {blockMenuMode === "project" ? (
-                              <>
-                                <button className="blk-mgmt-row" onClick={() => setBlockMenuMode(null)}>
-                                  <div className="blk-mgmt-row-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg></div>
-                                  <span className="blk-mgmt-row-txt" style={{ fontSize:11, fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", color:"var(--text3)" }}>Change project</span>
-                                </button>
-                                <div className="blk-mgmt-divider" />
-                                <div className="blk-mgmt-proj-list">
-                                {data.projects.filter(p => p.status === "active" && p.id !== proj?.id).map(p => {
-                                  const d2 = data.domains?.find(d => d.id === p.domainId);
-                                  return (
-                                    <button key={p.id} className="blk-mgmt-row sub-item" onClick={() => {
-                                      setData(d => ({ ...d, blocks: d.blocks.map(b => b.id === blk.id ? { ...b, projectId: p.id, todayTasks: undefined } : b) }));
-                                      setBlockMenuOpen(null); setBlockMenuMode(null);
-                                    }}>
-                                      <span style={{ width:8, height:8, borderRadius:"50%", background: d2?.color || "var(--text3)", flexShrink:0, display:"inline-block" }} />
-                                      <span className="blk-mgmt-row-txt">{p.name}</span>
-                                    </button>
-                                  );
-                                })}
-                                </div>
-                              </>
-                            ) : (
-                              <>
-                                <button className="blk-mgmt-row" onClick={() => setBlockMenuMode("project")}>
-                                  <div className="blk-mgmt-row-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg></div>
-                                  <span className="blk-mgmt-row-txt">Change project</span>
-                                </button>
-                                <div className="blk-mgmt-divider" />
-                                <button className="blk-mgmt-row" onClick={() => { rescheduleToTomorrow(blk.id); setBlockMenuOpen(null); setBlockMenuMode(null); setExpandedId(null); }}>
-                                  <div className="blk-mgmt-row-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
-                                  <span className="blk-mgmt-row-txt">Push to tomorrow</span>
-                                </button>
-                                <div className="blk-mgmt-divider" />
-                                <button className="blk-mgmt-row danger" onClick={() => { setData(d => ({ ...d, blocks: d.blocks.filter(b => b.id !== blk.id) })); setBlockMenuOpen(null); setBlockMenuMode(null); setExpandedId(null); }}>
-                                  <div className="blk-mgmt-row-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></div>
-                                  <span className="blk-mgmt-row-txt">Clear slot</span>
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                    </div>
-                    </div>
-                  </div>
-                );
-              }
 
               // Deep Work slot
               if (item.type === "deepwork") {
@@ -2619,15 +2210,6 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
             )}
           </div>
 
-          {/* + Add block link */}
-          {!viewingTomorrow && (
-            <div style={{ display:"flex", alignItems:"center", gap:8, padding:"6px 16px 14px", opacity:.5 }}>
-              <button onClick={openAddBlock} style={{ background:"none", border:"none", color:"var(--text3)", fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:"'DM Sans',sans-serif", display:"flex", alignItems:"center", gap:5 }}>
-                <span style={{ fontSize:16 }}>＋</span> Add block
-              </button>
-            </div>
-          )}
-
           {/* LOOSE TASKS BLOCK */}
           {!viewingTomorrow && (() => {
             const allLoose = data.looseTasks || [];
@@ -2851,7 +2433,7 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                     );
                   })()}
                 {!shutdownDone && (
-                  <div className="shutdown-row" style={{ opacity: isAfter4 ? 1 : 0.45 }} onClick={openShutdown}>
+                  <div className="shutdown-row" onClick={openShutdown}>
                     <span className="sd-ico">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" strokeWidth="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
                     </span>
@@ -3132,8 +2714,7 @@ const PROJ_COLORS = DOMAIN_COLORS;
 
 function ProjectCard({ proj, domain, isExp, newTaskText,
   onToggleExpand, onToggleStatus, onDelete, onEditSave,
-  onToggleTask, onDeleteTask, onSaveTask, onNewTaskChange, onAddTask, autoFocus,
-  onWorkNow, hasBlockToday }) {
+  onToggleTask, onDeleteTask, onSaveTask, onNewTaskChange, onAddTask, autoFocus }) {
   const [addingTask, setAddingTask] = useState(false);
   const taskInputRef = useRef(null);
   const nameInputRef = useRef(null);
@@ -3284,35 +2865,7 @@ function ProjectCard({ proj, domain, isExp, newTaskText,
             />
           )}
 
-          {/* Work Now button — only show when card is expanded */}
-          {onWorkNow && proj.status === "active" && (
-            <div style={{ padding:"10px 14px 14px", borderTop:"1px solid var(--border2)" }}>
-              <button
-                onClick={e => { e.stopPropagation(); onWorkNow(); }}
-                style={{
-                  width:"100%", padding:"11px",
-                  background: hasBlockToday ? "var(--accent-s)" : "var(--accent)",
-                  border: hasBlockToday ? "1.5px solid rgba(232,160,48,.4)" : "none",
-                  borderRadius:12, fontSize:13, fontWeight:700,
-                  color: hasBlockToday ? "var(--accent)" : "#000",
-                  cursor:"pointer", fontFamily:"'DM Sans',sans-serif",
-                  display:"flex", alignItems:"center", justifyContent:"center", gap:6,
-                }}
-              >
-                {hasBlockToday ? (
-                  <>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5L19 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                    Go to Today's Block
-                  </>
-                ) : (
-                  <>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><polygon points="5,3 19,12 5,21" fill="currentColor"/></svg>
-                    Work on This Now
-                  </>
-                )}
-              </button>
-            </div>
-          )}
+          {/* Work Now button removed — blocks are deep work slots only */}
         </div>
       )}
     </div>
@@ -3372,7 +2925,7 @@ function RoutineBlockView({ routine, dateKey, data, setData, compact }) {
 }
 
 // ─── PROJECTS SCREEN ──────────────────────────────────────────────────────────
-function ProjectsScreen({ data, setData, openCategorize, onWorkNow }) {
+function ProjectsScreen({ data, setData, openCategorize }) {
   const { domains, projects } = data;
   const [activeDomain, setActiveDomain] = useState(domains[0]?.id || null);
   const [collapsedProjs, setCollapsedProjs] = useState(new Set());
@@ -3531,8 +3084,6 @@ function ProjectsScreen({ data, setData, openCategorize, onWorkNow }) {
             onSaveTask={(taskId, text) => saveTask(proj.id, taskId, text)}
             onNewTaskChange={v => setNewTaskText(t => ({ ...t, [proj.id]: v }))}
             onAddTask={() => addTask(proj.id)}
-            onWorkNow={onWorkNow ? () => onWorkNow(proj.id) : null}
-            hasBlockToday={data.blocks?.some(b => b.projectId === proj.id && b.dayOffset === 0)}
           />
         ))}
 
@@ -3626,7 +3177,7 @@ function getDeepSlots(data) {
   return saved.map((s, i) => ({ ...(DEFAULT_DEEP_SLOTS[i] || DEFAULT_DEEP_SLOTS[0]), ...s, slotIndex: i }));
 }
 
-function PlanScreen({ data, setData, openAddBlock, onGoToSeason, lightMode, toggleTheme }) {
+function PlanScreen({ data, setData, onGoToSeason, lightMode, toggleTheme }) {
   const { domains, projects, blocks, weekIntention, workWeek = [2,3,4,5,6] } = data;
   const [editingIntention, setEditingIntention] = useState(false);
   const [intentionDraft, setIntentionDraft] = useState(weekIntention);
@@ -3691,10 +3242,7 @@ function PlanScreen({ data, setData, openAddBlock, onGoToSeason, lightMode, togg
     const dow = dayDate.getDay();
     const isWorkDay = workWeek.includes(dow);
     const dateStr = `${dayDate.getFullYear()}-${String(dayDate.getMonth()+1).padStart(2,"0")}-${String(dayDate.getDate()).padStart(2,"0")}`;
-    const realBlocks = blocks.filter(b => b.dayOffset === offset)
-      .sort((a,b) => a.startHour*60+a.startMin-(b.startHour*60+b.startMin));
-
-    if (!isWorkDay) return realBlocks.map(b => ({ type: "real", block: b }));
+    if (!isWorkDay) return [];
 
     // Filled DW slots for this day
     const savedDW = (data.deepWorkSlots || {})[dateStr] || [];
@@ -3712,11 +3260,10 @@ function PlanScreen({ data, setData, openAddBlock, onGoToSeason, lightMode, togg
       };
     }).filter(Boolean);
 
-    // How many filled DW slots exist? Empty = maxDeepBlocks - filled - real blocks (min 0)
+    // How many filled DW slots exist? Empty = maxDeepBlocks - filled (min 0)
     const maxDW = data.deepWorkTargets?.maxDeepBlocks ?? 3;
     const filledCount = filledDWSlots.length;
-    const realCount = realBlocks.length;
-    const emptyCount = Math.max(0, maxDW - filledCount - realCount);
+    const emptyCount = Math.max(0, maxDW - filledCount);
 
     // Empty DW slots: use the deepSlots that are NOT filled, up to emptyCount
     const emptyDWSlots = deepSlots
@@ -3731,14 +3278,12 @@ function PlanScreen({ data, setData, openAddBlock, onGoToSeason, lightMode, togg
       }));
 
     const allItems = [
-      ...realBlocks.map(b => ({ type: "real", block: b })),
       ...filledDWSlots,
       ...emptyDWSlots,
     ];
 
     allItems.sort((a, b) => {
       const getMin = x => {
-        if (x.type === "real") return x.block.startHour*60+x.block.startMin;
         if (x.type === "deepwork-filled") return x.startHour*60+x.startMin;
         return x.slot.startHour*60+x.slot.startMin;
       };
@@ -3809,62 +3354,6 @@ function PlanScreen({ data, setData, openAddBlock, onGoToSeason, lightMode, togg
                     />
                   );
                 }
-                if (row.type === "real") {
-                  const blk = row.block;
-                  const proj = blk.projectId ? getProject(blk.projectId) : null;
-                  const domain = proj ? getDomain(proj.domainId) : null;
-                  const domColor = domain?.color || null;
-                  const cardKey = `real_${blk.id}`;
-                  const isExpReal = wkDwPickerOpen === cardKey + "_exp";
-                  const isDone = completedBlockIds.has(blk.id);
-                  const isMissed = isPastDay && !isDone;
-                  return (
-                    <div key={blk.id} style={{ padding: "6px 12px 2px", opacity: isDone ? 0.38 : isMissed ? 0.55 : 1, filter: isDone ? "saturate(0.15)" : "none", transition: "opacity .2s" }}>
-                      <div
-                        style={{
-                          background: "var(--bg3)",
-                          border: isMissed ? "1px solid rgba(224,85,85,0.25)" : domColor ? `1px solid ${domColor}60` : "1px solid var(--border)",
-                          boxShadow: isDone || isMissed ? "none" : domColor ? `0 0 14px ${domColor}1a` : "none",
-                          borderRadius: 12,
-                          overflow: "hidden",
-                          cursor: isPastDay ? "default" : "pointer",
-                        }}
-                        onClick={() => !isPastDay && setWkDwPickerOpen(isExpReal ? null : cardKey + "_exp")}
-                      >
-                        <div style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 14px" }}>
-                          <div style={{ width:3, borderRadius:2, alignSelf:"stretch", minHeight:36, background: domColor || "var(--bg4)", flexShrink:0 }} />
-                          <div style={{ flex:1, minWidth:0 }}>
-                            <div style={{ fontSize:10, fontWeight:700, letterSpacing:".08em", textTransform:"uppercase", color: domColor || "var(--accent)", marginBottom:2, opacity:.9 }}>Deep Work</div>
-                            <div style={{ fontSize:14, fontWeight:600, color:"var(--text)", textDecoration: isMissed ? "line-through" : "none" }}>{proj?.name || blk.label || "Block"}</div>
-                            <div style={{ fontSize:11, color:"var(--text3)", marginTop:3 }}>
-                              {domain?.name} · {blk.durationMin} min · {fmtTime(blk.startHour, blk.startMin)}
-                            </div>
-                          </div>
-                          <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                            {isDone
-                              ? <div style={{ width:20, height:20, borderRadius:"50%", background:"rgba(69,193,122,0.2)", border:"1.5px solid rgba(69,193,122,0.5)", display:"flex", alignItems:"center", justifyContent:"center" }}><span style={{ fontSize:10, color:"#45C17A", fontWeight:800 }}>✓</span></div>
-                              : isMissed
-                                ? <div style={{ fontSize:10, fontWeight:700, letterSpacing:".05em", textTransform:"uppercase", color:"var(--red)", opacity:.7 }}>missed</div>
-                                : <><div style={{ fontSize:10, fontWeight:700, letterSpacing:".07em", textTransform:"uppercase", color: domColor || "var(--accent)", opacity:.8 }}>DW</div>
-                                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style={{ color:"var(--text3)", opacity:.45, transform: isExpReal ? "rotate(90deg)" : "rotate(0deg)", transition:"transform .2s" }}><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg></>
-                            }
-                          </div>
-                        </div>
-                        {isExpReal && !isPastDay && (
-                          <div style={{ borderTop:"1px solid var(--border2)", padding:"10px 14px" }} onClick={e => e.stopPropagation()}>
-                            <div style={{ display:"flex", gap:8 }}>
-                              <button onClick={() => { deleteBlock(blk.id); setWkDwPickerOpen(null); }}
-                                style={{ flex:1, background:"rgba(224,85,85,.1)", color:"var(--red)", border:"none", borderRadius:8, padding:"9px", fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
-                                Clear slot
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                }
-
                 // Filled deep work slot
                 if (row.type === "deepwork-filled") {
                   const proj2 = getProject(row.projectId);
@@ -4100,10 +3589,6 @@ function PlanScreen({ data, setData, openAddBlock, onGoToSeason, lightMode, togg
                 );
               })})()}
 
-              <div className="wc-add" onClick={openAddBlock}>
-                <span className="wca-ico">＋</span>
-                <span className="wca-txt">Add block</span>
-              </div>
             </div>
           );
         })}
@@ -4662,15 +4147,10 @@ const SD_ITEMS = [
   "Mind cleared — nothing left open",
 ];
 
-function ShutdownSheet({ onClose, onComplete, alreadyDone, data, onAddBlock, onCategorizeLoose }) {
+function ShutdownSheet({ onClose, onComplete, alreadyDone, data, onCategorizeLoose }) {
   const swipe = useSwipeDown(onClose);
-  const [checked, setChecked]       = useState(alreadyDone ? [0,1,2,3] : []);
-  const [addingBlock, setAddingBlock] = useState(false);
-  // inline quick-block form state
-  const { projects, domains, blocks } = data;
-  const [projectId, setProjectId]   = useState(projects.find(p=>p.status==="active")?.id || projects[0]?.id || "");
-  const [startHour, setStartHour]   = useState(9);
-  const [duration, setDuration]     = useState(90);
+  const [checked, setChecked] = useState(alreadyDone ? [0,1,2,3] : []);
+  const { projects, domains } = data;
 
   // Uncategorized loose tasks added today
   const todayStr = new Date().toDateString();
@@ -4688,38 +4168,12 @@ function ShutdownSheet({ onClose, onComplete, alreadyDone, data, onAddBlock, onC
     onCategorizeLoose(taskId, domainId);
   };
 
-  const tomorrowBlocks = blocks
-    .filter(b => b.dayOffset === 1)
-    .sort((a,b) => a.startHour*60+a.startMin - (b.startHour*60+b.startMin));
-
-  const firstBlock   = tomorrowBlocks[0];
-  const hasTomorrow  = !!firstBlock;
-
-  // step 5 is auto-checked if tomorrow already has a block
-  const step5Done    = hasTomorrow || addingBlock === "saved";
-  const allDone      = checked.length === SD_ITEMS.length && step5Done && (uncategorized.length === 0 || allCategorized);
+  const allDone = checked.length === SD_ITEMS.length && (uncategorized.length === 0 || allCategorized);
 
   const toggle = i => setChecked(p => p.includes(i) ? p.filter(x=>x!==i) : [...p, i]);
 
-  const saveBlock = () => {
-    const proj = projects.find(p => p.id === projectId);
-    onAddBlock({
-      id: uid(),
-      projectId,
-      startHour,
-      startMin: 0,
-      durationMin: duration,
-      dayOffset: 1,
-      isAdmin: false,
-    });
-    setAddingBlock("saved");
-  };
-
   const getProject = id => projects.find(p => p.id === id);
   const getDomain  = id => domains.find(d => d.id === id);
-
-  const tomorrowPreviewProj   = firstBlock ? getProject(firstBlock.projectId) : null;
-  const tomorrowPreviewDomain = tomorrowPreviewProj ? getDomain(tomorrowPreviewProj.domainId) : null;
 
   return (
     <>
@@ -4775,154 +4229,8 @@ function ShutdownSheet({ onClose, onComplete, alreadyDone, data, onAddBlock, onC
             </div>
           ))}
 
-          {/* divider */}
-          <div style={{ height: 1, background: "var(--border2)", margin: "10px 0" }} />
 
-          {/* step 5 — tomorrow's first block */}
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10 }}>
-              <div style={{
-                width:20, height:20, borderRadius:6, flexShrink:0,
-                background: step5Done ? "var(--green)" : "transparent",
-                border: step5Done ? "none" : "1.5px solid var(--border)",
-                display:"flex", alignItems:"center", justifyContent:"center",
-                transition:"all .15s",
-              }}>
-                {step5Done && <span style={{fontSize:10,color:"#fff",fontWeight:700}}>✓</span>}
-              </div>
-              <span style={{ fontSize:14, color:"var(--text)", fontWeight: step5Done ? 400 : 500 }}>
-                Tomorrow's first block is set
-              </span>
-            </div>
-
-            {/* CASE A: has a block already */}
-            {hasTomorrow && (
-              <div style={{
-                background:"var(--bg3)", borderRadius:12, padding:"12px 14px",
-                display:"flex", alignItems:"center", gap:12, marginLeft:28,
-              }}>
-                <div style={{
-                  width:3, borderRadius:2, alignSelf:"stretch", minHeight:28, flexShrink:0,
-                  background: tomorrowPreviewDomain?.color || "var(--bg4)",
-                }} />
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:13, fontWeight:600, color:"var(--text)" }}>
-                    {tomorrowPreviewProj?.name || firstBlock.label || "Block"}
-                  </div>
-                  <div style={{ fontSize:11, color:"var(--text3)", marginTop:2 }}>
-                    {fmtTime(firstBlock.startHour, firstBlock.startMin)} · {firstBlock.durationMin} min
-                    {tomorrowPreviewDomain ? ` · ${tomorrowPreviewDomain.name}` : ""}
-                  </div>
-                </div>
-                {tomorrowBlocks.length > 1 && (
-                  <span style={{ fontSize:11, color:"var(--text3)" }}>+{tomorrowBlocks.length-1} more</span>
-                )}
-              </div>
-            )}
-
-            {/* CASE B: no block — prompt to add */}
-            {!hasTomorrow && addingBlock !== "saved" && (
-              <div style={{ marginLeft:28 }}>
-                {!addingBlock ? (
-                  <div style={{
-                    background:"rgba(224,85,85,0.08)", border:"1px solid rgba(224,85,85,0.25)",
-                    borderRadius:12, padding:"11px 14px", display:"flex", alignItems:"center", gap:10,
-                  }}>
-                    <span style={{fontSize:16}}>⚠️</span>
-                    <div style={{flex:1}}>
-                      <div style={{fontSize:12,fontWeight:600,color:"#E05555",marginBottom:2}}>No blocks scheduled</div>
-                      <div style={{fontSize:12,color:"var(--text2)"}}>Set tomorrow's first deep work block before you close out.</div>
-                    </div>
-                    <button
-                      onClick={() => setAddingBlock("open")}
-                      style={{
-                        background:"var(--accent)", color:"#000", border:"none",
-                        borderRadius:8, padding:"7px 12px", fontSize:12, fontWeight:700,
-                        cursor:"pointer", fontFamily:"'DM Sans',sans-serif", flexShrink:0,
-                      }}>
-                      + Add
-                    </button>
-                  </div>
-                ) : (
-                  /* inline mini form */
-                  <div style={{
-                    background:"var(--bg3)", border:"1px solid var(--border)",
-                    borderRadius:12, padding:"14px",
-                  }}>
-                    <div style={{fontSize:11,fontWeight:600,letterSpacing:".07em",textTransform:"uppercase",color:"var(--text3)",marginBottom:10}}>
-                      Tomorrow's First Block
-                    </div>
-                    <div style={{marginBottom:8}}>
-                      <div style={{fontSize:11,fontWeight:600,letterSpacing:".06em",textTransform:"uppercase",color:"var(--text3)",marginBottom:4}}>Project</div>
-                      <select
-                        style={{width:"100%",background:"var(--bg4)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 10px",color:"var(--text)",fontFamily:"'DM Sans',sans-serif",fontSize:13,outline:"none",appearance:"none"}}
-                        value={projectId} onChange={e => setProjectId(e.target.value)}>
-                        {projects.map(p => {
-                          const d = getDomain(p.domainId);
-                          return <option key={p.id} value={p.id}>{p.name}{d ? ` (${d.name})` : ""}</option>;
-                        })}
-                      </select>
-                    </div>
-                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
-                      <div>
-                        <div style={{fontSize:11,fontWeight:600,letterSpacing:".06em",textTransform:"uppercase",color:"var(--text3)",marginBottom:4}}>Start Time</div>
-                        <select
-                          style={{width:"100%",background:"var(--bg4)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 10px",color:"var(--text)",fontFamily:"'DM Sans',sans-serif",fontSize:13,outline:"none",appearance:"none"}}
-                          value={startHour} onChange={e => setStartHour(Number(e.target.value))}>
-                          {Array.from({length:13},(_,i)=>i+7).map(h => (
-                            <option key={h} value={h}>{h>12?h-12:h}:00 {h>=12?"PM":"AM"}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <div style={{fontSize:11,fontWeight:600,letterSpacing:".06em",textTransform:"uppercase",color:"var(--text3)",marginBottom:4}}>Duration</div>
-                        <select
-                          style={{width:"100%",background:"var(--bg4)",border:"1px solid var(--border)",borderRadius:8,padding:"9px 10px",color:"var(--text)",fontFamily:"'DM Sans',sans-serif",fontSize:13,outline:"none",appearance:"none"}}
-                          value={duration} onChange={e => setDuration(Number(e.target.value))}>
-                          <option value={25}>25 min</option>
-                          <option value={45}>45 min</option>
-                          <option value={60}>60 min</option>
-                          <option value={90}>90 min</option>
-                          <option value={120}>2 hours</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div style={{display:"flex",gap:8}}>
-                      <button onClick={saveBlock} style={{flex:1,background:"var(--accent)",color:"#000",border:"none",borderRadius:8,padding:"10px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>
-                        Set Block
-                      </button>
-                      <button onClick={() => setAddingBlock(null)} style={{background:"var(--bg4)",color:"var(--text3)",border:"none",borderRadius:8,padding:"10px 14px",fontSize:13,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* CASE C: just saved */}
-            {addingBlock === "saved" && (() => {
-              const savedProj   = getProject(projectId);
-              const savedDomain = savedProj ? getDomain(savedProj.domainId) : null;
-              return (
-                <div style={{
-                  background:"rgba(69,193,122,0.08)", border:"1px solid rgba(69,193,122,0.2)",
-                  borderRadius:12, padding:"12px 14px", display:"flex", alignItems:"center", gap:12, marginLeft:28,
-                }}>
-                  <div style={{width:3,borderRadius:2,alignSelf:"stretch",minHeight:28,flexShrink:0,background:savedDomain?.color||"var(--bg4)"}} />
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:13,fontWeight:600,color:"var(--text)"}}>{savedProj?.name}</div>
-                    <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>
-                      {fmtTime(startHour, 0)} · {duration} min{savedDomain ? ` · ${savedDomain.name}` : ""}
-                    </div>
-                  </div>
-                  <span style={{fontSize:13,color:"var(--green)",fontWeight:600}}>Set ✓</span>
-                </div>
-              );
-            })()}
-          </div>
-
-          {/* UNCATEGORIZED LOOSE TASKS */}
+                    {/* UNCATEGORIZED LOOSE TASKS */}
           {uncategorized.length > 0 && (
             <div style={{ margin:"4px 0 14px" }}>
               <div style={{ height:1, background:"var(--border2)", marginBottom:14 }} />
@@ -5032,7 +4340,7 @@ function ShutdownSheet({ onClose, onComplete, alreadyDone, data, onAddBlock, onC
             disabled={!allDone}
             onClick={() => { onComplete(); onClose(); }}
           >
-            {allDone ? "Shutdown Complete ✓" : `${checked.length + (step5Done ? 1 : 0)} of 5 complete`}
+            {allDone ? "Shutdown Complete ✓" : `${checked.length} of ${SD_ITEMS.length} complete`}
           </button>
 
         </div>
@@ -5042,19 +4350,9 @@ function ShutdownSheet({ onClose, onComplete, alreadyDone, data, onAddBlock, onC
 }
 
 // ─── ADD BLOCK SHEET ──────────────────────────────────────────────────────────
-function AddBlockSheet({ data, onClose, onAdd, onAddRoutine }) {
+function AddBlockSheet({ data, onClose, onAddRoutine }) {
   const swipe = useSwipeDown(onClose);
-  const { projects, domains } = data;
   const DAY_NAMES = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
-
-  // Step 1: type selection
-  const [blockType, setBlockType] = useState(null); // null | "project" | "routine"
-
-  // Project block state
-  const [projectId, setProjectId]   = useState(projects[0]?.id || "");
-  const [startHour, setStartHour]   = useState(9);
-  const [duration, setDuration]     = useState(90);
-  const [dayOffset, setDayOffset]   = useState(0);
 
   // Routine block state
   const [rtTitle, setRtTitle]       = useState("");
@@ -5074,17 +4372,11 @@ function AddBlockSheet({ data, onClose, onAdd, onAddRoutine }) {
     setTimeout(() => rtInputRef.current?.focus(), 30);
   };
 
-  const submitProject = () => {
-    onAdd({ id: uid(), projectId, startHour, startMin: 0, durationMin: duration, dayOffset, isAdmin: false });
-    onClose();
-  };
-
   const submitRoutine = () => {
     if (!rtTitle.trim()) return;
     const today = new Date();
     let targetDate = null;
     if (!rtRecurring) {
-      // one-time: find next occurrence of rtDayOfWeek within next 7 days
       const d = new Date(today);
       for (let i = 0; i < 7; i++) {
         if (d.getDay() === rtDayOfWeek) { targetDate = d.toDateString(); break; }
@@ -5106,91 +4398,13 @@ function AddBlockSheet({ data, onClose, onAdd, onAddRoutine }) {
     onClose();
   };
 
-  // ── Type picker ───────────────────────────────────────────────
-  if (!blockType) return (
-    <>
-      <div className="backdrop" onClick={onClose} />
-      <div className="sheet" {...swipe} style={swipe.style}>
-        <div className="sheet-pull" />
-        <div className="sheet-title">Add Block</div>
-        <div className="sheet-sub">What kind of block is this?</div>
-        <div className="sheet-scroll">
-          <div style={{ display:"flex", flexDirection:"column", gap:10, padding:"8px 0 16px" }}>
-            <button onClick={() => setBlockType("project")} style={{
-              background:"var(--bg3)", border:"1px solid var(--border)", borderRadius:14,
-              padding:"16px 18px", textAlign:"left", cursor:"pointer", color:"var(--text)", fontFamily:"'DM Sans',sans-serif"
-            }}>
-              <div style={{ fontSize:15, fontWeight:700, marginBottom:3 }}>Project Block</div>
-              <div style={{ fontSize:12, color:"var(--text3)" }}>Focused work on a specific project</div>
-            </button>
-            <button onClick={() => setBlockType("routine")} style={{
-              background:"var(--bg3)", border:"1px solid var(--border)", borderRadius:14,
-              padding:"16px 18px", textAlign:"left", cursor:"pointer", color:"var(--text)", fontFamily:"'DM Sans',sans-serif"
-            }}>
-              <div style={{ fontSize:15, fontWeight:700, marginBottom:3 }}>Routine Block</div>
-              <div style={{ fontSize:12, color:"var(--text3)" }}>Recurring tasks like admin, reviews, or check-ins</div>
-            </button>
-          </div>
-        </div>
-      </div>
-    </>
-  );
-
-  // ── Project block form ────────────────────────────────────────
-  if (blockType === "project") return (
-    <>
-      <div className="backdrop" onClick={onClose} />
-      <div className="sheet" {...swipe} style={swipe.style}>
-        <div className="sheet-pull" />
-        <div style={{ display:"flex", alignItems:"center", gap:10, padding:"16px 20px 4px" }}>
-          <button onClick={() => setBlockType(null)} style={{ background:"none", border:"none", color:"var(--text3)", fontSize:18, cursor:"pointer", padding:0, lineHeight:1 }}>‹</button>
-          <div className="sheet-title" style={{ margin:0 }}>Project Block</div>
-        </div>
-        <div className="sheet-scroll">
-          <div className="form-row">
-            <label className="form-label">Project</label>
-            <select className="form-select" value={projectId} onChange={e => setProjectId(e.target.value)}>
-              {projects.map(p => { const d = domains.find(d=>d.id===p.domainId); return <option key={p.id} value={p.id}>{p.name} ({d?.name})</option>; })}
-            </select>
-          </div>
-          <div className="form-row">
-            <label className="form-label">Day</label>
-            <select className="form-select" value={dayOffset} onChange={e => setDayOffset(Number(e.target.value))}>
-              {["Today","Tomorrow","In 2 days","In 3 days","In 4 days","In 5 days","In 6 days"].map((d,i) => <option key={i} value={i}>{d}</option>)}
-            </select>
-          </div>
-          <div className="form-row form-row-2">
-            <div>
-              <label className="form-label">Start Time</label>
-              <select className="form-select" value={startHour} onChange={e => setStartHour(Number(e.target.value))}>
-                {Array.from({length:13},(_,i)=>i+7).map(h => <option key={h} value={h}>{h>12?h-12:h}:00 {h>=12?"PM":"AM"}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="form-label">Duration</label>
-              <select className="form-select" value={duration} onChange={e => setDuration(Number(e.target.value))}>
-                <option value={25}>25 min</option><option value={45}>45 min</option>
-                <option value={60}>60 min</option><option value={90}>90 min</option>
-                <option value={120}>2 hours</option>
-              </select>
-            </div>
-          </div>
-          <button className="form-btn" onClick={submitProject}>Add Block</button>
-        </div>
-      </div>
-    </>
-  );
-
   // ── Routine block form ────────────────────────────────────────
   return (
     <>
       <div className="backdrop" onClick={onClose} />
       <div className="sheet" {...swipe} style={swipe.style}>
         <div className="sheet-pull" />
-        <div style={{ display:"flex", alignItems:"center", gap:10, padding:"16px 20px 4px" }}>
-          <button onClick={() => setBlockType(null)} style={{ background:"none", border:"none", color:"var(--text3)", fontSize:18, cursor:"pointer", padding:0, lineHeight:1 }}>‹</button>
-          <div className="sheet-title" style={{ margin:0 }}>Routine Block</div>
-        </div>
+        <div className="sheet-title">Add Routine Block</div>
         <div className="sheet-scroll">
           <div className="form-row">
             <label className="form-label">Title</label>
@@ -5829,7 +5043,6 @@ export default function App() {
 
   const closeSheet = () => setSheet(null);
 
-  const handleAddBlock = b => setData(d => ({ ...d, blocks: [...d.blocks, b] }));
   const handleAddRoutine = r => setData(d => ({ ...d, routineBlocks: [...(d.routineBlocks||[]), r] }));
   const handleQuickAdd = item => {
     setData(d => ({
@@ -5853,33 +5066,6 @@ export default function App() {
     };
   });
 
-  const handleWorkNow = (projectId) => {
-    // Check if project already has a block for today
-    const existing = (data.blocks || []).find(b => b.projectId === projectId && b.dayOffset === 0);
-    if (existing) {
-      // Jump to Today and open that block
-      setJumpToBlock(existing.id);
-      setTab("today");
-    } else {
-      // Create a new block starting now (rounded to nearest 15 min)
-      const now = new Date();
-      const totalMins = now.getHours() * 60 + now.getMinutes();
-      const rounded = Math.ceil(totalMins / 15) * 15;
-      const startHour = Math.floor(rounded / 60) % 24;
-      const startMin = rounded % 60;
-      const newId = uid();
-      setData(d => ({
-        ...d,
-        blocks: [...(d.blocks || []), {
-          id: newId, projectId, startHour, startMin,
-          durationMin: 90, dayOffset: 0, todayTasks: undefined,
-        }]
-      }));
-      setJumpToBlock(newId);
-      setTab("today");
-    }
-  };
-
   return (
     <>
       <style>{css}</style>
@@ -5888,13 +5074,13 @@ export default function App() {
           {!data.onboardingDone && (
             <OnboardingFlow onDone={() => setData(d => ({ ...d, onboardingDone: true }))} />
           )}
-          {tab==="today"    && <TodayScreen    data={data} setData={setData} openShutdown={()=>setSheet("shutdown")} openAddBlock={()=>setSheet("addblock")} focusMode={focusMode} setFocusMode={setFocusMode} onSignOut={() => supabase.auth.signOut()} jumpToBlock={jumpToBlock} onClearJump={() => setJumpToBlock(null)} />}
-          {tab==="projects" && <ProjectsScreen data={data} setData={setData} openCategorize={()=>setSheet("categorize")} onWorkNow={handleWorkNow} />}
-          {tab==="plan"     && <PlanScreen     data={data} setData={setData} openAddBlock={()=>setSheet("addblock")} onGoToSeason={()=>setTab("season")} lightMode={lightMode} toggleTheme={toggleTheme} />}
+          {tab==="today"    && <TodayScreen    data={data} setData={setData} openShutdown={()=>setSheet("shutdown")} focusMode={focusMode} setFocusMode={setFocusMode} onSignOut={() => supabase.auth.signOut()} jumpToBlock={jumpToBlock} onClearJump={() => setJumpToBlock(null)} />}
+          {tab==="projects" && <ProjectsScreen data={data} setData={setData} openCategorize={()=>setSheet("categorize")} />}
+          {tab==="plan"     && <PlanScreen     data={data} setData={setData} onGoToSeason={()=>setTab("season")} lightMode={lightMode} toggleTheme={toggleTheme} />}
           {tab==="season"  && <SeasonScreen   data={data} setData={setData} />}
 
-          {sheet==="shutdown"  && <ShutdownSheet    onClose={closeSheet} onComplete={()=>setData(d=>({...d,shutdownDone:true}))} alreadyDone={data.shutdownDone} data={data} onAddBlock={b=>setData(d=>({...d,blocks:[...d.blocks,b]}))} onCategorizeLoose={(taskId, domainId) => setData(d => ({ ...d, looseTasks: (d.looseTasks||[]).map(t => t.id === taskId ? { ...t, domainId } : t) }))} />}
-          {sheet==="addblock"  && <AddBlockSheet    data={data} onClose={closeSheet} onAdd={handleAddBlock} onAddRoutine={handleAddRoutine} />}
+          {sheet==="shutdown"  && <ShutdownSheet    onClose={closeSheet} onComplete={()=>setData(d=>({...d,shutdownDone:true}))} alreadyDone={data.shutdownDone} data={data} onCategorizeLoose={(taskId, domainId) => setData(d => ({ ...d, looseTasks: (d.looseTasks||[]).map(t => t.id === taskId ? { ...t, domainId } : t) }))} />}
+          {sheet==="addblock"  && <AddBlockSheet    data={data} onClose={closeSheet} onAddRoutine={handleAddRoutine} />}
 
           {sheet==="categorize"&& <CategorizeSheet  data={data} onClose={closeSheet} onCategorize={handleCategorize} onDismiss={handleDismissInbox} onDoToday={handleDoToday} />}
 
