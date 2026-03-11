@@ -898,8 +898,8 @@ const css = `
   .qr-input::placeholder{color:var(--text3);}
 
   /* FAB */
-  .fab{width:50px;height:50px;border-radius:50%;background:rgba(232,160,48,0.18);border:1.5px solid rgba(232,160,48,0.35);color:var(--accent);font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative;bottom:28px;z-index:26;flex-shrink:0;transition:transform .15s,background .15s;font-family:'DM Sans',sans-serif;box-shadow:0 2px 16px rgba(0,0,0,.3);}
-  .fab.open{background:rgba(232,160,48,0.28);border-color:rgba(232,160,48,0.6);transform:scale(1.05);}
+  .fab{width:50px;height:50px;border-radius:50%;background:var(--accent);border:none;color:#000;font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative;bottom:28px;z-index:26;flex-shrink:0;transition:transform .15s,background .15s;font-family:'DM Sans',sans-serif;box-shadow:0 2px 16px rgba(0,0,0,.3);}
+  .fab.open{background:var(--accent);filter:brightness(1.1);transform:scale(1.05);}
   .fab:active{transform:scale(.93);}
   .capture-input{width:100%;background:var(--bg3);border:1.5px solid var(--accent);border-radius:12px;padding:14px 16px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:16px;outline:none;margin-bottom:14px;}
   .capture-input::placeholder{color:var(--text3);}
@@ -1562,7 +1562,7 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                       } />
                       <div className="tl-connector" />
                     </div>
-                    <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ flex:1, minWidth:0, margin:"8px 0 6px" }}>
                       <div className={`tl-card ${cardClass}`} data-blockid={blk.id} style={{ "--domain-color": domainCardColor + "50" }}>
                       {/* Conflict warning */}
                       {showConflict && (
@@ -1849,7 +1849,7 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
                         </div>
                         <div className="tl-connector" />
                       </div>
-                      <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ flex:1, minWidth:0, margin:"8px 0 6px" }}>
                         <div className={`tl-card${isExp ? " active-card" : ""}`}
                           data-blockid={slot.id}
                           style={{ border: cardBorder, boxShadow: cardShadow }}
@@ -3168,9 +3168,11 @@ function PlanScreen({ data, setData, openAddBlock, onGoToSeason, lightMode, togg
           const isWorkDay = workWeek.includes(dow);
           const isToday = offset === 0;
           const mergedRows = getMergedRows(offset);
+          const dayDateStr = `${dayDate.getFullYear()}-${String(dayDate.getMonth()+1).padStart(2,"0")}-${String(dayDate.getDate()).padStart(2,"0")}`;
+          const dayHasPickerOpen = wkDwPickerOpen && wkDwPickerOpen.startsWith(dayDateStr);
 
           return (
-            <div key={offset} className="week-card">
+            <div key={offset} className="week-card" style={dayHasPickerOpen ? { overflow:"visible" } : undefined}>
               <div className="wc-head">
                 <div style={{ display:"flex", alignItems:"center", gap:8 }}>
                   <span className={`wc-day ${isToday ? "today" : ""}`}>{days[dow]}</span>
@@ -4059,24 +4061,6 @@ function SeasonScreen({ data, setData }) {
           );
         })()}
 
-        <div className="sh"><span className="sh-label">Projects Moved</span></div>
-        <div className="moved-card">
-          {Object.entries(reviewData.projectProgress).map(([projId, info]) => {
-            const proj = data.projects.find(p => p.id === projId);
-            if (!proj) return null;
-            const domain = data.domains.find(d => d.id === proj.domainId);
-            return (
-              <div key={projId} className="mv-row">
-                <div className="mv-stripe" style={{ background: domain?.color }} />
-                <div className="mv-info">
-                  <div className="mv-name">{proj.name}</div>
-                  <div className="mv-bar-wrap"><div className="mv-bar-fill" style={{ width: `${info.pct}%`, background: domain?.color }} /></div>
-                </div>
-                <span className="mv-delta">+{info.delta}%</span>
-              </div>
-            );
-          })}
-        </div>
         <div className="spacer" />
       </div>
     </div>
