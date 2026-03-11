@@ -48,6 +48,7 @@ const INITIAL_DATA = {
   looseTasks: [], // [{id, domainId, text, done, doneAt}]
   weekIntention: "Ship Podcast episode. At least one Freelance deliverable. Get Church Social Media unblocked.",
   shutdownDone: false,
+  shutdownDate: null,
   seasonGoals: [
     { id: "sg1", text: "Launch Podcast to 100 listeners", domainId: "church", done: false },
     { id: "sg2", text: "Land 2 new Freelance clients",    domainId: "work",   done: false },
@@ -1328,6 +1329,14 @@ function TodayScreen({ data, setData, openShutdown, focusMode: focusModeprop, se
     return () => clearInterval(id);
   }, []);
 
+  // Reset shutdownDone each new day
+  useEffect(() => {
+    const todayISO = toISODate();
+    if (data.shutdownDone && data.shutdownDate !== todayISO) {
+      setData(d => ({ ...d, shutdownDone: false, shutdownDate: todayISO }));
+    }
+  }, [data.shutdownDone, data.shutdownDate]);
+
   const now   = new Date();
   const today = new Date();
   const days   = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
@@ -1801,7 +1810,7 @@ function TodayScreen({ data, setData, openShutdown, focusMode: focusModeprop, se
                   const totalTasks = proj?.tasks.length || 0;
                   const todayTaskIds = slot.todayTasks;
                   const hasTodayTasks = Array.isArray(todayTaskIds) && todayTaskIds.length > 0;
-                  const relevantTasks = hasTodayTasks ? todayTaskIds.map(id => proj?.tasks.find(t => t.id === id)).filter(Boolean) : (proj?.tasks || []);
+                  const relevantTasks = hasTodayTasks ? todayTaskIds.map(id => proj?.tasks.find(t => t.id === id)).filter(Boolean) : [];
                   const relevantDone = relevantTasks.filter(t => t.done).length;
                   const allTasksDone = relevantTasks.length > 0 && relevantDone === relevantTasks.length;
                   const isPastSlot = (slot.startHour * 60 + slot.startMin + slot.durationMin) <= nowMins;
@@ -1871,19 +1880,26 @@ function TodayScreen({ data, setData, openShutdown, focusMode: focusModeprop, se
                             }
                           </div>
                           {/* Inline tasks on card face */}
-                          {!isExp && !isCompleted && relevantTasks.length > 0 && (
-                            <div style={{ padding:"0 14px 10px", borderTop:"1px solid var(--border2)" }} onClick={e => e.stopPropagation()}>
-                              {relevantTasks.map(t => (
-                                <div key={t.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"5px 0", cursor:"pointer" }}
-                                  onClick={() => { setData(d => ({ ...d, projects: d.projects.map(p => p.id === proj.id ? { ...p, tasks: p.tasks.map(tk => tk.id === t.id ? { ...tk, done: !tk.done } : tk) } : p) })); }}>
-                                  <div className={`tl-check ${t.done ? "done" : ""}`} style={{ width:16, height:16, flexShrink:0 }}>
-                                    {t.done && <span style={{fontSize:8,color:"#fff",fontWeight:700}}>✓</span>}
+                          {!isExp && !isCompleted && relevantTasks.length > 0 && (() => {
+                            const visibleTasks = relevantTasks.slice(0, 3);
+                            const hiddenCount = relevantTasks.length - visibleTasks.length;
+                            return (
+                              <div style={{ padding:"0 14px 10px", borderTop:"1px solid var(--border2)" }} onClick={e => e.stopPropagation()}>
+                                {visibleTasks.map(t => (
+                                  <div key={t.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"5px 0", cursor:"pointer" }}
+                                    onClick={() => { setData(d => ({ ...d, projects: d.projects.map(p => p.id === proj.id ? { ...p, tasks: p.tasks.map(tk => tk.id === t.id ? { ...tk, done: !tk.done } : tk) } : p) })); }}>
+                                    <div className={`tl-check ${t.done ? "done" : ""}`} style={{ width:16, height:16, flexShrink:0 }}>
+                                      {t.done && <span style={{fontSize:8,color:"#fff",fontWeight:700}}>✓</span>}
+                                    </div>
+                                    <span className={`tl-task-txt ${t.done ? "done" : ""}`} style={{ fontSize:12 }}>{t.text}</span>
                                   </div>
-                                  <span className={`tl-task-txt ${t.done ? "done" : ""}`} style={{ fontSize:12 }}>{t.text}</span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
+                                ))}
+                                {hiddenCount > 0 && (
+                                  <div style={{ fontSize:11, color:"var(--text3)", paddingTop:2 }}>+{hiddenCount} more — tap to expand</div>
+                                )}
+                              </div>
+                            );
+                          })()}
                           {isExp && (() => {
                             const todayTaskIds = slot.todayTasks;
                             const hasPicked = Array.isArray(todayTaskIds) && todayTaskIds.length > 0;
@@ -5079,7 +5095,7 @@ export default function App() {
           {tab==="plan"     && <PlanScreen     data={data} setData={setData} onGoToSeason={()=>setTab("season")} lightMode={lightMode} toggleTheme={toggleTheme} />}
           {tab==="season"  && <SeasonScreen   data={data} setData={setData} />}
 
-          {sheet==="shutdown"  && <ShutdownSheet    onClose={closeSheet} onComplete={()=>setData(d=>({...d,shutdownDone:true}))} alreadyDone={data.shutdownDone} data={data} onCategorizeLoose={(taskId, domainId) => setData(d => ({ ...d, looseTasks: (d.looseTasks||[]).map(t => t.id === taskId ? { ...t, domainId } : t) }))} />}
+          {sheet==="shutdown"  && <ShutdownSheet    onClose={closeSheet} onComplete={()=>setData(d=>({...d,shutdownDone:true,shutdownDate:toISODate()}))} alreadyDone={data.shutdownDone} data={data} onCategorizeLoose={(taskId, domainId) => setData(d => ({ ...d, looseTasks: (d.looseTasks||[]).map(t => t.id === taskId ? { ...t, domainId } : t) }))} />}
           {sheet==="addblock"  && <AddBlockSheet    data={data} onClose={closeSheet} onAddRoutine={handleAddRoutine} />}
 
           {sheet==="categorize"&& <CategorizeSheet  data={data} onClose={closeSheet} onCategorize={handleCategorize} onDismiss={handleDismissInbox} onDoToday={handleDoToday} />}
