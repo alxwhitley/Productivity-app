@@ -1652,30 +1652,12 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
   const viewBlocks = viewingTomorrow ? blocks.filter(b => b.dayOffset === 1) : todayBlocks;
   const viewRoutines = viewingTomorrow ? getRoutinesForDate(data.routineBlocks || [], tomorrow) : todayRoutines;
 
-  // Build all candidate slots (iterate over whichever is longer: defaults or saved)
-  const slotCount = Math.max(deepDefaults.length, savedDWSlots.length);
-  const allCandidates = [];
-  for (let i = 0; i < slotCount; i++) {
-    const def = deepDefaults[i] || deepDefaults[deepDefaults.length - 1]; // fallback to last default
+  // Always show exactly maxDeepBlocks slots — never filter past or empty cards
+  // Rule of 3: always 3 cards visible regardless of time of day or completion status
+  const todayDWSlots = Array.from({ length: maxDeepBlocks }, (_, i) => {
+    const def = deepDefaults[i] || deepDefaults[deepDefaults.length - 1];
     const saved = savedDWSlots[i] || {};
-    const endMins2 = (saved.startHour ?? def.startHour) * 60 + (saved.startMin ?? def.startMin) + (saved.durationMin ?? def.durationMin);
-    // Skip unfilled past slots on today view
-    if (!viewingTomorrow && endMins2 <= nowMins && !saved.projectId) continue;
-    allCandidates.push({ i, def, saved, isFilled: !!saved.projectId });
-  }
-
-  // Regular blocks (from data.blocks) also count toward the cap — REMOVED, only DW + routine blocks exist now
-  const dwCapRemaining = maxDeepBlocks;
-
-  // Enforce cap: all filled slots count toward the remaining budget, empties fill the remainder
-  const filledCandidates = allCandidates.filter(c => c.isFilled);
-  const emptyCandidates  = allCandidates.filter(c => !c.isFilled);
-  const filledToShow     = filledCandidates.slice(0, dwCapRemaining);
-  const emptyAllowed     = Math.max(0, dwCapRemaining - filledToShow.length);
-  const emptyToShow      = emptyCandidates.slice(0, emptyAllowed);
-  const slotsToShow      = [...filledToShow, ...emptyToShow];
-
-  const todayDWSlots = slotsToShow.map(({ i, def, saved }) => ({
+    return ({
     id: `dw-${viewDateKeyISO}-${i}`,
     slotIndex: i,
     startHour: saved.startHour ?? def.startHour,
@@ -1683,7 +1665,8 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
     durationMin: saved.durationMin ?? def.durationMin,
     projectId:   saved.projectId || null,
     todayTasks:  saved.todayTasks || null,
-  }));
+  });
+  });
 
   const timeline = [
     ...viewRoutines.map(r => ({ type: "routine", id: r.id, mins: r.startHour * 60 + r.startMin, data: r })),
@@ -1819,7 +1802,7 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
               const isPast = !viewingTomorrow && (item.mins + (item.data.durationMin || 60)) <= nowMins;
               const isNow  = !viewingTomorrow && currentItem?.id === item.id;
               const isExp  = expandedId === item.id;
-              const flexVal = isNow ? 2.2 : 1;
+              const flexVal = currentItem ? (isNow ? 2.2 : 0.8) : 1;
 
               // ── ROUTINE CARD ──
               if (item.type === "routine") {
@@ -1927,12 +1910,15 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                     >
                       {!isExp ? (
                         <div style={{ flex:1, display:"flex", alignItems:"center", gap:14, padding:"0 18px" }}>
-                          <div style={{ width:32, height:32, borderRadius:"50%", border:"1.5px dashed rgba(255,255,255,.2)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                          <div style={{ width:34, height:34, borderRadius:10, background:"var(--bg3)", border:"1.5px dashed rgba(255,255,255,.15)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="var(--text3)" strokeWidth="2" strokeLinecap="round"/></svg>
                           </div>
-                          <div>
-                            <div style={{ fontSize:14, fontWeight:600, color:"var(--text3)" }}>Unassigned Block</div>
-                            <div style={{ fontSize:11, color:"var(--text3)", opacity:.7, marginTop:2 }}>{data.todayPrefs?.hideTimes ? "" : `${fmtTime(slot.startHour, slot.startMin)} · `}{slot.durationMin} min · Tap to assign</div>
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ fontSize:10, fontWeight:700, letterSpacing:".08em", textTransform:"uppercase", color:"var(--text3)", marginBottom:3 }}>
+                              {isPast ? "Past" : "Upcoming"} · Deep Work
+                            </div>
+                            <div style={{ fontSize:15, fontWeight:700, color:"var(--text3)" }}>Empty Slot</div>
+                            <div style={{ fontSize:11, color:"var(--text3)", opacity:.6, marginTop:2 }}>{data.todayPrefs?.hideTimes ? "" : `${fmtTime(slot.startHour, slot.startMin)} · `}{slot.durationMin} min · Tap to assign</div>
                           </div>
                         </div>
                       ) : (
@@ -2001,7 +1987,7 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
 
                 return (
                   <div key={slot.id} data-blockid={slot.id}
-                    style={{ flex:flexVal, minHeight:0, borderRadius:18, background:cardBg, border:cardBorder, boxShadow:cardShadow, overflow:"hidden", display:"flex", flexDirection:"column", opacity: isPast && !isCompleted ? 0.45 : 1, transition:"flex .35s cubic-bezier(.4,0,.2,1), opacity .2s", "--domain-color": domainColor || "transparent", position:"relative" }}
+                    style={{ flex:flexVal, minHeight:0, borderRadius:18, background:cardBg, border:cardBorder, boxShadow:cardShadow, overflow:"hidden", display:"flex", flexDirection:"column", opacity: isPast && !isCompleted ? 0.55 : 1, transition:"flex .35s cubic-bezier(.4,0,.2,1), opacity .2s", "--domain-color": domainColor || "transparent", position:"relative" }}
                     onClick={() => !isExp && setExpandedId(slot.id)}
                   >
                     {/* Colour stripe */}
@@ -2009,6 +1995,13 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
 
                     {/* Collapsed header — visible always, bigger when now */}
                     <div style={{ padding: isExp ? "14px 16px 10px 20px" : "0 16px 0 20px", flex: isExp ? "none" : 1, display:"flex", alignItems:"center", gap:12, minHeight:0 }}>
+                      {/* Mode icon */}
+                      <div style={{ width:34, height:34, borderRadius:10, background: domainColor ? `${domainColor}18` : "var(--bg3)", border: `1px solid ${domainColor ? domainColor+"35" : "var(--border)"}`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, opacity: isCompleted ? 0.5 : 1 }}>
+                        {isSessionMode
+                          ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M20 12a8 8 0 1 1-2-5.3" stroke={domainColor||"var(--text2)"} strokeWidth="2.2" strokeLinecap="round"/><path d="M20 7v5h-5" stroke={domainColor||"var(--text2)"} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                          : <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke={domainColor||"var(--text2)"} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" stroke={domainColor||"var(--text2)"} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        }
+                      </div>
                       <div style={{ flex:1, minWidth:0 }}>
                         {/* Eyebrow */}
                         <div style={{ fontSize:10, fontWeight:700, letterSpacing:".08em", textTransform:"uppercase", color: isNow ? (domainColor||"var(--accent)") : "var(--text3)", marginBottom: isNow || isExp ? 4 : 2, opacity: isCompleted ? 0.5 : 1 }}>
