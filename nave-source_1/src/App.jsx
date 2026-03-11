@@ -1821,12 +1821,12 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                   }));
                 };
                 return (
-                  <div key={rb.id} style={{ flex:flexVal, minHeight:0, borderRadius:18, background:"var(--bg2)", border: isNow ? "1.5px solid rgba(75,170,187,.5)" : allDone ? "1px solid rgba(69,193,122,.25)" : "1px solid var(--border)", overflow:"hidden", display:"flex", flexDirection:"column", opacity: isPast && !allDone ? 0.45 : 1, transition:"flex .35s cubic-bezier(.4,0,.2,1), opacity .2s", cursor:"pointer" }}
+                  <div key={rb.id} style={{ flex: isExp ? 3 : 0.85, minHeight:0, borderRadius:18, background: isExp ? "var(--bg2)" : "var(--bg2)", border: isExp ? "1.5px solid rgba(75,170,187,.5)" : isNow ? "1.5px solid rgba(75,170,187,.3)" : allDone ? "1px solid rgba(69,193,122,.2)" : "1px solid var(--border)", boxShadow: isExp ? "0 0 24px rgba(75,170,187,.15)" : "none", overflow:"hidden", display:"flex", flexDirection:"column", opacity: isPast && !allDone && !isExp ? 0.45 : 1, transition:"flex .35s cubic-bezier(.4,0,.2,1), opacity .2s, border-color .2s, box-shadow .2s", cursor:"pointer" }}
                     onClick={() => setExpandedId(isExp ? null : rb.id)}
                   >
                     {/* Collapsed header */}
-                    <div style={{ padding: isExp ? "14px 16px 10px" : "0 16px", flex: isExp ? "none" : 1, display:"flex", alignItems:"center", gap:12, minHeight:0 }}>
-                      <div style={{ width:10, height:10, borderRadius:"50%", background:"var(--teal)", flexShrink:0, opacity: allDone ? 0.4 : 1 }} />
+                    <div style={{ padding: isExp ? "14px 16px 10px" : "14px 16px 12px", flex: isExp ? "none" : 1, display:"flex", alignItems:"flex-start", gap:12, minHeight:0 }}>
+                      <div style={{ width:10, height:10, borderRadius:"50%", background:"var(--teal)", flexShrink:0, opacity: allDone ? 0.4 : 1, marginTop:3 }} />
                       <div style={{ flex:1, minWidth:0 }}>
                         <div style={{ fontSize: isNow ? 17 : 14, fontWeight:700, color: allDone ? "var(--text3)" : "var(--text)", letterSpacing:"-.01em", lineHeight:1.2 }}>{rb.title}</div>
                         {!isExp && <div style={{ fontSize:11, color:"var(--text3)", marginTop:2 }}>{data.todayPrefs?.hideTimes ? "" : `${fmtTime(rb.startHour, rb.startMin)} · `}{rb.durationMin} min · {doneCt}/{rb.tasks.length} done</div>}
@@ -1905,21 +1905,12 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                   });
 
                   return (
-                    <div key={slot.id} data-blockid={slot.id} style={{ flex:flexVal, minHeight:0, borderRadius:18, background:"var(--bg2)", border:"1.5px dashed rgba(255,255,255,.15)", overflow:"hidden", display:"flex", flexDirection:"column", opacity: isPast ? 0.4 : 1, transition:"flex .35s cubic-bezier(.4,0,.2,1)", cursor:"pointer" }}
+                    <div key={slot.id} data-blockid={slot.id} style={{ flex: isExp ? 3 : 0.6, minHeight:0, borderRadius:18, background: isExp ? "var(--bg2)" : "var(--bg2)", border: isExp ? "1.5px solid rgba(255,255,255,.18)" : "1.5px dashed rgba(255,255,255,.1)", overflow:"hidden", display:"flex", flexDirection:"column", opacity: isPast && !isExp ? 0.35 : 1, transition:"flex .35s cubic-bezier(.4,0,.2,1), border-color .2s, opacity .2s", cursor:"pointer" }}
                       onClick={() => setExpandedId(isExp ? null : slot.id)}
                     >
                       {!isExp ? (
-                        <div style={{ flex:1, display:"flex", alignItems:"center", gap:14, padding:"0 18px" }}>
-                          <div style={{ width:34, height:34, borderRadius:10, background:"var(--bg3)", border:"1.5px dashed rgba(255,255,255,.15)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="var(--text3)" strokeWidth="2" strokeLinecap="round"/></svg>
-                          </div>
-                          <div style={{ flex:1, minWidth:0 }}>
-                            <div style={{ fontSize:10, fontWeight:700, letterSpacing:".08em", textTransform:"uppercase", color:"var(--text3)", marginBottom:3 }}>
-                              {isPast ? "Past" : "Upcoming"} · Deep Work
-                            </div>
-                            <div style={{ fontSize:15, fontWeight:700, color:"var(--text3)" }}>Empty Slot</div>
-                            <div style={{ fontSize:11, color:"var(--text3)", opacity:.6, marginTop:2 }}>{data.todayPrefs?.hideTimes ? "" : `${fmtTime(slot.startHour, slot.startMin)} · `}{slot.durationMin} min · Tap to assign</div>
-                          </div>
+                        <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                          <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="rgba(255,255,255,.2)" strokeWidth="2" strokeLinecap="round"/></svg>
                         </div>
                       ) : (
                         <div style={{ flex:1, overflowY:"auto", padding:"14px 16px" }} onClick={e => e.stopPropagation()}>
@@ -1985,18 +1976,21 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                 // ── ASSIGNED CARD ──
                 const incompleteTasks = (proj?.tasks||[]).filter(t=>!t.done);
 
+                const expandedBg = domainColor ? `color-mix(in srgb, ${domainColor} 8%, var(--bg2))` : "var(--bg2)";
+                const expandedBorder = isCompleted ? "1px solid rgba(69,193,122,.4)" : domainColor ? `2px solid ${domainColor}` : "1.5px solid rgba(255,255,255,.25)";
+                const expandedShadow = domainColor ? `0 0 40px ${domainColor}30, 0 0 0 1px ${domainColor}20` : "0 0 20px rgba(255,255,255,.06)";
                 return (
                   <div key={slot.id} data-blockid={slot.id}
-                    style={{ flex:flexVal, minHeight:0, borderRadius:18, background:cardBg, border:cardBorder, boxShadow:cardShadow, overflow:"hidden", display:"flex", flexDirection:"column", opacity: isPast && !isCompleted ? 0.55 : 1, transition:"flex .35s cubic-bezier(.4,0,.2,1), opacity .2s", "--domain-color": domainColor || "transparent", position:"relative" }}
-                    onClick={() => !isExp && setExpandedId(slot.id)}
+                    style={{ flex: isExp ? 3 : (currentItem && !isExp ? 0.8 : 1), minHeight:0, borderRadius:18, background: isExp ? expandedBg : cardBg, border: isExp ? expandedBorder : cardBorder, boxShadow: isExp ? expandedShadow : cardShadow, overflow:"hidden", display:"flex", flexDirection:"column", opacity: isPast && !isCompleted && !isExp ? 0.55 : 1, transition:"flex .35s cubic-bezier(.4,0,.2,1), opacity .2s, border-color .2s, background .2s, box-shadow .2s", "--domain-color": domainColor || "transparent", position:"relative" }}
+                    onClick={() => setExpandedId(isExp ? null : slot.id)}
                   >
                     {/* Colour stripe */}
                     {domainColor && <div style={{ position:"absolute", left:0, top:0, bottom:0, width:3, background: domainColor, borderRadius:"18px 0 0 18px" }} />}
 
                     {/* Collapsed header — visible always, bigger when now */}
-                    <div style={{ padding: isExp ? "14px 16px 10px 20px" : "0 16px 0 20px", flex: isExp ? "none" : 1, display:"flex", alignItems:"center", gap:12, minHeight:0 }}>
+                    <div style={{ padding: isExp ? "14px 16px 10px 20px" : "14px 16px 12px 20px", flex: isExp ? "none" : 1, display:"flex", alignItems:"flex-start", gap:12, minHeight:0 }}>
                       {/* Mode icon */}
-                      <div style={{ width:34, height:34, borderRadius:10, background: domainColor ? `${domainColor}18` : "var(--bg3)", border: `1px solid ${domainColor ? domainColor+"35" : "var(--border)"}`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, opacity: isCompleted ? 0.5 : 1 }}>
+                      <div style={{ width:34, height:34, borderRadius:10, background: isExp ? (domainColor ? `${domainColor}25` : "var(--bg3)") : (domainColor ? `${domainColor}18` : "var(--bg3)"), border: isExp ? `1.5px solid ${domainColor ? domainColor+"60" : "var(--border)"}` : `1px solid ${domainColor ? domainColor+"35" : "var(--border)"}`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, opacity: isCompleted ? 0.5 : 1, transition:"background .2s, border-color .2s", flexShrink:0 }}>
                         {isSessionMode
                           ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M20 12a8 8 0 1 1-2-5.3" stroke={domainColor||"var(--text2)"} strokeWidth="2.2" strokeLinecap="round"/><path d="M20 7v5h-5" stroke={domainColor||"var(--text2)"} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                           : <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke={domainColor||"var(--text2)"} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" stroke={domainColor||"var(--text2)"} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
