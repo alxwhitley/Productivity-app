@@ -1928,7 +1928,7 @@ function TodayScreen({ data, setData, openShutdown, focusMode: focusModeprop, se
                               <div style={{ display:"flex", alignItems:"center", gap:5, marginBottom:3 }}>
                               <div style={{ width:16, height:16, borderRadius:"50%", background:`${domainColor || "var(--accent)"}22`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
                                 {isSessionMode
-                                  ? <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke={domainColor || "var(--accent)"} strokeWidth="2"/><path d="M12 8v4l2.5 2.5" stroke={domainColor || "var(--accent)"} strokeWidth="2" strokeLinecap="round"/><path d="M16.5 7.5A6 6 0 1 1 9 7" stroke={domainColor || "var(--accent)"} strokeWidth="2" strokeLinecap="round"/><path d="M9 4v3h3" stroke={domainColor || "var(--accent)"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                  ? <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M20 12a8 8 0 1 1-2-5.3" stroke={domainColor || "var(--accent)"} strokeWidth="2.2" strokeLinecap="round"/><path d="M20 7v5h-5" stroke={domainColor || "var(--accent)"} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                                   : <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke={domainColor || "var(--accent)"} strokeWidth="2"/><path d="M9 12l2 2 4-4" stroke={domainColor || "var(--accent)"} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                                 }
                               </div>
@@ -2000,6 +2000,10 @@ function TodayScreen({ data, setData, openShutdown, focusMode: focusModeprop, se
                                       value={slot.sessionNote || ""}
                                       onChange={e => saveDWSessionNote(slot.slotIndex, e.target.value)}
                                       onClick={e => e.stopPropagation()}
+                                      onFocus={e => e.stopPropagation()}
+                                      onMouseDown={e => e.stopPropagation()}
+                                      onTouchStart={e => e.stopPropagation()}
+                                      onKeyDown={e => e.stopPropagation()}
                                     />
                                     {projSessions.length > 0 && (
                                       <div style={{ fontSize:11, color:"var(--text3)", marginTop:4 }}>{projSessions.length} session{projSessions.length !== 1 ? "s" : ""} logged on this project</div>
@@ -2243,16 +2247,24 @@ function TodayScreen({ data, setData, openShutdown, focusMode: focusModeprop, se
                                 <div style={{ width:10, height:10, borderRadius:"50%", background: data.domains?.find(d => d.id === pickerProj.domainId)?.color || "var(--text3)", flexShrink:0 }} />
                                 <div style={{ fontSize:14, fontWeight:600, color:"var(--text)" }}>{pickerProj.name}</div>
                               </div>
-                              <div className="dw-time-row">
-                                <select className="dw-time-sel" value={`${pickerTime.startHour}:${pickerTime.startMin}`}
-                                  onChange={e => { const [h,m] = e.target.value.split(":").map(Number); setDwPickerTime(s => ({ ...s, [slot.id]: { ...s[slot.id], startHour:h, startMin:m } })); }}>
-                                  {timeOptions.map(({h,m}) => <option key={`${h}:${m}`} value={`${h}:${m}`}>{fmt(h,m)}</option>)}
-                                </select>
-                                <select className="dw-time-sel" value={pickerTime.durationMin}
-                                  onChange={e => setDwPickerTime(s => ({ ...s, [slot.id]: { ...s[slot.id], durationMin: Number(e.target.value) } }))}>
-                                  {[30,45,60,90,120].map(d => <option key={d} value={d}>{d} min</option>)}
-                                </select>
-                              </div>
+                              {data.todayPrefs?.hideTimes ? (
+                                <div onClick={() => setData(d => ({ ...d, todayPrefs: { ...(d.todayPrefs||{}), hideTimes: false } }))}
+                                  style={{ display:"flex", alignItems:"center", gap:8, padding:"10px 12px", borderRadius:10, background:"var(--bg3)", border:"1.5px dashed var(--border)", cursor:"pointer", marginBottom:10, opacity:0.6 }}>
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round"/><line x1="1" y1="1" x2="23" y2="23" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round"/></svg>
+                                  <span style={{ fontSize:13, color:"var(--text2)" }}>Times hidden — tap to enable</span>
+                                </div>
+                              ) : (
+                                <div className="dw-time-row">
+                                  <select className="dw-time-sel" value={`${pickerTime.startHour}:${pickerTime.startMin}`}
+                                    onChange={e => { const [h,m] = e.target.value.split(":").map(Number); setDwPickerTime(s => ({ ...s, [slot.id]: { ...s[slot.id], startHour:h, startMin:m } })); }}>
+                                    {timeOptions.map(({h,m}) => <option key={`${h}:${m}`} value={`${h}:${m}`}>{fmt(h,m)}</option>)}
+                                  </select>
+                                  <select className="dw-time-sel" value={pickerTime.durationMin}
+                                    onChange={e => setDwPickerTime(s => ({ ...s, [slot.id]: { ...s[slot.id], durationMin: Number(e.target.value) } }))}>
+                                    {[30,45,60,90,120].map(d => <option key={d} value={d}>{d} min</option>)}
+                                  </select>
+                                </div>
+                              )}
                               <button className="dw-confirm-btn"
                                 onClick={() => {
                                   saveDWSlot(slot.id, slot.slotIndex, pickerProj.id, pickerTime.startHour, pickerTime.startMin, pickerTime.durationMin, null);
@@ -2904,7 +2916,7 @@ function ProjectCard({ proj, domain, isExp, newTaskText,
           <div style={{ width: 80, background: "var(--blue)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, cursor: "pointer" }} onClick={e => { e.stopPropagation(); onModeToggle(); setSwipeX(0); }}>
             {isSessionMode
               ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#fff" strokeWidth="1.8"/><path d="M9 12l2 2 4-4" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              : <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#fff" strokeWidth="1.8"/><path d="M12 8v4l2.5 2.5" stroke="#fff" strokeWidth="2" strokeLinecap="round"/><path d="M16.5 7.5A6 6 0 1 1 9 7" stroke="#fff" strokeWidth="1.8" strokeLinecap="round"/><path d="M9 4v3h3" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              : <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M20 12a8 8 0 1 1-2-5.3" stroke="#fff" strokeWidth="2" strokeLinecap="round"/><path d="M20 7v5h-5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
             }
             <span style={{ color: "#fff", fontSize: 11, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase" }}>{isSessionMode ? "Tasks" : "Session"}</span>
           </div>
@@ -2925,7 +2937,7 @@ function ProjectCard({ proj, domain, isExp, newTaskText,
             {/* Mode icon replaces stripe */}
             <div style={{ width:32, height:32, borderRadius:"50%", background: `${domain?.color || "var(--text3)"}18`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, opacity: proj.status === "active" ? 1 : 0.4 }}>
               {isSessionMode
-                ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke={domain?.color || "var(--text3)"} strokeWidth="1.8"/><path d="M12 8v4l2.5 2.5" stroke={domain?.color || "var(--text3)"} strokeWidth="1.8" strokeLinecap="round"/><path d="M16.5 7.5A6 6 0 1 1 9 7" stroke={domain?.color || "var(--text3)"} strokeWidth="1.8" strokeLinecap="round"/><path d="M9 4v3h3" stroke={domain?.color || "var(--text3)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M20 12a8 8 0 1 1-2-5.3" stroke={domain?.color || "var(--text3)"} strokeWidth="2" strokeLinecap="round"/><path d="M20 7v5h-5" stroke={domain?.color || "var(--text3)"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                 : <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke={domain?.color || "var(--text3)"} strokeWidth="1.8"/><path d="M9 12l2 2 4-4" stroke={domain?.color || "var(--text3)"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
               }
             </div>
@@ -3297,7 +3309,7 @@ function ProjectsScreen({ data, setData, openCategorize }) {
               >
                 <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
                   <div style={{ width:24, height:24, borderRadius:"50%", background:`${domain?.color || "var(--accent)"}18`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke={domain?.color || "var(--accent)"} strokeWidth="2"/><path d="M12 8v4l2.5 2.5" stroke={domain?.color || "var(--accent)"} strokeWidth="1.8" strokeLinecap="round"/><path d="M16.5 7.5A6 6 0 1 1 9 7" stroke={domain?.color || "var(--accent)"} strokeWidth="1.8" strokeLinecap="round"/><path d="M9 4v3h3" stroke={domain?.color || "var(--accent)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M20 12a8 8 0 1 1-2-5.3" stroke={domain?.color || "var(--accent)"} strokeWidth="2.2" strokeLinecap="round"/><path d="M20 7v5h-5" stroke={domain?.color || "var(--accent)"} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                   </div>
                   <span style={{ fontSize:13, fontWeight:700, color:"var(--text)" }}>Sessions</span>
                 </div>
@@ -3773,24 +3785,32 @@ function PlanScreen({ data, setData, onGoToSeason, lightMode, toggleTheme }) {
                           return (
                           <div className="dw-confirm-wrap">
                             <div style={{ fontSize:13, fontWeight:600, color:"var(--text)", marginBottom:10 }}>{pickerProj2.name}</div>
-                            <div className="dw-time-row">
-                              <div style={{ flex:1 }}>
-                                <div className="dw-picker-sect" style={{ padding:"0 0 4px" }}>Start time</div>
-                                <select className="dw-time-sel"
-                                  value={`${pickerTime2.startHour}:${pickerTime2.startMin}`}
-                                  onChange={e => { const [h,m] = e.target.value.split(":").map(Number); setWkDwPickerTime(st => ({ ...st, [pickerKey]: { ...st[pickerKey], startHour:h, startMin:m } })); }}>
-                                  {timeOptions2.map(({h,m}) => <option key={`${h}${m}`} value={`${h}:${m}`}>{fmt2(h,m)}</option>)}
-                                </select>
+                            {data.todayPrefs?.hideTimes ? (
+                              <div onClick={() => setData(d => ({ ...d, todayPrefs: { ...(d.todayPrefs||{}), hideTimes: false } }))}
+                                style={{ display:"flex", alignItems:"center", gap:8, padding:"10px 12px", borderRadius:10, background:"var(--bg3)", border:"1.5px dashed var(--border)", cursor:"pointer", marginBottom:10, opacity:0.6 }}>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round"/><line x1="1" y1="1" x2="23" y2="23" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round"/></svg>
+                                <span style={{ fontSize:13, color:"var(--text2)" }}>Times hidden — tap to enable</span>
                               </div>
-                              <div style={{ flex:1 }}>
-                                <div className="dw-picker-sect" style={{ padding:"0 0 4px" }}>Duration</div>
-                                <select className="dw-time-sel"
-                                  value={pickerTime2.durationMin}
-                                  onChange={e => setWkDwPickerTime(st => ({ ...st, [pickerKey]: { ...st[pickerKey], durationMin: Number(e.target.value) } }))}>
-                                  {[30,45,60,75,90,105,120].map(d => <option key={d} value={d}>{d} min</option>)}
-                                </select>
+                            ) : (
+                              <div className="dw-time-row">
+                                <div style={{ flex:1 }}>
+                                  <div className="dw-picker-sect" style={{ padding:"0 0 4px" }}>Start time</div>
+                                  <select className="dw-time-sel"
+                                    value={`${pickerTime2.startHour}:${pickerTime2.startMin}`}
+                                    onChange={e => { const [h,m] = e.target.value.split(":").map(Number); setWkDwPickerTime(st => ({ ...st, [pickerKey]: { ...st[pickerKey], startHour:h, startMin:m } })); }}>
+                                    {timeOptions2.map(({h,m}) => <option key={`${h}${m}`} value={`${h}:${m}`}>{fmt2(h,m)}</option>)}
+                                  </select>
+                                </div>
+                                <div style={{ flex:1 }}>
+                                  <div className="dw-picker-sect" style={{ padding:"0 0 4px" }}>Duration</div>
+                                  <select className="dw-time-sel"
+                                    value={pickerTime2.durationMin}
+                                    onChange={e => setWkDwPickerTime(st => ({ ...st, [pickerKey]: { ...st[pickerKey], durationMin: Number(e.target.value) } }))}>
+                                    {[30,45,60,75,90,105,120].map(d => <option key={d} value={d}>{d} min</option>)}
+                                  </select>
+                                </div>
                               </div>
-                            </div>
+                            )}
                             {projTasks.length > 0 && (
                               <div style={{ marginBottom:10 }}>
                                 <div className="dw-picker-sect" style={{ padding:"0 0 6px" }}>Focus tasks <span style={{ color:"var(--text3)", fontWeight:400, textTransform:"none", letterSpacing:0 }}>(optional)</span></div>
