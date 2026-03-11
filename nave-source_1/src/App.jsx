@@ -146,6 +146,7 @@ const FIELD_DEFAULTS = {
   deepWorkTargets: { dailyHours: 4, weeklyHours: 20 }, // user-configurable
   deepWorkSlots: {}, // { [dateStr]: [{ projectId, startHour, startMin, durationMin, todayTasks }] }
   todayLoosePicks: {}, // { [dateStr]: [looseTaskId, ...] } — tasks picked for today's loose block
+  onboardingDone: false,
 };
 
 // ── Migrations — run in order when schema version is behind ─────────────────
@@ -385,7 +386,7 @@ const css = `
   .dw-empty-label{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:rgba(255,255,255,.25);margin-bottom:1px;}
   .dw-empty-sub{font-size:12px;color:rgba(255,255,255,.18);}
   .dw-empty-dur{font-size:11px;color:rgba(255,255,255,.18);margin-left:auto;flex-shrink:0;}
-  .dw-picker-wrap{background:var(--bg3);border:1.5px dashed rgba(255,255,255,.14);border-top:none;border-radius:0 0 14px 14px;overflow:visible;}
+  .dw-picker-wrap{background:var(--bg3);border:1.5px dashed rgba(255,255,255,.14);border-top:none;border-radius:0 0 14px 14px;overflow:hidden;}
   .dw-picker-sect{padding:10px 10px 6px;font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text3);}
   .dw-proj-row{display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;border-radius:8px;margin:0 4px;}
   .dw-proj-row:active{background:var(--bg4);}
@@ -798,8 +799,8 @@ const css = `
   /* ── NAV ── */
   .nav{flex-shrink:0;height:78px;background:var(--bg);border-top:1px solid var(--border2);display:flex;align-items:flex-end;padding-bottom:10px;position:relative;z-index:25;overflow:visible;}
   .nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;padding-top:10px;}
-  .nav-ico{width:22px;height:22px;display:flex;align-items:center;justify-content:center;color:var(--text3);transition:color .15s;}
-  .nav-ico svg{width:22px;height:22px;display:block;color:inherit;}
+  .nav-ico{width:24px;height:24px;display:flex;align-items:center;justify-content:center;color:var(--text3);transition:color .15s;}
+  .nav-ico svg{width:24px;height:24px;display:block;color:inherit;}
   .nav-lbl{font-size:10px;font-weight:500;letter-spacing:.04em;color:var(--text3);text-transform:uppercase;transition:color .15s;}
   .nav-btn.on .nav-ico,.nav-btn.on .nav-lbl{color:var(--accent);}
   .nav-dot{position:absolute;top:8px;right:calc(50% - 14px);width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px rgba(232,160,48,.6);}
@@ -897,48 +898,263 @@ const css = `
 `;
 
 // ─── STATUS BAR (no time) ─────────────────────────────────────────────────────
+// ─── ONBOARDING FLOW ──────────────────────────────────────────────────────────
+const ONBOARDING_CARDS = [
+  {
+    eyebrow: "Welcome to Clearwork",
+    headline: "Built on two\nbig ideas.",
+    body: "Clearwork isn't a to-do app. It's a system built around how your brain actually works — drawing on the research of Cal Newport and Andrew Huberman.",
+    accent: "#E8A030",
+    illustration: "welcome",
+  },
+  {
+    eyebrow: "Cal Newport · Deep Work",
+    headline: "Your best thinking needs\nprotected time.",
+    body: "Shallow tasks — email, admin, quick replies — expand to fill whatever time you give them. Deep Work blocks carve out uninterrupted 60–90 minute windows for the work that actually moves things forward.",
+    accent: "#5B8AF0",
+    illustration: "deepwork",
+  },
+  {
+    eyebrow: "Task Fatigue",
+    headline: "A long list is\ndemotivating by design.",
+    body: "Seeing 40 tasks creates decision paralysis before you've started. Clearwork keeps tasks inside projects, projects inside domains — and Today only shows what's actually scheduled. The rest is out of sight until you need it.",
+    accent: "#45C17A",
+    illustration: "tasks",
+  },
+  {
+    eyebrow: "Cal Newport · Seasons",
+    headline: "Big goals need\na longer horizon.",
+    body: "Weeks are too short for meaningful progress. Clearwork uses a quarterly Season — up to 4 goals that define what this chapter is actually about. Everything else is in service of those.",
+    accent: "#9B72CF",
+    illustration: "season",
+  },
+  {
+    eyebrow: "Newport + Huberman · Shutdown",
+    headline: "Ending work deliberately\nprotects your recovery.",
+    body: "Without a clear stop signal, your brain keeps processing work problems into the evening. The Shutdown Ritual is a deliberate cognitive closure — a signal that the workday is done and recovery can begin.",
+    accent: "#4BAABB",
+    illustration: "shutdown",
+  },
+];
+
+function OnboardingIllustration({ type, accent }) {
+  if (type === "welcome") return (
+    <svg width="120" height="120" viewBox="0 0 120 120" fill="none">
+      <circle cx="60" cy="60" r="48" stroke={accent} strokeWidth="1.5" strokeDasharray="4 4" opacity="0.3"/>
+      <circle cx="60" cy="60" r="32" stroke={accent} strokeWidth="1.5" opacity="0.5"/>
+      <circle cx="60" cy="60" r="14" fill={accent} opacity="0.9"/>
+      <path d="M60 12V24M60 96V108M12 60H24M96 60H108" stroke={accent} strokeWidth="2" strokeLinecap="round" opacity="0.4"/>
+    </svg>
+  );
+  if (type === "deepwork") return (
+    <svg width="120" height="120" viewBox="0 0 120 120" fill="none">
+      {/* Timeline blocks */}
+      <rect x="16" y="30" width="88" height="14" rx="4" fill={accent} opacity="0.15" stroke={accent} strokeWidth="1.5"/>
+      <rect x="16" y="53" width="56" height="28" rx="6" fill={accent} opacity="0.9"/>
+      <rect x="16" y="53" width="4" height="28" rx="2" fill="#fff" opacity="0.5"/>
+      <text x="26" y="63" fill="#000" fontSize="8" fontWeight="700" opacity="0.8">DEEP WORK</text>
+      <text x="26" y="74" fill="#000" fontSize="7" opacity="0.7">90 min · no interruptions</text>
+      <rect x="16" y="90" width="36" height="10" rx="3" fill={accent} opacity="0.2" stroke={accent} strokeWidth="1"/>
+      <rect x="58" y="90" width="46" height="10" rx="3" fill={accent} opacity="0.1" stroke={accent} strokeWidth="1" strokeDasharray="3 2"/>
+    </svg>
+  );
+  if (type === "tasks") return (
+    <svg width="120" height="120" viewBox="0 0 120 120" fill="none">
+      {/* Long overwhelming list (faded) */}
+      {[0,1,2,3,4,5,6].map(i => (
+        <rect key={i} x="16" y={18 + i*10} width={60 - i*4} height="6" rx="3" fill="#666" opacity={0.12 + i*0.02}/>
+      ))}
+      {/* Arrow */}
+      <path d="M88 60L76 54V58H64V62H76V66L88 60Z" fill={accent} opacity="0.7"/>
+      {/* Clean structured view */}
+      <rect x="92" y="30" width="12" height="12" rx="3" fill="#5B8AF0" opacity="0.8"/>
+      <rect x="92" y="47" width="12" height="12" rx="3" fill="#9B72CF" opacity="0.8"/>
+      <rect x="92" y="64" width="12" height="12" rx="3" fill={accent} opacity="0.8"/>
+      <rect x="106" y="33" width="8" height="2.5" rx="1.5" fill="#fff" opacity="0.4"/>
+      <rect x="106" y="37" width="5" height="2" rx="1" fill="#fff" opacity="0.25"/>
+      <rect x="106" y="50" width="8" height="2.5" rx="1.5" fill="#fff" opacity="0.4"/>
+      <rect x="106" y="54" width="6" height="2" rx="1" fill="#fff" opacity="0.25"/>
+      <rect x="106" y="67" width="8" height="2.5" rx="1.5" fill="#fff" opacity="0.4"/>
+    </svg>
+  );
+  if (type === "season") return (
+    <svg width="120" height="120" viewBox="0 0 120 120" fill="none">
+      {/* Quarter arc */}
+      <path d="M60 20 A40 40 0 0 1 100 60" stroke={accent} strokeWidth="3" strokeLinecap="round" opacity="0.3"/>
+      <path d="M60 20 A40 40 0 0 1 100 60" stroke={accent} strokeWidth="3" strokeLinecap="round" strokeDasharray="0 100" opacity="0"/>
+      <circle cx="60" cy="20" r="4" fill={accent} opacity="0.5"/>
+      <circle cx="100" cy="60" r="4" fill={accent} opacity="0.5"/>
+      {/* Goal rows */}
+      {[0,1,2,3].map(i => (
+        <g key={i}>
+          <circle cx="28" cy={52 + i*14} r="4" stroke={accent} strokeWidth="1.5" fill={i < 2 ? accent : "none"} opacity="0.8"/>
+          <rect x="38" y={49 + i*14} width={i===0?52:i===1?40:44} height="6" rx="3" fill={accent} opacity={i < 2 ? 0.4 : 0.15}/>
+        </g>
+      ))}
+    </svg>
+  );
+  if (type === "shutdown") return (
+    <svg width="120" height="120" viewBox="0 0 120 120" fill="none">
+      {/* Power symbol */}
+      <path d="M60 28V52" stroke={accent} strokeWidth="3" strokeLinecap="round"/>
+      <path d="M44 38 A26 26 0 1 0 76 38" stroke={accent} strokeWidth="3" strokeLinecap="round" fill="none"/>
+      {/* Check marks below */}
+      <rect x="24" y="80" width="72" height="22" rx="6" fill={accent} opacity="0.12" stroke={accent} strokeWidth="1" strokeDasharray="3 2"/>
+      <path d="M34 91l5 5 9-9" stroke={accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <rect x="52" y="88" width="36" height="3" rx="1.5" fill={accent} opacity="0.35"/>
+      <rect x="52" y="93" width="24" height="3" rx="1.5" fill={accent} opacity="0.2"/>
+    </svg>
+  );
+  return null;
+}
+
+function OnboardingFlow({ onDone }) {
+  const [card, setCard] = useState(0);
+  const [animDir, setAnimDir] = useState(null); // "in" | null
+  const touchStartX = useRef(null);
+  const total = ONBOARDING_CARDS.length;
+  const current = ONBOARDING_CARDS[card];
+
+  const advance = (dir = 1) => {
+    const next = card + dir;
+    if (next < 0) return;
+    if (next >= total) { onDone(); return; }
+    setAnimDir("out");
+    setTimeout(() => {
+      setCard(next);
+      setAnimDir("in");
+      setTimeout(() => setAnimDir(null), 280);
+    }, 180);
+  };
+
+  const onTouchStart = e => { touchStartX.current = e.touches[0].clientX; };
+  const onTouchEnd = e => {
+    if (touchStartX.current === null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    touchStartX.current = null;
+    if (dx < -44) advance(1);
+    else if (dx > 44) advance(-1);
+  };
+
+  const slideStyle = {
+    transform: animDir === "out" ? "translateX(-32px)" : animDir === "in" ? "translateX(16px)" : "translateX(0)",
+    opacity: animDir === "out" ? 0 : animDir === "in" ? 0 : 1,
+    transition: animDir === "out" ? "transform .18s ease-in, opacity .18s ease-in" : animDir === "in" ? "none" : "transform .28s cubic-bezier(.2,.8,.4,1), opacity .28s ease-out",
+  };
+
+  return (
+    <div
+      style={{ position:"absolute", inset:0, zIndex:200, background:"var(--bg)", display:"flex", flexDirection:"column", borderRadius:"inherit", overflow:"hidden" }}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+    >
+      <StatusBar />
+
+      {/* Skip */}
+      <div style={{ display:"flex", justifyContent:"flex-end", padding:"8px 20px 0" }}>
+        <button onClick={onDone} style={{ background:"none", border:"none", color:"var(--text3)", fontSize:13, fontWeight:500, cursor:"pointer", fontFamily:"'DM Sans',sans-serif", padding:"4px 0" }}>
+          Skip
+        </button>
+      </div>
+
+      {/* Card content */}
+      <div style={{ flex:1, display:"flex", flexDirection:"column", justifyContent:"center", padding:"0 32px 16px", ...slideStyle }}>
+
+        {/* Illustration */}
+        <div style={{ display:"flex", justifyContent:"center", marginBottom:32 }}>
+          <OnboardingIllustration type={current.illustration} accent={current.accent} />
+        </div>
+
+        {/* Eyebrow */}
+        <div style={{ fontSize:11, fontWeight:700, letterSpacing:".1em", textTransform:"uppercase", color:current.accent, marginBottom:10 }}>
+          {current.eyebrow}
+        </div>
+
+        {/* Headline */}
+        <div style={{ fontSize:28, fontWeight:800, color:"var(--text)", lineHeight:1.15, letterSpacing:"-.02em", marginBottom:16, whiteSpace:"pre-line" }}>
+          {current.headline}
+        </div>
+
+        {/* Body */}
+        <div style={{ fontSize:15, color:"var(--text2)", lineHeight:1.6, fontWeight:400 }}>
+          {current.body}
+        </div>
+      </div>
+
+      {/* Bottom controls */}
+      <div style={{ padding:"0 28px 36px", display:"flex", flexDirection:"column", gap:20 }}>
+
+        {/* Progress dots */}
+        <div style={{ display:"flex", justifyContent:"center", gap:6 }}>
+          {ONBOARDING_CARDS.map((_, i) => (
+            <div key={i} style={{
+              width: i === card ? 20 : 6,
+              height: 6,
+              borderRadius: 3,
+              background: i === card ? current.accent : "var(--border)",
+              transition: "width .25s cubic-bezier(.4,0,.2,1), background .25s",
+            }} />
+          ))}
+        </div>
+
+        {/* Next / Let's go button */}
+        <button
+          onClick={() => advance(1)}
+          style={{
+            width:"100%",
+            padding:"15px",
+            background: current.accent,
+            color: "#000",
+            border:"none",
+            borderRadius:14,
+            fontSize:16,
+            fontWeight:800,
+            cursor:"pointer",
+            fontFamily:"'DM Sans',sans-serif",
+            letterSpacing:"-.01em",
+          }}
+        >
+          {card === total - 1 ? "Let's go →" : "Next →"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── SHARED ICONS ─────────────────────────────────────────────────────────────
 
 function NavIcon({ id, active }) {
-  // Use currentColor so CSS on .nav-ico and .nav-btn.on controls the color
+  // Bold, simple shapes — readable at 22px. All use currentColor.
   if (id === "today") return (
     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.75"/>
-      <path d="M12 7.5V12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-      <path d="M12 12L15.5 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-      <circle cx="12" cy="12" r="1.25" fill="currentColor"/>
+      {/* Clock — thick stroke, large hands */}
+      <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="2"/>
+      <path d="M12 8v4.5l3 1.8" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   );
   if (id === "projects") return (
     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="3.5" y="3.5" width="7" height="7" rx="2" stroke="currentColor" strokeWidth="1.75" fill={active ? "currentColor" : "none"} fillOpacity="0.15"/>
-      <rect x="13.5" y="3.5" width="7" height="7" rx="2" stroke="currentColor" strokeWidth="1.75"/>
-      <rect x="3.5" y="13.5" width="7" height="7" rx="2" stroke="currentColor" strokeWidth="1.75"/>
-      <rect x="13.5" y="13.5" width="7" height="7" rx="2" stroke="currentColor" strokeWidth="1.75" fill={active ? "currentColor" : "none"} fillOpacity="0.15"/>
+      {/* 2×2 grid — large rounded squares with clear gaps */}
+      <rect x="3" y="3" width="8" height="8" rx="2.5" stroke="currentColor" strokeWidth="2"/>
+      <rect x="13" y="3" width="8" height="8" rx="2.5" stroke="currentColor" strokeWidth="2"/>
+      <rect x="3" y="13" width="8" height="8" rx="2.5" stroke="currentColor" strokeWidth="2"/>
+      <rect x="13" y="13" width="8" height="8" rx="2.5" stroke="currentColor" strokeWidth="2"/>
     </svg>
   );
   if (id === "plan") return (
     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="3" y="5" width="18" height="16" rx="3" stroke="currentColor" strokeWidth="1.75"/>
-      {active && <rect x="3" y="5" width="18" height="5.5" rx="3" fill="currentColor" fillOpacity="0.2"/>}
-      <path d="M3 10h18" stroke="currentColor" strokeWidth="1.5"/>
-      <path d="M8 3v4M16 3v4" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"/>
-      <circle cx="8" cy="15" r="1.1" fill="currentColor"/>
-      <circle cx="12" cy="15" r="1.1" fill="currentColor"/>
-      <circle cx="16" cy="15" r="1.1" fill="currentColor" fillOpacity="0.4"/>
+      {/* Calendar — clean, no internal dots (too small to read) */}
+      <rect x="3" y="6" width="18" height="15" rx="3" stroke="currentColor" strokeWidth="2"/>
+      <path d="M3 11h18" stroke="currentColor" strokeWidth="2"/>
+      <path d="M8 3v5M16 3v5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/>
     </svg>
   );
   if (id === "season") return (
     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="12" cy="12" r="3.5" stroke="currentColor" strokeWidth="1.75" fill={active ? "currentColor" : "none"} fillOpacity="0.2"/>
-      <path d="M12 3.5V5.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"/>
-      <path d="M12 18.5V20.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"/>
-      <path d="M3.5 12H5.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"/>
-      <path d="M18.5 12H20.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"/>
-      <path d="M6.22 6.22L7.64 7.64" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"/>
-      <path d="M16.36 16.36L17.78 17.78" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"/>
-      <path d="M17.78 6.22L16.36 7.64" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"/>
-      <path d="M7.64 16.36L6.22 17.78" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"/>
+      {/* Sun — larger core, only 4 rays (diagonal look cleaner at small size) */}
+      <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="2"/>
+      <path d="M12 2.5V5M12 19v2.5M2.5 12H5M19 12h2.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/>
+      <path d="M5.6 5.6L7.4 7.4M16.6 16.6L18.4 18.4M18.4 5.6L16.6 7.4M7.4 16.6L5.6 18.4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
     </svg>
   );
   return null;
@@ -3194,6 +3410,23 @@ function PlanScreen({ data, setData, openAddBlock, onGoToSeason, lightMode, togg
   const [wkDwPickerProj, setWkDwPickerProj] = useState({}); // { [key]: projectId }
   const [wkDwPickerTime, setWkDwPickerTime] = useState({}); // { [key]: { startHour, startMin, durationMin } }
   const [wkDwPickerTasks, setWkDwPickerTasks] = useState({}); // { [key]: [taskId, ...] }
+  const wkScrollRef = useRef(null);
+  const wkPickerRef = useRef(null);
+
+  useEffect(() => {
+    if (wkDwPickerOpen && wkPickerRef.current && wkScrollRef.current) {
+      setTimeout(() => {
+        const pickerEl = wkPickerRef.current;
+        const scrollEl = wkScrollRef.current;
+        if (!pickerEl || !scrollEl) return;
+        const pickerBottom = pickerEl.offsetTop + pickerEl.offsetHeight;
+        const scrollBottom = scrollEl.scrollTop + scrollEl.clientHeight;
+        if (pickerBottom > scrollBottom - 20) {
+          scrollEl.scrollTo({ top: pickerBottom - scrollEl.clientHeight + 40, behavior: "smooth" });
+        }
+      }, 50);
+    }
+  }, [wkDwPickerOpen]);
 
   const saveIntention = () => { setData(d => ({ ...d, weekIntention: intentionDraft })); setEditingIntention(false); };
   const deleteBlock   = id => setData(d => ({ ...d, blocks: d.blocks.filter(b => b.id !== id) }));
@@ -3292,8 +3525,7 @@ function PlanScreen({ data, setData, openAddBlock, onGoToSeason, lightMode, togg
           <button className="plan-gear" onClick={() => setShowWorkWeek(true)}><GearIcon size={20} /></button>
         </div>
       </div>
-      <div className="scroll">
-        <div className="sh" style={{ paddingTop: 8 }}><span className="sh-label">Schedule</span></div>
+      <div className="scroll" ref={wkScrollRef}>
 
         {[0,1,2,3,4,5,6].map(offset => {
           const dayDate = new Date(today); dayDate.setDate(today.getDate() + offset);
@@ -3535,11 +3767,11 @@ function PlanScreen({ data, setData, openAddBlock, onGoToSeason, lightMode, togg
                       <div className="dw-empty-dur">{s.durationMin}m</div>
                     </button>
                     {isPickerOpen2 && (
-                      <div className="dw-picker-wrap">
+                      <div className="dw-picker-wrap" ref={wkPickerRef}>
                         {pickerStep2 === "project" && (
                           <>
                             <div className="dw-picker-sect">Choose a project</div>
-                            <div style={{ maxHeight:220, overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
+                            <div>
                             {data.projects.filter(p => p.status === "active").map(p => {
                               const d2 = data.domains?.find(d => d.id === p.domainId);
                               return (
@@ -5268,6 +5500,9 @@ export default function App() {
       <style>{css}</style>
       <div style={{ height:"100%", display:"flex", alignItems:"center", justifyContent:"center", background: lightMode ? "#E8E4DE" : "#101213" }}>
         <div className={`phone ${lightMode ? "light" : ""}`}>
+          {!data.onboardingDone && (
+            <OnboardingFlow onDone={() => setData(d => ({ ...d, onboardingDone: true }))} />
+          )}
           {tab==="today"    && <TodayScreen    data={data} setData={setData} openShutdown={()=>setSheet("shutdown")} openAddBlock={()=>setSheet("addblock")} focusMode={focusMode} setFocusMode={setFocusMode} onSignOut={() => supabase.auth.signOut()} />}
           {tab==="projects" && <ProjectsScreen data={data} setData={setData} openCategorize={()=>setSheet("categorize")} />}
           {tab==="plan"     && <PlanScreen     data={data} setData={setData} openAddBlock={()=>setSheet("addblock")} onGoToSeason={()=>setTab("season")} lightMode={lightMode} toggleTheme={toggleTheme} />}
