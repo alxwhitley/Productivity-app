@@ -895,6 +895,7 @@ const css = `
   .qr-items{max-height:260px;overflow-y:auto;}
   .qr-item{display:flex;align-items:center;gap:6px;padding:9px 12px 9px 18px;border-bottom:1px solid var(--border2);}
   .qr-item-text{flex:1;font-size:14px;color:var(--text);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .qr-item-input{flex:1;background:transparent;border:none;outline:none;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);min-width:0;padding:0;}
   .qr-pill{flex-shrink:0;padding:4px 9px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.03em;cursor:pointer;border:1.5px solid transparent;transition:all .12s;font-family:'DM Sans',sans-serif;line-height:1.4;}
   .qr-pill-today{border-color:rgba(232,160,48,.3);color:rgba(232,160,48,.45);background:transparent;}
   .qr-pill-today.active{background:var(--accent-s);border-color:var(--accent);color:var(--accent);}
@@ -1510,28 +1511,36 @@ function TodayScreen({ data, setData, openShutdown, openAddBlock, focusMode: foc
   // For tomorrow: show all slots (don't hide past since nowMins doesn't apply)
   const viewBlocks = viewingTomorrow ? blocks.filter(b => b.dayOffset === 1) : todayBlocks;
   const viewRoutines = viewingTomorrow ? getRoutinesForDate(data.routineBlocks || [], tomorrow) : todayRoutines;
-  // Count filled slots first so we can cap empties
-  const filledDWCount = deepDefaults.filter((_, i) => (savedDWSlots[i] || {}).projectId).length;
-  const emptyDWAllowed = Math.max(0, maxDeepBlocks - filledDWCount);
-  let emptyDWShown = 0;
-  const todayDWSlots = deepDefaults.map((def, i) => {
+
+  // Build all candidate slots (iterate over whichever is longer: defaults or saved)
+  const slotCount = Math.max(deepDefaults.length, savedDWSlots.length);
+  const allCandidates = [];
+  for (let i = 0; i < slotCount; i++) {
+    const def = deepDefaults[i] || deepDefaults[deepDefaults.length - 1]; // fallback to last default
     const saved = savedDWSlots[i] || {};
     const endMins2 = (saved.startHour ?? def.startHour) * 60 + (saved.startMin ?? def.startMin) + (saved.durationMin ?? def.durationMin);
-    if (!viewingTomorrow && endMins2 <= nowMins && !saved.projectId) return null; // hide unfilled past slots on today only
-    if (!saved.projectId) {
-      if (emptyDWShown >= emptyDWAllowed) return null; // cap empty slots
-      emptyDWShown++;
-    }
-    return {
-      id: `dw-${viewDateKeyISO}-${i}`,
-      slotIndex: i,
-      startHour: saved.startHour ?? def.startHour,
-      startMin: saved.startMin ?? def.startMin,
-      durationMin: saved.durationMin ?? def.durationMin,
-      projectId: saved.projectId || null,
-      todayTasks: saved.todayTasks || null,
-    };
-  }).filter(Boolean);
+    // Skip unfilled past slots on today view
+    if (!viewingTomorrow && endMins2 <= nowMins && !saved.projectId) continue;
+    allCandidates.push({ i, def, saved, isFilled: !!saved.projectId });
+  }
+
+  // Enforce cap: all filled slots count toward the max, empties fill the remainder
+  const filledCandidates = allCandidates.filter(c => c.isFilled);
+  const emptyCandidates  = allCandidates.filter(c => !c.isFilled);
+  const filledToShow     = filledCandidates.slice(0, maxDeepBlocks);
+  const emptyAllowed     = Math.max(0, maxDeepBlocks - filledToShow.length);
+  const emptyToShow      = emptyCandidates.slice(0, emptyAllowed);
+  const slotsToShow      = [...filledToShow, ...emptyToShow];
+
+  const todayDWSlots = slotsToShow.map(({ i, def, saved }) => ({
+    id: `dw-${viewDateKeyISO}-${i}`,
+    slotIndex: i,
+    startHour: saved.startHour ?? def.startHour,
+    startMin:  saved.startMin  ?? def.startMin,
+    durationMin: saved.durationMin ?? def.durationMin,
+    projectId:   saved.projectId || null,
+    todayTasks:  saved.todayTasks || null,
+  }));
 
   const timeline = [
     ...viewBlocks.map(b => ({ type: "block", id: b.id, mins: b.startHour * 60 + b.startMin, data: b })),
@@ -5010,42 +5019,51 @@ function AddBlockSheet({ data, onClose, onAdd, onAddRoutine }) {
 }
 
 // ─── QUICK CAPTURE ────────────────────────────────────────────────────────────
-function QuickReminders({ onClose, onAddAll }) {
-  // items: [{ id, text, dest: "today"|"later"|null }]
-  const [items, setItems]   = useState([]);
-  const [draft, setDraft]   = useState("");
-  const inputRef            = useRef(null);
-  const itemRefsMap         = useRef({}); // id -> ref for future focus if needed
+function QuickReminders({ onClose, onAddAll, onReadyChange }) {
+  const [items, setItems] = useState([]);
+  const [draft, setDraft] = useState("");
+  const [draftDest, setDraftDest] = useState(null);
+  const inputRef = useRef(null);
 
   useEffect(() => { setTimeout(() => inputRef.current?.focus(), 60); }, []);
+
+  // Tell parent whether all committed items are tagged
+  useEffect(() => {
+    const allTagged = items.length > 0 && items.every(i => i.dest !== null);
+    onReadyChange?.(allTagged);
+  }, [items]);
 
   const commitDraft = () => {
     const t = draft.trim();
     if (!t) return;
-    setItems(prev => [...prev, { id: uid(), text: t, dest: null }]);
+    setItems(prev => [...prev, { id: uid(), text: t, dest: draftDest }]);
     setDraft("");
+    setDraftDest(null);
     setTimeout(() => inputRef.current?.focus(), 10);
   };
 
   const setDest = (id, dest) => {
-    setItems(prev => prev.map(i => {
-      if (i.id !== id) return i;
-      // tapping active pill deselects it
-      return { ...i, dest: i.dest === dest ? null : dest };
-    }));
-    // advance focus to the input for next entry
+    setItems(prev => prev.map(i => i.id !== id ? i : { ...i, dest: i.dest === dest ? null : dest }));
     setTimeout(() => inputRef.current?.focus(), 30);
   };
+
+  const setDraftDestToggle = (dest) => {
+    setDraftDest(prev => prev === dest ? null : dest);
+    setTimeout(() => inputRef.current?.focus(), 30);
+  };
+
+  const updateText = (id, text) => setItems(prev => prev.map(i => i.id === id ? { ...i, text } : i));
 
   const finish = () => {
     const finalItems = [...items];
     const t = draft.trim();
-    if (t) finalItems.push({ id: uid(), text: t, dest: null });
+    if (t) finalItems.push({ id: uid(), text: t, dest: draftDest });
     if (finalItems.length === 0) { onClose(); return; }
-    // items with no dest default to "later"
     onAddAll(finalItems.map(i => ({ ...i, dest: i.dest || "later" })));
     onClose();
   };
+
+  const hasDraftText = draft.trim().length > 0;
 
   return (
     <>
@@ -5057,15 +5075,14 @@ function QuickReminders({ onClose, onAddAll }) {
           <div className="qr-items">
             {items.map(i => (
               <div key={i.id} className="qr-item">
-                <span className="qr-item-text">{i.text}</span>
-                <button
-                  className={`qr-pill qr-pill-today${i.dest === "today" ? " active" : ""}`}
-                  onClick={() => setDest(i.id, "today")}
-                >Today</button>
-                <button
-                  className={`qr-pill qr-pill-later${i.dest === "later" ? " active" : ""}`}
-                  onClick={() => setDest(i.id, "later")}
-                >Later</button>
+                <input
+                  className="qr-item-input"
+                  value={i.text}
+                  onChange={e => updateText(i.id, e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") inputRef.current?.focus(); }}
+                />
+                <button className={`qr-pill qr-pill-today${i.dest === "today" ? " active" : ""}`} onClick={() => setDest(i.id, "today")}>Today</button>
+                <button className={`qr-pill qr-pill-later${i.dest === "later" ? " active" : ""}`} onClick={() => setDest(i.id, "later")}>Later</button>
               </div>
             ))}
           </div>
@@ -5080,13 +5097,18 @@ function QuickReminders({ onClose, onAddAll }) {
             onChange={e => setDraft(e.target.value)}
             onKeyDown={e => { if (e.key === "Enter") commitDraft(); if (e.key === "Escape") finish(); }}
           />
+          {hasDraftText && (
+            <>
+              <button className={`qr-pill qr-pill-today${draftDest === "today" ? " active" : ""}`} onClick={() => setDraftDestToggle("today")}>Today</button>
+              <button className={`qr-pill qr-pill-later${draftDest === "later" ? " active" : ""}`} onClick={() => setDraftDestToggle("later")}>Later</button>
+            </>
+          )}
         </div>
       </div>
     </>
   );
 }
 
-// ─── CATEGORIZE SHEET ─────────────────────────────────────────────────────────
 // ─── TODAY SETTINGS SHEET ────────────────────────────────────────────────────
 function TodaySettingsSheet({ data, setData, onClose }) {
   const swipe = useSwipeDown(onClose);
@@ -5530,6 +5552,7 @@ export default function App() {
   const [sheet, setSheet] = useState(null);
   const [focusMode, setFocusMode] = useState(false);
   const [captureOpen, setCaptureOpen] = useState(false);
+  const [captureReady, setCaptureReady] = useState(false); // true when all QR items are tagged
   const [lightMode, setLightMode] = useState(() => {
     try { return localStorage.getItem(THEME_KEY) === "light"; } catch { return false; }
   });
@@ -5597,8 +5620,9 @@ export default function App() {
 
           {!focusMode && captureOpen && (
             <QuickReminders
-              onClose={() => setCaptureOpen(false)}
+              onClose={() => { setCaptureOpen(false); setCaptureReady(false); }}
               onAddAll={handleQuickAdd}
+              onReadyChange={setCaptureReady}
             />
           )}
 
@@ -5615,10 +5639,18 @@ export default function App() {
             {/* Center FAB */}
             <button
               className={`fab${captureOpen ? " open" : ""}`}
-              onClick={() => setCaptureOpen(v => !v)}
+              style={captureOpen ? { background: captureReady ? "var(--accent)" : "var(--bg4)", boxShadow: captureReady ? undefined : "none", transition: "background .2s" } : undefined}
+              onClick={() => {
+                if (captureOpen) {
+                  // act as confirm — trigger finish via ref or just close
+                  setCaptureOpen(v => !v);
+                } else {
+                  setCaptureOpen(true);
+                }
+              }}
             >
               {captureOpen
-                ? <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5L19 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                ? <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5L19 7" stroke={captureReady ? "currentColor" : "var(--text3)"} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                 : <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></svg>
               }
             </button>
