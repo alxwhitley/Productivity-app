@@ -2251,50 +2251,47 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                         : totalLoggedMin < 60 ? `${totalLoggedMin}m logged`
                         : `${totalLoggedHrs % 1 === 0 ? totalLoggedHrs : totalLoggedHrs.toFixed(1)}h logged`;
 
-                      // Compact timer — countdown, minimal, reset only when paused
+                      // Bottom bar: [ countdown pill ]  [ reset · play/pause ]  [ done circle ]
                       const TimerBlock = ({ onDone }) => {
-                        const circBtn = (onClick, icon, bg, color) => (
-                          <button onClick={e => { e.stopPropagation(); onClick(); }}
-                            style={{ width:28, height:28, borderRadius:"50%", border:"none", background:bg, color:color, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", flexShrink:0 }}>
-                            {icon}
+                        const smCirc = (onClick, children, active) => (
+                          <button onClick={e => { e.stopPropagation(); if (onClick) onClick(); }}
+                            style={{ width:26, height:26, borderRadius:"50%", border:"none", background:"var(--bg4)", color: active ? "var(--text)" : "var(--text3)", display:"flex", alignItems:"center", justifyContent:"center", cursor: onClick ? "pointer" : "default", flexShrink:0, opacity: active ? 1 : 0.3, transition:"opacity .15s, color .15s" }}>
+                            {children}
                           </button>
                         );
                         return (
-                          <div onClick={e => e.stopPropagation()} style={{ marginTop:10, display:"flex", flexDirection:"column", gap:6 }}>
-                            {/* Timer row */}
-                            <div style={{ display:"flex", alignItems:"center", gap:8, background:"var(--bg3)", borderRadius:10, padding:"6px 10px", border:"1px solid var(--border2)" }}>
-                              {/* Countdown */}
-                              <span style={{ fontSize:14, fontWeight:700, fontVariantNumeric:"tabular-nums", letterSpacing:".02em", color: isRunning ? "var(--text)" : isPaused ? "var(--accent)" : "var(--text3)", fontFamily:"'DM Sans',sans-serif", lineHeight:1, minWidth:36 }}>
+                          <div onClick={e => e.stopPropagation()}
+                            style={{ marginTop:10, display:"flex", alignItems:"center", gap:8, padding:"6px 2px" }}>
+
+                            {/* Left pill — countdown */}
+                            <div style={{ background:"var(--bg3)", border:"1px solid var(--border2)", borderRadius:20, padding:"6px 12px", display:"flex", alignItems:"center", gap:6, flexShrink:0 }}>
+                              {isRunning && <div style={{ width:5, height:5, borderRadius:"50%", background:"var(--accent)", animation:"pulse-dot 1.2s ease-in-out infinite", flexShrink:0 }} />}
+                              <span style={{ fontSize:13, fontWeight:700, fontVariantNumeric:"tabular-nums", color: isRunning ? "var(--text)" : isPaused ? "var(--accent)" : "var(--text3)", fontFamily:"'DM Sans',sans-serif", letterSpacing:".02em", lineHeight:1 }}>
                                 {cdStr}
                               </span>
-                              {isRunning && <div style={{ width:5, height:5, borderRadius:"50%", background:"var(--accent)", flexShrink:0, animation:"pulse-dot 1.2s ease-in-out infinite" }} />}
-                              <div style={{ flex:1 }} />
-                              {/* Paused: show Reset + Resume side by side */}
-                              {isPaused ? (
-                                <>
-                                  <button onClick={e => { e.stopPropagation(); resetTimer(slot.id); }}
-                                    style={{ fontSize:11, fontWeight:600, color:"var(--text3)", background:"none", border:"none", cursor:"pointer", padding:"0 6px", fontFamily:"'DM Sans',sans-serif" }}>
-                                    Reset
-                                  </button>
-                                  {circBtn(() => startTimerSlot(slot.id),
-                                    <svg width="9" height="10" viewBox="0 0 16 18" fill="none"><path d="M1 1l14 8-14 8V1z" fill="currentColor"/></svg>,
-                                    "var(--green)", "#fff")}
-                                </>
-                              ) : isRunning ? (
-                                circBtn(() => pauseTimerSlot(slot.id),
-                                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor"/></svg>,
-                                  "var(--red)", "#fff")
-                              ) : (
-                                circBtn(() => startTimerSlot(slot.id),
-                                  <svg width="9" height="10" viewBox="0 0 16 18" fill="none"><path d="M1 1l14 8-14 8V1z" fill="currentColor"/></svg>,
-                                  "var(--green)", "#fff")
-                              )}
                             </div>
-                            {/* Done bar */}
+
+                            {/* Middle: reset + play/pause — flex grows to fill */}
+                            <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>
+                              {/* Reset — muted unless paused */}
+                              {smCirc(isPaused ? () => resetTimer(slot.id) : null,
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M1 4v6h6" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"/><path d="M3.51 15a9 9 0 1 0 .49-4.95" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+                                isPaused)}
+                              {/* Play / Pause */}
+                              {isRunning
+                                ? smCirc(() => pauseTimerSlot(slot.id),
+                                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none"><rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor"/></svg>,
+                                    true)
+                                : smCirc(() => startTimerSlot(slot.id),
+                                    <svg width="8" height="9" viewBox="0 0 16 18" fill="none"><path d="M1 1l14 8-14 8V1z" fill="currentColor"/></svg>,
+                                    true)
+                              }
+                            </div>
+
+                            {/* Right: Done circle */}
                             <button onClick={e => { e.stopPropagation(); onDone(); }}
-                              style={{ width:"100%", background: timerActive ? "rgba(69,193,122,.1)" : "var(--bg3)", border: timerActive ? "1px solid rgba(69,193,122,.25)" : "1px solid var(--border2)", borderRadius:9, padding:"7px 0", fontSize:12, fontWeight:700, color: timerActive ? "var(--green)" : "var(--text3)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", display:"flex", alignItems:"center", justifyContent:"center", gap:5, transition:"all .2s", boxSizing:"border-box" }}>
-                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                              Done{timerActive ? ` · ${elapsedStr} worked` : ""}
+                              style={{ width:36, height:36, borderRadius:"50%", border:"none", background: timerActive ? "var(--green)" : "var(--bg4)", color: timerActive ? "#fff" : "var(--text3)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", flexShrink:0, transition:"background .2s, color .2s" }}>
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
                             </button>
                           </div>
                         );
