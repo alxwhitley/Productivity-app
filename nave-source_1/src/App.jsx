@@ -147,6 +147,7 @@ const FIELD_DEFAULTS = {
   todayLoosePicks: {}, // { [dateStr]: [looseTaskId, ...] } — tasks picked for today's loose block
   onboardingDone: false,
   sessionLog: [], // [{ id, projectId, date, durationMin, note }]
+  captured: [], // [{ id, text, createdAt }] — raw unprocessed brain-dump items
 };
 
 // ── Migrations — run in order when schema version is behind ─────────────────
@@ -967,6 +968,25 @@ const css = `
 
 
   /* QUICK REMINDERS MODAL */
+  /* ── Capture panel ── */
+  .cap-backdrop{position:absolute;inset:0;z-index:24;background:rgba(0,0,0,.55);backdrop-filter:blur(2px);}
+  .cap-panel{position:absolute;left:0;right:0;bottom:0;background:var(--bg2);border-radius:24px 24px 0 0;z-index:25;display:flex;flex-direction:column;max-height:72vh;animation:sheet-up .22s cubic-bezier(.4,0,.2,1);box-shadow:0 -4px 40px rgba(0,0,0,.5);}
+  .cap-handle-row{display:flex;justify-content:center;padding-top:10px;flex-shrink:0;}
+  .cap-handle{width:36px;height:4px;border-radius:2px;background:var(--border);}
+  .cap-header{display:flex;align-items:center;justify-content:space-between;padding:10px 20px 12px;flex-shrink:0;border-bottom:1px solid var(--border2);}
+  .cap-title{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);}
+  .cap-close{background:none;border:none;cursor:pointer;padding:4px;color:var(--text3);display:flex;align-items:center;justify-content:center;}
+  .cap-items{flex:1;overflow-y:auto;padding:6px 18px 4px;}
+  .cap-item{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid var(--border2);}
+  .cap-item-dot{width:5px;height:5px;border-radius:50%;background:var(--text3);flex-shrink:0;margin-top:7px;}
+  .cap-item-text{flex:1;font-size:15px;color:var(--text);line-height:1.4;}
+  .cap-textarea-row{padding:10px 18px 6px;flex-shrink:0;}
+  .cap-textarea{width:100%;background:transparent;border:none;outline:none;resize:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:16px;line-height:1.55;box-sizing:border-box;min-height:52px;}
+  .cap-textarea::placeholder{color:var(--text3);}
+  .cap-footer{padding:8px 18px 28px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+  .cap-count{font-size:12px;color:var(--text3);}
+  .cap-done-btn{background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:7px 18px;font-size:13px;font-weight:700;color:var(--text2);cursor:pointer;font-family:'DM Sans',sans-serif;}
+  /* legacy qr classes kept for safety */
   .qr-backdrop{position:absolute;inset:0;z-index:24;background:rgba(0,0,0,.6);backdrop-filter:blur(2px);}
   .qr-panel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:calc(100% - 40px);max-width:340px;background:var(--bg2);border-radius:20px;box-shadow:0 16px 48px rgba(0,0,0,.6);z-index:25;overflow:hidden;animation:qr-in .2s cubic-bezier(.34,1.3,.64,1);}
   @keyframes qr-in{from{opacity:0;transform:translate(-50%,-46%) scale(.94);}to{opacity:1;transform:translate(-50%,-50%) scale(1);}}
@@ -1890,7 +1910,7 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                 const relevantTasks = hasTodayTasks ? todayTaskIds.map(id => proj?.tasks.find(t => t.id === id)).filter(Boolean) : [];
                 const relevantDone = relevantTasks.filter(t => t.done).length;
                 const allTasksDone = isSessionMode ? manualCompleted.has(slot.id) : (relevantTasks.length > 0 && relevantDone === relevantTasks.length);
-                const isCompleted = allTasksDone;
+                const isCompleted = allTasksDone || manualCompleted.has(slot.id);
 
                 const lateInfo = lateStarted[slot.id];
                 const isRunning = !!lateInfo;
@@ -2068,10 +2088,10 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                     {/* Collapsed header — visible always, bigger when now */}
                     <div style={{ padding: isExp ? "14px 16px 10px 20px" : "14px 16px 12px 20px", flex: isExp ? "none" : 1, display:"flex", alignItems:"flex-start", gap:12, minHeight:0 }}>
                       {/* Mode icon */}
-                      <div style={{ width:34, height:34, borderRadius:10, background: isExp ? (domainColor ? `${domainColor}25` : "var(--bg3)") : (domainColor ? `${domainColor}18` : "var(--bg3)"), border: isExp ? `1.5px solid ${domainColor ? domainColor+"60" : "var(--border)"}` : `1px solid ${domainColor ? domainColor+"35" : "var(--border)"}`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, opacity: isCompleted ? 0.5 : 1, transition:"background .2s, border-color .2s", flexShrink:0 }}>
+                      <div style={{ width:34, height:34, borderRadius:10, background: isCompleted ? "var(--bg3)" : isExp ? (domainColor ? `${domainColor}25` : "var(--bg3)") : (domainColor ? `${domainColor}18` : "var(--bg3)"), border: isCompleted ? "1px solid var(--border)" : isExp ? `1.5px solid ${domainColor ? domainColor+"60" : "var(--border)"}` : `1px solid ${domainColor ? domainColor+"35" : "var(--border)"}`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, opacity: isCompleted ? 0.5 : 1, transition:"background .2s, border-color .2s", flexShrink:0 }}>
                         {isSessionMode
-                          ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M20 12a8 8 0 1 1-2-5.3" stroke={domainColor||"var(--text2)"} strokeWidth="2.2" strokeLinecap="round"/><path d="M20 7v5h-5" stroke={domainColor||"var(--text2)"} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                          : <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke={domainColor||"var(--text2)"} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" stroke={domainColor||"var(--text2)"} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                          ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M20 12a8 8 0 1 1-2-5.3" stroke={isCompleted ? "var(--text3)" : (domainColor||"var(--text2)")} strokeWidth="2.2" strokeLinecap="round"/><path d="M20 7v5h-5" stroke={isCompleted ? "var(--text3)" : (domainColor||"var(--text2)")} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                          : <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke={isCompleted ? "var(--text3)" : (domainColor||"var(--text2)")} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" stroke={isCompleted ? "var(--text3)" : (domainColor||"var(--text2)")} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                         }
                       </div>
                       <div style={{ flex:1, minWidth:0 }}>
@@ -2086,21 +2106,21 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                               {domain?.name}{data.todayPrefs?.hideTimes ? "" : ` · ${fmtTime(slot.startHour, slot.startMin)}`} · {slot.durationMin} min
                               {!isSessionMode && hasTodayTasks ? ` · ${relevantDone}/${relevantTasks.length}` : ""}
                             </div>
-                            {!isSessionMode && !isCompleted && (() => {
-                              if (!hasTodayTasks) return (
+                            {!isSessionMode && (() => {
+                              if (!hasTodayTasks) return isCompleted ? null : (
                                 <div style={{ marginTop:8, fontSize:12, color:"var(--text3)", opacity:.5, fontStyle:"italic" }}>Assign tasks</div>
                               );
                               const preview = relevantTasks.slice(0, 3);
                               const hidden = relevantTasks.length - 3;
                               return (
-                                <div style={{ marginTop:8, display:"flex", flexDirection:"column", gap:5 }}>
+                                <div style={{ marginTop:8, display:"flex", flexDirection:"column", gap:5, opacity: isCompleted ? 0.35 : 1, transition:"opacity .3s" }}>
                                   {preview.map(t => (
-                                    <div key={t.id} onClick={e => { e.stopPropagation(); toggleTask(proj.id, t.id); }}
-                                      style={{ display:"flex", alignItems:"center", gap:7, cursor:"pointer" }}>
-                                      <div style={{ width:13, height:13, borderRadius:3, border: t.done ? "none" : `1.5px solid ${domainColor ? domainColor+"60" : "var(--border)"}`, background: t.done ? (domainColor||"var(--green)") : "transparent", flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                                    <div key={t.id} onClick={e => { e.stopPropagation(); if (!isCompleted) toggleTask(proj.id, t.id); }}
+                                      style={{ display:"flex", alignItems:"center", gap:7, cursor: isCompleted ? "default" : "pointer" }}>
+                                      <div style={{ width:13, height:13, borderRadius:3, border: t.done ? "none" : `1.5px solid ${domainColor ? domainColor+"60" : "var(--border)"}`, background: t.done ? "var(--green)" : "transparent", flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center" }}>
                                         {t.done && <span style={{ fontSize:7, color:"#000", fontWeight:900 }}>✓</span>}
                                       </div>
-                                      <span style={{ fontSize:12, color: t.done ? "var(--text3)" : "var(--text2)", textDecoration: t.done ? "line-through" : "none", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{t.text}</span>
+                                      <span style={{ fontSize:12, color:"var(--text3)", textDecoration: t.done ? "line-through" : "none", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{t.text}</span>
                                     </div>
                                   ))}
                                   {hidden > 0 && (
@@ -2135,19 +2155,35 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
 
                     {/* Expanded body */}
                     {isExp && (
-                      <div style={{ flex:1, overflowY:"auto", padding:"0 16px 14px 20px" }} onClick={e => e.stopPropagation()}>
+                      <div style={{ flex:1, overflowY:"auto", padding:"0 16px 14px 20px" }} onClick={() => setExpandedId(null)}>
                         <div style={{ fontSize:12, color:"var(--text3)", marginBottom:10 }}>{domain?.name}{data.todayPrefs?.hideTimes ? "" : ` · ${fmtTime(slot.startHour, slot.startMin)}`} · {slot.durationMin} min</div>
 
                         {isCompleted ? (
-                          <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-                            <div style={{ width:24, height:24, borderRadius:"50%", background:"rgba(69,193,122,.15)", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                          <div onClick={e => e.stopPropagation()}>
+                            {/* Faded task list */}
+                            {!isSessionMode && hasTodayTasks && (
+                              <div style={{ display:"flex", flexDirection:"column", gap:2, opacity:0.35, marginBottom:14 }}>
+                                {relevantTasks.map((t, i) => (
+                                  <div key={t.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"6px 0", borderBottom: i < relevantTasks.length-1 ? "1px solid var(--border2)" : "none" }}>
+                                    <div className="tl-check done" style={{ width:20, height:20, flexShrink:0 }}>
+                                      <span style={{fontSize:10,color:"#fff",fontWeight:700}}>✓</span>
+                                    </div>
+                                    <span style={{ fontSize:14, color:"var(--text3)", textDecoration:"line-through" }}>{t.text}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {/* Complete row */}
+                            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                              <div style={{ width:22, height:22, borderRadius:"50%", background:"rgba(69,193,122,.15)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="var(--green)" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                              </div>
+                              <span style={{ fontSize:13, color:"var(--green)", fontWeight:700, flex:1 }}>Complete</span>
+                              <button onClick={() => unmarkManualDone(slot.id, proj.id, slot.todayTasks)}
+                                style={{ background:"none", border:"1px solid var(--border)", borderRadius:8, fontSize:12, color:"var(--text3)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", padding:"4px 10px" }}>
+                                ← Undo
+                              </button>
                             </div>
-                            <span style={{ fontSize:14, color:"var(--green)", fontWeight:700 }}>{isSessionMode ? "Session logged" : "Block complete"}</span>
-                            <button onClick={() => unmarkManualDone(slot.id, proj.id, slot.todayTasks)}
-                              style={{ marginLeft:"auto", background:"none", border:"1px solid var(--border)", borderRadius:8, fontSize:12, color:"var(--text3)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", padding:"4px 10px" }}>
-                              ← Undo
-                            </button>
                           </div>
                         ) : isSessionMode ? (
                           <div style={{ display:"flex", gap:8 }}>
@@ -2203,7 +2239,16 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                               <div key={t.id} className="tl-task-row" style={{ padding:"8px 0", borderBottom: i < relevantTasks.length-1 ? "1px solid var(--border2)" : "none" }}>
                                 <div className={`tl-check ${t.done ? "done" : ""} ${recentlyChecked.has(t.id) ? "bounce" : ""}`}
                                   style={{ width:20, height:20, flexShrink:0 }}
-                                  onClick={e => { e.stopPropagation(); toggleTask(proj.id, t.id); }}>
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    toggleTask(proj.id, t.id);
+                                    // Auto-complete if all tasks now done
+                                    const wasAlreadyDone = t.done;
+                                    if (!wasAlreadyDone) {
+                                      const remaining = relevantTasks.filter(rt => rt.id !== t.id && !rt.done);
+                                      if (remaining.length === 0) markManualDone(slot.id, proj.id, slot.todayTasks);
+                                    }
+                                  }}>
                                   {t.done && <span style={{fontSize:10,color:"#fff",fontWeight:700}}>✓</span>}
                                 </div>
                                 {editingDwTaskId === t.id ? (
@@ -2226,36 +2271,49 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                                 )}
                               </div>
                             ))}
-                            {isNow && (
-                              <div style={{ display:"flex", gap:8, marginTop:10 }}>
-                                <button className="tl-start-btn" style={{ ...(isRunning ? { background:"rgba(224,85,85,.12)", color:"var(--red)", borderColor:"rgba(224,85,85,.3)" } : {}) }}
-                                  onClick={e => { e.stopPropagation(); isRunning ? setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }) : startBlock(slot.id); }}>
-                                  {isRunning ? "Stop ■" : "Start →"}
-                                </button>
-                              </div>
-                            )}
-                          </>
-                        ) : (
-                          <>
-                            <div style={{ fontSize:13, color:"var(--text3)", marginBottom:10 }}>No tasks picked yet.</div>
-                            <div style={{ display:"flex", gap:8 }}>
-                              <button className="tl-start-btn"
-                                onClick={e => { e.stopPropagation(); setPickerState({ blockId: slot.id, projectId: proj.id, selected: new Set(), newText: "" }); }}>
-                                Pick tasks
-                              </button>
+                            <div style={{ display:"flex", justifyContent:"flex-end", alignItems:"center", marginTop:14, gap:8 }} onClick={e => e.stopPropagation()}>
                               {isNow && (
                                 <button className="tl-start-btn" style={{ ...(isRunning ? { background:"rgba(224,85,85,.12)", color:"var(--red)", borderColor:"rgba(224,85,85,.3)" } : {}) }}
                                   onClick={e => { e.stopPropagation(); isRunning ? setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }) : startBlock(slot.id); }}>
                                   {isRunning ? "Stop ■" : "Start →"}
                                 </button>
                               )}
+                              <button
+                                onClick={e => { e.stopPropagation(); markManualDone(slot.id, proj.id, slot.todayTasks); }}
+                                style={{ display:"flex", alignItems:"center", gap:6, background:"rgba(69,193,122,.12)", border:"1.5px solid rgba(69,193,122,.3)", borderRadius:22, padding:"6px 14px", fontSize:12, fontWeight:700, color:"var(--green)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", transition:"background .15s" }}>
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                Complete
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div style={{ fontSize:13, color:"var(--text3)", marginBottom:10 }}>No tasks picked yet.</div>
+                            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:8 }}>
+                              <div style={{ display:"flex", gap:8 }} onClick={e => e.stopPropagation()}>
+                                <button className="tl-start-btn"
+                                  onClick={e => { e.stopPropagation(); setPickerState({ blockId: slot.id, projectId: proj.id, selected: new Set(), newText: "" }); }}>
+                                  Pick tasks
+                                </button>
+                                {isNow && (
+                                  <button className="tl-start-btn" style={{ ...(isRunning ? { background:"rgba(224,85,85,.12)", color:"var(--red)", borderColor:"rgba(224,85,85,.3)" } : {}) }}
+                                    onClick={e => { e.stopPropagation(); isRunning ? setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }) : startBlock(slot.id); }}>
+                                    {isRunning ? "Stop ■" : "Start →"}
+                                  </button>
+                                )}
+                              </div>
+                              <button onClick={e => { e.stopPropagation(); markManualDone(slot.id, proj.id, null); }}
+                                style={{ display:"flex", alignItems:"center", gap:6, background:"rgba(69,193,122,.12)", border:"1.5px solid rgba(69,193,122,.3)", borderRadius:22, padding:"6px 14px", fontSize:12, fontWeight:700, color:"var(--green)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                Complete
+                              </button>
                             </div>
                           </>
                         )}
 
                         {/* Overflow menu */}
                         {dwOverflowOpen === slot.id && (
-                          <div style={{ marginTop:12, background:"var(--bg3)", borderRadius:10, border:"1px solid var(--border)", overflow:"hidden" }}>
+                          <div style={{ marginTop:12, background:"var(--bg3)", borderRadius:10, border:"1px solid var(--border)", overflow:"hidden" }} onClick={e => e.stopPropagation()}>
                             <button style={{ width:"100%", background:"none", border:"none", borderBottom:"1px solid var(--border2)", padding:"11px 14px", textAlign:"left", fontSize:13, color:"var(--text2)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontWeight:500, display:"flex", alignItems:"center", gap:10 }}
                               onClick={() => { mutateDWSlot(toISODate(), slot.slotIndex, null); setExpandedId(null); setDwOverflowOpen(null); }}>
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/></svg>
@@ -2275,6 +2333,17 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                             )}
                           </div>
                         )}
+                        {/* ── Green complete button — bottom right ── */}
+                        {!isCompleted && (
+                          <div style={{ display:"flex", justifyContent:"flex-end", marginTop:14 }} onClick={e => e.stopPropagation()}>
+                            <button
+                              onClick={() => { isSessionMode ? (logSession(proj.id, slot.durationMin, null), markManualDone(slot.id, proj.id, null)) : markManualDone(slot.id, proj.id, slot.todayTasks); }}
+                              style={{ display:"flex", alignItems:"center", gap:6, background:"rgba(69,193,122,.12)", border:"1.5px solid rgba(69,193,122,.3)", borderRadius:22, padding:"7px 14px", fontSize:12, fontWeight:700, color:"var(--green)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", letterSpacing:".02em", transition:"background .15s, border-color .15s" }}>
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                              Mark complete
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -2291,15 +2360,24 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
       {/* ── LOOSE TASKS BANNER ── */}
       {(() => {
         const looseCt = (data.looseTasks||[]).filter(t=>!t.done).length;
+        const capCt = (data.captured||[]).length;
+        const totalCt = looseCt + capCt;
         return (
           <div onClick={() => setLooseBlockExp(true)}
             style={{ flexShrink:0, margin:"0 12px 8px", background:"var(--bg2)", borderRadius:14, border:"1px solid var(--border)", padding:"11px 16px", display:"flex", alignItems:"center", gap:12, cursor:"pointer" }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round"/></svg>
             <span style={{ flex:1, fontSize:13, fontWeight:600, color:"var(--text2)" }}>Loose Tasks</span>
-            {looseCt > 0
-              ? <span style={{ fontSize:12, fontWeight:700, color:"var(--accent)", background:"rgba(232,160,48,.12)", borderRadius:20, padding:"2px 10px" }}>{looseCt} left</span>
-              : <span style={{ fontSize:12, color:"var(--text3)" }}>None</span>
-            }
+            <div style={{ display:"flex", alignItems:"center", gap:5 }}>
+              {capCt > 0 && (
+                <span style={{ fontSize:11, fontWeight:700, color:"var(--blue)", background:"rgba(91,138,240,.12)", borderRadius:20, padding:"2px 8px" }}>
+                  {capCt} captured
+                </span>
+              )}
+              {looseCt > 0
+                ? <span style={{ fontSize:12, fontWeight:700, color:"var(--accent)", background:"rgba(232,160,48,.12)", borderRadius:20, padding:"2px 10px" }}>{looseCt} left</span>
+                : totalCt === 0 && <span style={{ fontSize:12, color:"var(--text3)" }}>None</span>
+              }
+            </div>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style={{ color:"var(--text3)", opacity:.5 }}><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </div>
         );
@@ -2339,12 +2417,60 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
             </div>
             {/* Header */}
             <div style={{ flexShrink:0, padding:"10px 20px 12px", display:"flex", alignItems:"center", justifyContent:"space-between", borderBottom:"2px solid var(--border)" }}>
-              <div style={{ fontSize:15, fontWeight:800, color:"var(--text)", letterSpacing:"-.01em" }}>Loose Tasks</div>
+              <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                <div style={{ fontSize:15, fontWeight:800, color:"var(--text)", letterSpacing:"-.01em" }}>Loose Tasks</div>
+                {(data.captured||[]).length > 0 && (
+                  <div style={{ background:"rgba(91,138,240,.15)", border:"1px solid rgba(91,138,240,.3)", borderRadius:12, padding:"2px 8px", fontSize:11, fontWeight:700, color:"var(--blue)" }}>
+                    {(data.captured||[]).length} captured
+                  </div>
+                )}
+              </div>
               <button onClick={() => { setLooseBlockExp(false); setLooseEditId(null); }} style={{ background:"none", border:"none", cursor:"pointer", padding:4, color:"var(--text3)" }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></svg>
               </button>
             </div>
             <div style={{ flex:1, overflowY:"auto", padding:"6px 16px 24px" }}>
+              {/* ── Captured section ── */}
+              {(data.captured||[]).length > 0 && (() => {
+                const moveToInbox = (s) => setData(d => ({
+                  ...d,
+                  captured: (d.captured||[]).filter(sc => sc.id !== s.id),
+                  inbox: [...(d.inbox||[]), { id: uid(), text: s.text, createdAt: s.createdAt || Date.now() }]
+                }));
+                const dismiss = (s) => setData(d => ({ ...d, captured: (d.captured||[]).filter(sc => sc.id !== s.id) }));
+                return (
+                  <div style={{ marginBottom:16 }}>
+                    <div style={{ fontSize:10, fontWeight:700, letterSpacing:".08em", textTransform:"uppercase", color:"var(--blue)", marginBottom:6, paddingLeft:2, opacity:.8 }}>Captured</div>
+                    {(data.captured||[]).map(s => (
+                      <div key={s.id} style={{ display:"flex", alignItems:"flex-start", gap:10, padding:"9px 0", borderBottom:"1px solid var(--border2)" }}>
+                        <div style={{ width:5, height:5, borderRadius:"50%", background:"var(--text3)", flexShrink:0, marginTop:7 }} />
+                        <span style={{ flex:1, fontSize:14, color:"var(--text2)", lineHeight:1.4 }}>{s.text}</span>
+                        <div style={{ display:"flex", gap:4, flexShrink:0 }}>
+                          <button onClick={() => moveToInbox(s)}
+                            style={{ background:"rgba(91,138,240,.12)", border:"1px solid rgba(91,138,240,.3)", borderRadius:8, padding:"4px 10px", fontSize:12, fontWeight:700, color:"var(--blue)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", whiteSpace:"nowrap" }}>
+                            → Inbox
+                          </button>
+                          <button onClick={() => dismiss(s)}
+                            style={{ background:"none", border:"1px solid var(--border)", borderRadius:8, padding:"4px 8px", fontSize:12, color:"var(--text3)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
+                            ×
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    {(data.captured||[]).length > 1 && (
+                      <button onClick={() => setData(d => ({
+                        ...d,
+                        captured: [],
+                        inbox: [...(d.inbox||[]), ...(d.captured||[]).map(s => ({ id: uid(), text: s.text, createdAt: s.createdAt || Date.now() }))]
+                      }))}
+                        style={{ marginTop:10, width:"100%", background:"rgba(91,138,240,.08)", border:"1px solid rgba(91,138,240,.2)", borderRadius:10, padding:"9px 12px", fontSize:13, fontWeight:700, color:"var(--blue)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
+                        Move all {(data.captured||[]).length} to Inbox
+                      </button>
+                    )}
+                    <div style={{ height:1, background:"var(--border)", margin:"14px 0 6px" }} />
+                  </div>
+                );
+              })()}
               {(() => {
                 const loose = (data.looseTasks||[]).filter(t=>!t.done);
                 const saveEdit = (id) => {
@@ -4605,69 +4731,82 @@ function AddBlockSheet({ data, onClose, onAddRoutine }) {
   );
 }
 
-// ─── QUICK CAPTURE ────────────────────────────────────────────────────────────
-function QuickReminders({ onClose, onAdd }) {
-  const [items, setItems] = useState([]);
+// ─── SCRIBBLES ────────────────────────────────────────────────────────────────
+// Fast brain-dump: type, Enter = new item, close = saved. Zero decisions.
+function QuickReminders({ onClose, onAddCaptured, existingCaptured }) {
   const [draft, setDraft] = useState("");
-  const inputRef = useRef(null);
+  const [localItems, setLocalItems] = useState([]); // items added this session
+  const taRef = useRef(null);
 
-  useEffect(() => { setTimeout(() => inputRef.current?.focus(), 60); }, []);
+  useEffect(() => { setTimeout(() => taRef.current?.focus(), 80); }, []);
 
-  const commitDraft = () => {
+  // Auto-resize textarea
+  const autoResize = (el) => { if (!el) return; el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; };
+
+  const commitLine = () => {
     const t = draft.trim();
-    if (!t) return;
-    // Commit immediately to inbox — no routing decision needed here
-    onAdd({ id: uid(), text: t, createdAt: Date.now() });
-    setItems(prev => [...prev, t]);
+    if (!t) { onClose(); return; }
+    const item = { id: uid(), text: t, createdAt: Date.now() };
+    onAddCaptured(item);
+    setLocalItems(prev => [...prev, item]);
     setDraft("");
+    setTimeout(() => { if (taRef.current) { taRef.current.style.height = "auto"; taRef.current.focus(); } }, 0);
   };
 
   const finish = () => {
-    // Commit any unsubmitted draft on close
     const t = draft.trim();
-    if (t) onAdd({ id: uid(), text: t, createdAt: Date.now() });
+    if (t) { const item = { id: uid(), text: t, createdAt: Date.now() }; onAddCaptured(item); setLocalItems(prev => [...prev, item]); }
     onClose();
   };
 
+  const totalCount = (existingCaptured?.length || 0) + localItems.length;
+
   return (
     <>
-      <div className="qr-backdrop" onClick={finish} />
-      <div className="qr-panel" onClick={e => e.stopPropagation()}>
-        <div className="qr-header">Capture</div>
+      <div className="cap-backdrop" onClick={finish} />
+      <div className="cap-panel" onClick={e => e.stopPropagation()}>
+        <div className="cap-handle-row"><div className="cap-handle" /></div>
+        <div className="cap-header">
+          <span className="cap-title">Captured</span>
+          <button className="cap-close" onClick={finish}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></svg>
+          </button>
+        </div>
 
-        {/* Already-captured items — reassurance list */}
-        {items.length > 0 && (
-          <div className="qr-items">
-            {items.map((text, i) => (
-              <div key={i} className="qr-item">
-                <span style={{ fontSize:11, color:"var(--green)", marginRight:6 }}>✓</span>
-                <span className="qr-item-text">{text}</span>
+        {/* Items captured so far this session */}
+        {localItems.length > 0 && (
+          <div className="cap-items">
+            {localItems.map(item => (
+              <div key={item.id} className="cap-item">
+                <div className="cap-item-dot" />
+                <span className="cap-item-text">{item.text}</span>
               </div>
             ))}
           </div>
         )}
 
-        <div className="qr-input-row">
-          <input
-            ref={inputRef}
-            className="qr-input"
-            placeholder="What's on your mind…"
+        {/* Input — feels like Notes */}
+        <div className="cap-textarea-row">
+          <textarea
+            ref={taRef}
+            className="cap-textarea"
+            placeholder={localItems.length === 0 ? "What's on your mind… (Enter to save each line)" : "Keep going…"}
             value={draft}
-            onChange={e => setDraft(e.target.value)}
+            rows={2}
+            onChange={e => { setDraft(e.target.value); autoResize(e.target); }}
             onKeyDown={e => {
-              if (e.key === "Enter") commitDraft();
+              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commitLine(); }
               if (e.key === "Escape") finish();
             }}
           />
         </div>
 
-        {items.length > 0 && (
-          <div style={{ padding:"8px 18px 14px", textAlign:"center" }}>
-            <span style={{ fontSize:11, color:"var(--text3)" }}>
-              {items.length} item{items.length !== 1 ? "s" : ""} saved to inbox
-            </span>
-          </div>
-        )}
+        <div className="cap-footer">
+          <span className="cap-count">
+            {totalCount > 0 ? `${totalCount} captured` : "Enter to save each thought"}
+          </span>
+          <button className="cap-done-btn" onClick={finish}>Done</button>
+        </div>
       </div>
     </>
   );
@@ -5205,7 +5344,8 @@ export default function App() {
           {captureOpen && (
             <QuickReminders
               onClose={() => setCaptureOpen(false)}
-              onAdd={handleQuickAdd}
+              onAddCaptured={item => setData(d => ({ ...d, captured: [...(d.captured||[]), item] }))}
+              existingCaptured={data.captured||[]}
             />
           )}
 
