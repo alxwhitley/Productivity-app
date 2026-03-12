@@ -1341,10 +1341,10 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
   };
 
   const saveDWSlot = (slotId, slotIndex, projectId, startHour, startMin, durationMin, todayTasks) =>
-    mutateDWSlot(toISODate(), slotIndex, { projectId, startHour, startMin, durationMin, todayTasks: todayTasks || null });
+    mutateDWSlot(viewDateKeyISO, slotIndex, { projectId, startHour, startMin, durationMin, todayTasks: todayTasks || null });
 
   const clearDWSlot = (slotIndex) =>
-    mutateDWSlot(toISODate(), slotIndex, null);
+    mutateDWSlot(viewDateKeyISO, slotIndex, null);
 
   const handleDragStart = (e, blockId) => {
     setDragId(blockId);
@@ -1516,15 +1516,15 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
   };
 
   const rescheduleDWSlot = (slotIndex, newHour, newMin) => {
-    mutateDWSlot(toISODate(), slotIndex, { startHour: newHour, startMin: newMin });
+    mutateDWSlot(viewDateKeyISO, slotIndex, { startHour: newHour, startMin: newMin });
     setEditingTime(null);
   };
 
   const saveDWTodayTasks = (slotIndex, taskIds) =>
-    mutateDWSlot(toISODate(), slotIndex, { todayTasks: taskIds.length > 0 ? taskIds : null });
+    mutateDWSlot(viewDateKeyISO, slotIndex, { todayTasks: taskIds.length > 0 ? taskIds : null });
 
   const saveDWSessionNote = (slotIndex, note) =>
-    mutateDWSlot(toISODate(), slotIndex, { sessionNote: note || null });
+    mutateDWSlot(viewDateKeyISO, slotIndex, { sessionNote: note || null });
 
   const logSession = (projectId, durationMin, note) => {
     setData(d => ({
@@ -1951,8 +1951,9 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                       onClick={() => setExpandedId(isExp ? null : slot.id)}
                     >
                       {!isExp ? (
-                        <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center" }}>
-                          <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="rgba(255,255,255,.2)" strokeWidth="2" strokeLinecap="round"/></svg>
+                        <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column", gap:7, padding:"10px 14px" }}>
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="rgba(255,255,255,.18)" strokeWidth="2" strokeLinecap="round"/></svg>
+                          <span style={{ fontSize:10, fontWeight:700, letterSpacing:".07em", textTransform:"uppercase", color:"rgba(255,255,255,.15)", textAlign:"center" }}>Deep Work Block</span>
                         </div>
                       ) : (
                         <div style={{ flex:1, overflowY:"auto", padding:"14px 16px" }} onClick={e => e.stopPropagation()}>
@@ -2315,7 +2316,7 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                         {dwOverflowOpen === slot.id && (
                           <div style={{ marginTop:12, background:"var(--bg3)", borderRadius:10, border:"1px solid var(--border)", overflow:"hidden" }} onClick={e => e.stopPropagation()}>
                             <button style={{ width:"100%", background:"none", border:"none", borderBottom:"1px solid var(--border2)", padding:"11px 14px", textAlign:"left", fontSize:13, color:"var(--text2)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontWeight:500, display:"flex", alignItems:"center", gap:10 }}
-                              onClick={() => { mutateDWSlot(toISODate(), slot.slotIndex, null); setExpandedId(null); setDwOverflowOpen(null); }}>
+                              onClick={() => { mutateDWSlot(viewDateKeyISO, slot.slotIndex, null); setExpandedId(null); setDwOverflowOpen(null); }}>
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/></svg>
                               Unassign
                             </button>
@@ -3167,7 +3168,34 @@ function ProjectsScreen({ data, setData, openCategorize }) {
             <div className="ph-eye">Your Work</div>
             <div className="ph-title">Projects</div>
           </div>
-          <button className="tab-gear" onClick={() => setShowManage(true)}><GearIcon size={20} /></button>
+          <div style={{ display:"flex", alignItems:"center", gap:10, paddingTop:2 }}>
+            {/* Captured inbox icon */}
+            <button onClick={openCategorize}
+              style={{ position:"relative", background:"none", border:"none", cursor:"pointer", padding:4, color:"var(--text3)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <path d="M22 12h-6l-2 3H10l-2-3H2" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              {((data.inbox||[]).length > 0 || (data.captured||[]).length > 0) && (() => {
+                const total = (data.inbox||[]).length + (data.captured||[]).length;
+                const isUrgent = (data.inbox||[]).some(i => i.createdAt && Date.now() - i.createdAt > 2*24*60*60*1000);
+                return (
+                  <span style={{
+                    position:"absolute", top:0, right:0,
+                    minWidth:16, height:16, borderRadius:8,
+                    background: isUrgent ? "var(--red)" : "var(--accent)",
+                    color:"#000", fontSize:10, fontWeight:800,
+                    display:"flex", alignItems:"center", justifyContent:"center",
+                    padding:"0 4px", lineHeight:1,
+                    border:"2px solid var(--bg)"
+                  }}>
+                    {total}
+                  </span>
+                );
+              })()}
+            </button>
+            <button className="tab-gear" onClick={() => setShowManage(true)}><GearIcon size={20} /></button>
+          </div>
         </div>
         <div className="ph-sub">{activeCount} active · {projects.length - activeCount} in backlog</div>
       </div>
@@ -3203,28 +3231,7 @@ function ProjectsScreen({ data, setData, openCategorize }) {
       </div>
 
       <div className="scroll" style={{ paddingTop: 16 }} onClick={() => {}}>
-        {data.inbox.length > 0 && (
-          <>
-            <div className="reminder-section-label" style={{ display:"flex", alignItems:"center", gap:6 }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M22 12h-6l-2 3H10l-2-3H2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              Reminders · tap to assign
-            </div>
-            {data.inbox.map(item => {
-              const ageMs = item.createdAt ? Date.now() - item.createdAt : 0;
-              const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
-              const ageClass = ageDays >= 3 ? "age-old" : ageDays >= 1 ? "age-warn" : "age-fresh";
-              const ageLabel = ageDays === 0 ? "Today" : ageDays === 1 ? "1 day" : `${ageDays} days`;
-              return (
-                <div key={item.id} className="reminder-card">
-                  <div className="reminder-card-dot" />
-                  <div className="reminder-card-text">{item.text}</div>
-                  <span className={`reminder-card-age ${ageClass}`}>{ageLabel}</span>
-                  <button className="reminder-card-assign" onClick={e => { e.stopPropagation(); openCategorize(); }}>Assign →</button>
-                </div>
-              );
-            })}
-          </>
-        )}
+
 
 
 
@@ -5353,8 +5360,8 @@ export default function App() {
             {/* Today + Projects */}
             {NAV_ITEMS.slice(0,2).map(n => (
               <div key={n.id} className={`nav-btn ${tab===n.id?"on":""}`} onClick={()=>setTab(n.id)}>
-                {n.id === "projects" && data.inbox.length > 0 && (
-                  <span className={`nav-dot${data.inbox.some(i => i.createdAt && Date.now() - i.createdAt > 2 * 24 * 60 * 60 * 1000) ? " urgent" : ""}`} />
+                {n.id === "projects" && ((data.inbox||[]).length > 0 || (data.captured||[]).length > 0) && (
+                  <span className={`nav-dot${(data.inbox||[]).some(i => i.createdAt && Date.now() - i.createdAt > 2 * 24 * 60 * 60 * 1000) ? " urgent" : ""}`} />
                 )}
                 <span className="nav-ico"><NavIcon id={n.id} active={tab===n.id} /></span>
                 <span className="nav-lbl">{n.lbl}</span>
