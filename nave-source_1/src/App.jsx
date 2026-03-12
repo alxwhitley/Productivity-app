@@ -2248,33 +2248,33 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                     {/* Expanded body */}
                     {isExp && (() => {
                       // Total logged hours for this project (session log)
-                      const totalLoggedMin = (data.sessionLog || [])
+                      var totalLoggedMin = (data.sessionLog || [])
                         .filter(s => s.projectId === proj.id)
                         .reduce((sum, s) => sum + (s.durationMin || 0), 0);
-                      const totalLoggedHrs = totalLoggedMin / 60;
-                      const loggedDisplay = totalLoggedMin === 0 ? null
+                      var totalLoggedHrs = totalLoggedMin / 60;
+                      var loggedDisplay = totalLoggedMin === 0 ? null
                         : totalLoggedMin < 60 ? `${totalLoggedMin}m logged`
                         : `${totalLoggedHrs % 1 === 0 ? totalLoggedHrs : totalLoggedHrs.toFixed(1)}h logged`;
 
                       // Timer derived values
-                      const timerProgress = timerActive
+                      var timerProgress = timerActive
                         ? Math.min(1, getElapsedMs(lateInfo) / (slot.durationMin * 60 * 1000))
                         : 0;
                       // Ring geometry
-                      const RING_SIZE = 80, RING_R = 34, RING_CX = 40, RING_CY = 40;
-                      const RING_CIRC = 2 * Math.PI * RING_R;
+                      var RING_SIZE = 80, RING_R = 34, RING_CX = 40, RING_CY = 40;
+                      var RING_CIRC = 2 * Math.PI * RING_R;
                       // Ring stroke colour by state
-                      const ringStroke = isRunning ? "var(--purple)" : isPaused ? "var(--accent)" : "rgba(155,114,207,.25)";
-                      // Timer tap/long-press handlers (plain vars, safe in render body)
+                      var ringStroke = isRunning ? "var(--purple)" : isPaused ? "var(--accent)" : "rgba(155,114,207,.25)";
+                      // Timer tap/long-press handlers (var, safe in render body — no TDZ)
                       var _lpTimer = null;
-                      const onTimerPointerDown = (e) => {
+                      var onTimerPointerDown = function(e) {
                         e.stopPropagation();
-                        _lpTimer = setTimeout(() => {
+                        _lpTimer = setTimeout(function() {
                           if (isPaused) resetTimer(slot.id);
                           _lpTimer = null;
                         }, 600);
                       };
-                      const onTimerPointerUp = (e) => {
+                      var onTimerPointerUp = function(e) {
                         e.stopPropagation();
                         if (_lpTimer) {
                           clearTimeout(_lpTimer);
@@ -2283,9 +2283,9 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                           else startTimerSlot(slot.id);
                         }
                       };
-                      const onTimerPointerLeave = () => { clearTimeout(_lpTimer); _lpTimer = null; };
+                      var onTimerPointerLeave = function() { clearTimeout(_lpTimer); _lpTimer = null; };
 
-                      const TimerBlock = ({ onDone, activeTaskLabel }) => (
+                      var TimerBlock = function({ onDone, activeTaskLabel }) { return (
                         <div onClick={e => e.stopPropagation()} style={{ marginTop:6 }}>
 
                           {/* ── Pinned active task context ── */}
@@ -2473,9 +2473,9 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                             </button>
                           </div>
                         </div>
-                      );
+                      ); };
 
-                      const TimerRow = () => null;
+                      var TimerRow = function() { return null; };
 
                       return (
                         <div style={{ flex:1, overflowY:"auto", padding:"0 16px 14px 20px" }} onClick={() => setExpandedId(null)}>
