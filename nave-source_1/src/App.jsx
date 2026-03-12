@@ -2266,7 +2266,7 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                       // Ring stroke colour by state
                       const ringStroke = isRunning ? "var(--purple)" : isPaused ? "var(--accent)" : "rgba(155,114,207,.25)";
                       // Timer tap/long-press handlers (plain vars, safe in render body)
-                      let _lpTimer = null;
+                      var _lpTimer = null;
                       const onTimerPointerDown = (e) => {
                         e.stopPropagation();
                         _lpTimer = setTimeout(() => {
