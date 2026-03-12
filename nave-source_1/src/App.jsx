@@ -1377,8 +1377,56 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
   const [newTaskText, setNewTaskText] = useState({});
   const [tick, setTick] = useState(0);
   const [viewingTomorrow, setViewingTomorrow] = useState(false);
-  // lateStarted: { [blockId]: { startedAt: ISO string } }
+  // lateStarted: { [slotId]: { startedAt: ms, accumulatedMs: number, paused: bool, pausedAt: ms|null } }
   const [lateStarted, setLateStarted] = useState({});
+
+  // Get elapsed ms for a slot (handles running + paused states)
+  const getElapsedMs = (info) => {
+    if (!info) return 0;
+    const accumulated = info.accumulatedMs || 0;
+    if (info.paused) return accumulated;
+    return accumulated + (Date.now() - (info.startedAt || Date.now()));
+  };
+
+  // Start or resume timer
+  const startTimerSlot = (slotId) => {
+    setLateStarted(prev => {
+      const existing = prev[slotId];
+      return { ...prev, [slotId]: {
+        startedAt: Date.now(),
+        accumulatedMs: existing?.accumulatedMs || 0,
+        paused: false,
+        pausedAt: null,
+      }};
+    });
+  };
+
+  // Pause timer — freeze elapsed, keep accumulated
+  const pauseTimerSlot = (slotId) => {
+    setLateStarted(prev => {
+      const info = prev[slotId];
+      if (!info || info.paused) return prev;
+      const accumulated = (info.accumulatedMs || 0) + (Date.now() - info.startedAt);
+      return { ...prev, [slotId]: { ...info, paused: true, pausedAt: Date.now(), accumulatedMs: accumulated } };
+    });
+  };
+
+  // Done: log elapsed time (even if running — snapshot now), mark complete, clear timer
+  const doneTimer = (slot, proj) => {
+    const info = lateStarted[slot.id];
+    const elapsedMs = getElapsedMs(info);
+    const elapsedMin = Math.round(elapsedMs / 60000);
+    if (elapsedMin > 0) logSession(proj.id, elapsedMin, null);
+    markManualDone(slot.id, proj.id, slot.todayTasks);
+    setLateStarted(prev => { const n = { ...prev }; delete n[slot.id]; return n; });
+  };
+
+  // Reset: clear timer entirely without saving
+  const resetTimer = (slotId) => {
+    setLateStarted(prev => { const n = { ...prev }; delete n[slotId]; return n; });
+  };
+
+
   const [conflictWarning, setConflictWarning] = useState(null); // blockId with conflict
 
   // pickerState: { blockId, projectId, selected: Set<taskId>, newText }
@@ -1579,21 +1627,9 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
     return newId;
   };
 
-  const startBlock = (blkId) => {
-    // Check for overlap with next block
-    const blk = blocks.find(b => b.id === blkId);
-    if (!blk) return;
-    const startMins = now.getHours() * 60 + now.getMinutes();
-    const endMins = startMins + blk.durationMin;
-    const conflict = todayBlocksSorted.find(b => b.id !== blkId && b.startHour * 60 + b.startMin < endMins && b.startHour * 60 + b.startMin > startMins);
-    if (conflict && conflictWarning !== blkId) {
-      const proj = conflict.projectId ? projects.find(p => p.id === conflict.projectId) : null;
-      setConflictWarning({ id: blkId, conflictName: proj?.name || conflict.label || "another block" });
-      return;
-    }
-    setConflictWarning(null);
-    setLateStarted(prev => ({ ...prev, [blkId]: { startedAt: new Date().toISOString() } }));
-    setExpandedId(blkId);
+  const startBlock = (slotId) => {
+    startTimerSlot(slotId);
+    setExpandedId(slotId);
   };
 
   // Today's loose task picks — can be loose tasks OR project tasks
@@ -1913,13 +1949,14 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                 const isCompleted = allTasksDone || manualCompleted.has(slot.id);
 
                 const lateInfo = lateStarted[slot.id];
-                const isRunning = !!lateInfo;
-                const cdStartMs = lateInfo ? new Date(lateInfo.startedAt).getTime() : 0;
-                const cdTotalSec = slot.durationMin * 60;
-                const cdRemSec = isRunning ? Math.max(0, cdTotalSec - Math.floor((Date.now() - cdStartMs) / 1000)) : cdTotalSec;
-                const cdM = Math.floor(cdRemSec / 60), cdS = cdRemSec % 60;
-                const cdStr = `${cdM}:${cdS.toString().padStart(2,"0")}`;
-                const cdDone = isRunning && cdRemSec === 0;
+                const timerActive = !!lateInfo; // has been started at least once
+                const isRunning = timerActive && !lateInfo.paused;
+                const isPaused = timerActive && !!lateInfo.paused;
+                const elapsedMs = getElapsedMs(lateInfo);
+                const elapsedSec = Math.floor(elapsedMs / 1000);
+                const elapsedM = Math.floor(elapsedSec / 60), elapsedS = elapsedSec % 60;
+                const elapsedStr = `${String(elapsedM).padStart(2,"0")}:${String(elapsedS).padStart(2,"0")}`;
+                const cdDone = false; // no auto-complete — user hits Done
 
                 const isPicking = pickerState?.blockId === slot.id;
 
@@ -2134,7 +2171,7 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                       <div style={{ flex:1, minWidth:0 }}>
                         {/* Eyebrow */}
                         <div style={{ fontSize:10, fontWeight:700, letterSpacing:".08em", textTransform:"uppercase", color: isNow ? (domainColor||"var(--accent)") : "var(--text3)", marginBottom: isNow || isExp ? 4 : 2, opacity: isCompleted ? 0.5 : 1 }}>
-                          {isSessionMode ? "Deep Work · Session" : "Deep Work · Tasks"}{isRunning ? ` · ${cdStr}` : ""}
+                          {isSessionMode ? "Deep Work · Session" : "Deep Work · Tasks"}{isRunning ? ` · ${elapsedStr}` : isPaused ? ` · ${elapsedStr} ⏸` : ""}
                         </div>
                         <div style={{ fontSize: isNow && !isExp ? 20 : 15, fontWeight:800, color: isCompleted ? "var(--text3)" : "var(--text)", letterSpacing:"-.02em", lineHeight:1.15, overflow:"hidden", textOverflow:"ellipsis", whiteSpace: isExp ? "normal" : "nowrap" }}>{proj.name}</div>
                         {!isExp && (
@@ -2191,173 +2228,213 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                     </div>
 
                     {/* Expanded body */}
-                    {isExp && (
-                      <div style={{ flex:1, overflowY:"auto", padding:"0 16px 14px 20px" }} onClick={() => setExpandedId(null)}>
-                        <div style={{ fontSize:12, color:"var(--text3)", marginBottom:10 }}>{domain?.name}{data.todayPrefs?.hideTimes ? "" : ` · ${fmtTime(slot.startHour, slot.startMin)}`} · {slot.durationMin} min</div>
+                    {isExp && (() => {
+                      // Total logged hours for this project (session log)
+                      const totalLoggedMin = (data.sessionLog || [])
+                        .filter(s => s.projectId === proj.id)
+                        .reduce((sum, s) => sum + (s.durationMin || 0), 0);
+                      const totalLoggedHrs = totalLoggedMin / 60;
+                      const loggedDisplay = totalLoggedMin === 0 ? null
+                        : totalLoggedMin < 60 ? `${totalLoggedMin}m logged`
+                        : `${totalLoggedHrs % 1 === 0 ? totalLoggedHrs : totalLoggedHrs.toFixed(1)}h logged`;
 
-                        {isCompleted ? (
-                          <div onClick={e => e.stopPropagation()}>
-                            {/* Faded task list */}
-                            {!isSessionMode && hasTodayTasks && (
-                              <div style={{ display:"flex", flexDirection:"column", gap:2, opacity:0.35, marginBottom:14 }}>
-                                {relevantTasks.map((t, i) => (
-                                  <div key={t.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"6px 0", borderBottom: i < relevantTasks.length-1 ? "1px solid var(--border2)" : "none" }}>
-                                    <div className="tl-check done" style={{ width:20, height:20, flexShrink:0 }}>
-                                      <span style={{fontSize:10,color:"#fff",fontWeight:700}}>✓</span>
-                                    </div>
-                                    <span style={{ fontSize:14, color:"var(--text3)", textDecoration:"line-through" }}>{t.text}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            {/* Complete row */}
-                            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                              <div style={{ width:22, height:22, borderRadius:"50%", background:"rgba(69,193,122,.15)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="var(--green)" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                              </div>
-                              <span style={{ fontSize:13, color:"var(--green)", fontWeight:700, flex:1 }}>Complete</span>
-                              <button onClick={() => unmarkManualDone(slot.id, proj.id, slot.todayTasks)}
-                                style={{ background:"none", border:"1px solid var(--border)", borderRadius:8, fontSize:12, color:"var(--text3)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", padding:"4px 10px" }}>
-                                ← Undo
-                              </button>
+                      // iOS-style timer display + controls
+                      const TimerBlock = ({ onDone }) => {
+                        const btnBase = { width:64, height:64, borderRadius:"50%", border:"none", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column", gap:3, fontFamily:"'DM Sans',sans-serif", fontWeight:700, fontSize:13, transition:"background .15s, opacity .15s" };
+                        return (
+                          <div onClick={e => e.stopPropagation()} style={{ marginTop:10 }}>
+                            {/* Big elapsed display */}
+                            <div style={{ textAlign:"center", fontVariantNumeric:"tabular-nums", fontSize:42, fontWeight:300, letterSpacing:"-0.02em", color: isRunning ? "var(--text)" : isPaused ? "var(--accent)" : "var(--text3)", margin:"6px 0 18px", fontFamily:"'DM Sans',sans-serif", lineHeight:1 }}>
+                              {elapsedStr}
                             </div>
-                          </div>
-                        ) : isSessionMode ? (
-                          <div style={{ display:"flex", gap:8 }}>
-                            {isNow && (
-                              <button className="tl-start-btn" style={{ ...(isRunning ? { background:"rgba(224,85,85,.12)", color:"var(--red)", borderColor:"rgba(224,85,85,.3)" } : {}) }}
-                                onClick={e => { e.stopPropagation(); isRunning ? setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }) : startBlock(slot.id); }}>
-                                {isRunning ? "Stop ■" : "Start →"}
-                              </button>
-                            )}
-                          </div>
-                        ) : isPicking ? (
-                          (() => {
-                            const ps = pickerState;
-                            const confirmPick = () => {
-                              let finalIds = [...ps.selected];
-                              if (ps.newText.trim()) { const newId = addTaskToProject(proj.id, ps.newText.trim()); finalIds.push(newId); }
-                              saveDWTodayTasks(slot.slotIndex, finalIds);
-                              setPickerState(null);
-                            };
-                            return (
-                              <div>
-                                <div style={{ fontSize:12, fontWeight:700, color:"var(--text3)", letterSpacing:".05em", textTransform:"uppercase", marginBottom:8 }}>Pick today's tasks</div>
-                                {proj.tasks.filter(t=>!t.done).map(t => {
-                                  const checked = ps.selected.has(t.id);
-                                  return (
-                                    <div key={t.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"7px 2px", cursor:"pointer" }}
-                                      onClick={() => setPickerState(prev => { const s = new Set(prev.selected); checked ? s.delete(t.id) : s.add(t.id); return { ...prev, selected: s }; })}>
-                                      <div style={{ width:18, height:18, borderRadius:5, border: checked ? "none" : "1.5px solid var(--border)", background: checked ? "var(--accent)" : "transparent", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                                        {checked && <span style={{ fontSize:10, color:"#000", fontWeight:800 }}>✓</span>}
-                                      </div>
-                                      <span style={{ fontSize:14, color: checked ? "var(--text)" : "var(--text2)" }}>{t.text}</span>
-                                    </div>
-                                  );
-                                })}
-                                <input style={{ width:"100%", background:"var(--bg3)", border:"1px solid var(--border2)", borderRadius:8, padding:"8px 10px", color:"var(--text)", fontSize:13, fontFamily:"'DM Sans',sans-serif", marginTop:8, boxSizing:"border-box" }}
-                                  placeholder="Add new task…" value={ps.newText}
-                                  onChange={e => setPickerState(prev => ({ ...prev, newText: e.target.value }))}
-                                  onKeyDown={e => e.key === "Enter" && confirmPick()} />
-                                <div style={{ display:"flex", gap:8, marginTop:8 }}>
-                                  <button className="dw-confirm-btn" style={{ flex:1 }} onClick={confirmPick}>✓ Confirm</button>
-                                  <button className="dw-back" onClick={() => setPickerState(null)}>✕</button>
+                            {/* Left + Right buttons row */}
+                            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"0 12px", marginBottom:14 }}>
+                              {/* Left: Reset (muted when idle, active when paused) */}
+                              {isPaused ? (
+                                <button onClick={e => { e.stopPropagation(); resetTimer(slot.id); }}
+                                  style={{ ...btnBase, background:"rgba(255,255,255,.1)", color:"var(--text)" }}>
+                                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M1 4v6h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M3.51 15a9 9 0 1 0 .49-4.95" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                  <span style={{ fontSize:11 }}>Reset</span>
+                                </button>
+                              ) : (
+                                <div style={{ ...btnBase, background:"rgba(255,255,255,.07)", color:"var(--text3)", opacity: timerActive ? 0.4 : 0.3, cursor:"default" }}>
+                                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M1 4v6h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M3.51 15a9 9 0 1 0 .49-4.95" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                  <span style={{ fontSize:11 }}>Reset</span>
                                 </div>
-                              </div>
-                            );
-                          })()
-                        ) : hasTodayTasks ? (
-                          <>
-                            {relevantTasks.map((t, i) => (
-                              <div key={t.id} className="tl-task-row" style={{ padding:"8px 0", borderBottom: i < relevantTasks.length-1 ? "1px solid var(--border2)" : "none" }}>
-                                <div className={`tl-check ${t.done ? "done" : ""} ${recentlyChecked.has(t.id) ? "bounce" : ""}`}
-                                  style={{ width:20, height:20, flexShrink:0 }}
-                                  onClick={e => {
-                                    e.stopPropagation();
-                                    toggleTask(proj.id, t.id);
-                                    // Auto-complete if all tasks now done
-                                    const wasAlreadyDone = t.done;
-                                    if (!wasAlreadyDone) {
-                                      const remaining = relevantTasks.filter(rt => rt.id !== t.id && !rt.done);
-                                      if (remaining.length === 0) markManualDone(slot.id, proj.id, slot.todayTasks);
-                                    }
-                                  }}>
-                                  {t.done && <span style={{fontSize:10,color:"#fff",fontWeight:700}}>✓</span>}
-                                </div>
-                                {editingDwTaskId === t.id ? (
-                                  <input autoFocus
-                                    style={{ flex:1, background:"transparent", border:"none", borderBottom:"1.5px solid var(--accent)", outline:"none", color:"var(--text)", fontSize:14, fontFamily:"'DM Sans',sans-serif", padding:"1px 0" }}
-                                    value={editingDwTaskText}
-                                    onChange={e => setEditingDwTaskText(e.target.value)}
-                                    onBlur={() => {
-                                      const txt = editingDwTaskText.trim();
-                                      if (txt && txt !== t.text) setData(d => ({ ...d, projects: d.projects.map(p => p.id !== proj.id ? p : { ...p, tasks: p.tasks.map(tk => tk.id !== t.id ? tk : { ...tk, text: txt }) }) }));
-                                      setEditingDwTaskId(null);
-                                    }}
-                                    onKeyDown={e => { if (e.key === "Enter" || e.key === "Escape") e.target.blur(); }}
-                                    onClick={e => e.stopPropagation()} />
-                                ) : (
-                                  <span className={`tl-task-txt ${t.done ? "done" : ""}`} style={{ fontSize:14, cursor:"text" }}
-                                    onClick={e => { e.stopPropagation(); if (!t.done) { setEditingDwTaskId(t.id); setEditingDwTaskText(t.text); } }}>
-                                    {t.text}
-                                  </span>
-                                )}
-                              </div>
-                            ))}
-                            <div style={{ display:"flex", justifyContent:"flex-end", alignItems:"center", marginTop:14, gap:8 }} onClick={e => e.stopPropagation()}>
-                              {isNow && (
-                                <button className="tl-start-btn" style={{ ...(isRunning ? { background:"rgba(224,85,85,.12)", color:"var(--red)", borderColor:"rgba(224,85,85,.3)" } : {}) }}
-                                  onClick={e => { e.stopPropagation(); isRunning ? setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }) : startBlock(slot.id); }}>
-                                  {isRunning ? "Stop ■" : "Start →"}
+                              )}
+                              {/* Right: Start / Pause / Resume */}
+                              {isRunning ? (
+                                <button onClick={e => { e.stopPropagation(); pauseTimerSlot(slot.id); }}
+                                  style={{ ...btnBase, background:"rgba(224,85,85,.85)", color:"#fff" }}>
+                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor"/></svg>
+                                  <span style={{ fontSize:11 }}>Pause</span>
+                                </button>
+                              ) : isPaused ? (
+                                <button onClick={e => { e.stopPropagation(); startTimerSlot(slot.id); }}
+                                  style={{ ...btnBase, background:"rgba(69,193,122,.85)", color:"#fff" }}>
+                                  <svg width="16" height="18" viewBox="0 0 16 18" fill="none"><path d="M1 1l14 8-14 8V1z" fill="currentColor"/></svg>
+                                  <span style={{ fontSize:11 }}>Resume</span>
+                                </button>
+                              ) : (
+                                <button onClick={e => { e.stopPropagation(); startTimerSlot(slot.id); }}
+                                  style={{ ...btnBase, background:"rgba(69,193,122,.85)", color:"#fff" }}>
+                                  <svg width="16" height="18" viewBox="0 0 16 18" fill="none"><path d="M1 1l14 8-14 8V1z" fill="currentColor"/></svg>
+                                  <span style={{ fontSize:11 }}>Start</span>
                                 </button>
                               )}
-                              <button
-                                onClick={e => { e.stopPropagation(); markManualDone(slot.id, proj.id, slot.todayTasks); }}
-                                style={{ display:"flex", alignItems:"center", gap:6, background:"rgba(69,193,122,.12)", border:"1.5px solid rgba(69,193,122,.3)", borderRadius:22, padding:"6px 14px", fontSize:12, fontWeight:700, color:"var(--green)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", transition:"background .15s" }}>
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                                Complete
-                              </button>
                             </div>
-                          </>
-                        ) : (
-                          <>
-                            <div style={{ fontSize:13, color:"var(--text3)", marginBottom:10 }}>No tasks picked yet.</div>
-                            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:8 }}>
-                              <div style={{ display:"flex", gap:8 }} onClick={e => e.stopPropagation()}>
-                                <button className="tl-start-btn"
-                                  onClick={e => { e.stopPropagation(); setPickerState({ blockId: slot.id, projectId: proj.id, selected: new Set(), newText: "" }); }}>
-                                  Pick tasks
-                                </button>
-                                {isNow && (
-                                  <button className="tl-start-btn" style={{ ...(isRunning ? { background:"rgba(224,85,85,.12)", color:"var(--red)", borderColor:"rgba(224,85,85,.3)" } : {}) }}
-                                    onClick={e => { e.stopPropagation(); isRunning ? setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }) : startBlock(slot.id); }}>
-                                    {isRunning ? "Stop ■" : "Start →"}
-                                  </button>
-                                )}
-                              </div>
-                              <button onClick={e => { e.stopPropagation(); markManualDone(slot.id, proj.id, null); }}
-                                style={{ display:"flex", alignItems:"center", gap:6, background:"rgba(69,193,122,.12)", border:"1.5px solid rgba(69,193,122,.3)", borderRadius:22, padding:"6px 14px", fontSize:12, fontWeight:700, color:"var(--green)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                                Complete
-                              </button>
-                            </div>
-                          </>
-                        )}
-
-
-                        {/* ── Green complete button — bottom right ── */}
-                        {!isCompleted && (
-                          <div style={{ display:"flex", justifyContent:"flex-end", marginTop:14 }} onClick={e => e.stopPropagation()}>
-                            <button
-                              onClick={() => { isSessionMode ? (logSession(proj.id, slot.durationMin, null), markManualDone(slot.id, proj.id, null)) : markManualDone(slot.id, proj.id, slot.todayTasks); }}
-                              style={{ display:"flex", alignItems:"center", gap:6, background:"rgba(69,193,122,.12)", border:"1.5px solid rgba(69,193,122,.3)", borderRadius:22, padding:"7px 14px", fontSize:12, fontWeight:700, color:"var(--green)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", letterSpacing:".02em", transition:"background .15s, border-color .15s" }}>
-                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                              Mark complete
+                            {/* Done bar — full width, bottom */}
+                            <button onClick={e => { e.stopPropagation(); onDone(); }}
+                              style={{ width:"100%", background: timerActive ? "rgba(69,193,122,.15)" : "rgba(255,255,255,.04)", border: timerActive ? "1.5px solid rgba(69,193,122,.35)" : "1px solid var(--border2)", borderRadius:14, padding:"11px 0", fontSize:13, fontWeight:700, color: timerActive ? "var(--green)" : "var(--text3)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", display:"flex", alignItems:"center", justifyContent:"center", gap:7, transition:"background .2s, border-color .2s, color .2s", boxSizing:"border-box" }}>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                              Done{timerActive ? ` · ${elapsedStr}` : ""}
                             </button>
                           </div>
-                        )}
-                      </div>
-                    )}
+                        );
+                      };
+
+                      // Kept for task mode bottom area (just the ios timer, no separate TimerRow)
+                      const TimerRow = () => null;
+
+                      return (
+                        <div style={{ flex:1, overflowY:"auto", padding:"0 16px 14px 20px" }} onClick={() => setExpandedId(null)}>
+                          <div style={{ fontSize:12, color:"var(--text3)", marginBottom:10 }}>{domain?.name}{data.todayPrefs?.hideTimes ? "" : ` · ${fmtTime(slot.startHour, slot.startMin)}`} · {slot.durationMin} min{loggedDisplay ? ` · ${loggedDisplay}` : ""}</div>
+
+                          {isCompleted ? (
+                            <div onClick={e => e.stopPropagation()}>
+                              {!isSessionMode && hasTodayTasks && (
+                                <div style={{ display:"flex", flexDirection:"column", gap:2, opacity:0.35, marginBottom:14 }}>
+                                  {relevantTasks.map((t, i) => (
+                                    <div key={t.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"6px 0", borderBottom: i < relevantTasks.length-1 ? "1px solid var(--border2)" : "none" }}>
+                                      <div className="tl-check done" style={{ width:20, height:20, flexShrink:0 }}>
+                                        <span style={{fontSize:10,color:"#fff",fontWeight:700}}>✓</span>
+                                      </div>
+                                      <span style={{ fontSize:14, color:"var(--text3)", textDecoration:"line-through" }}>{t.text}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                                <div style={{ width:22, height:22, borderRadius:"50%", background:"rgba(69,193,122,.15)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="var(--green)" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                </div>
+                                <span style={{ fontSize:13, color:"var(--green)", fontWeight:700, flex:1 }}>Session complete</span>
+                                <button onClick={() => unmarkManualDone(slot.id, proj.id, slot.todayTasks)}
+                                  style={{ background:"none", border:"1px solid var(--border)", borderRadius:8, fontSize:12, color:"var(--text3)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", padding:"4px 10px" }}>
+                                  ← Undo
+                                </button>
+                              </div>
+                            </div>
+
+                          ) : isSessionMode ? (
+                            <div onClick={e => e.stopPropagation()}>
+                              {totalLoggedMin > 0 && (
+                                <div style={{ background:"var(--bg3)", borderRadius:10, padding:"8px 14px", marginBottom:4, display:"flex", alignItems:"center", gap:10 }}>
+                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style={{ color:"var(--blue)", flexShrink:0 }}>
+                                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+                                    <path d="M12 6v6l4 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                                  </svg>
+                                  <span style={{ fontSize:12, color:"var(--text3)" }}>
+                                    <span style={{ fontWeight:700, color:"var(--text)" }}>{totalLoggedHrs % 1 === 0 ? totalLoggedHrs : totalLoggedHrs.toFixed(1)}h</span>
+                                    {" "}logged across all sessions
+                                  </span>
+                                </div>
+                              )}
+                              <TimerBlock onDone={() => doneTimer(slot, proj)} />
+                            </div>
+
+                          ) : isPicking ? (
+                            (() => {
+                              const ps = pickerState;
+                              const confirmPick = () => {
+                                let finalIds = [...ps.selected];
+                                if (ps.newText.trim()) { const newId = addTaskToProject(proj.id, ps.newText.trim()); finalIds.push(newId); }
+                                saveDWTodayTasks(slot.slotIndex, finalIds);
+                                setPickerState(null);
+                              };
+                              return (
+                                <div>
+                                  <div style={{ fontSize:12, fontWeight:700, color:"var(--text3)", letterSpacing:".05em", textTransform:"uppercase", marginBottom:8 }}>Pick today's tasks</div>
+                                  {proj.tasks.filter(t=>!t.done).map(t => {
+                                    const checked = ps.selected.has(t.id);
+                                    return (
+                                      <div key={t.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"7px 2px", cursor:"pointer" }}
+                                        onClick={() => setPickerState(prev => { const s = new Set(prev.selected); checked ? s.delete(t.id) : s.add(t.id); return { ...prev, selected: s }; })}>
+                                        <div style={{ width:18, height:18, borderRadius:5, border: checked ? "none" : "1.5px solid var(--border)", background: checked ? "var(--accent)" : "transparent", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                                          {checked && <span style={{ fontSize:10, color:"#000", fontWeight:800 }}>✓</span>}
+                                        </div>
+                                        <span style={{ fontSize:14, color: checked ? "var(--text)" : "var(--text2)" }}>{t.text}</span>
+                                      </div>
+                                    );
+                                  })}
+                                  <input style={{ width:"100%", background:"var(--bg3)", border:"1px solid var(--border2)", borderRadius:8, padding:"8px 10px", color:"var(--text)", fontSize:13, fontFamily:"'DM Sans',sans-serif", marginTop:8, boxSizing:"border-box" }}
+                                    placeholder="Add new task…" value={ps.newText}
+                                    onChange={e => setPickerState(prev => ({ ...prev, newText: e.target.value }))}
+                                    onKeyDown={e => e.key === "Enter" && confirmPick()} />
+                                  <div style={{ display:"flex", gap:8, marginTop:8 }}>
+                                    <button className="dw-confirm-btn" style={{ flex:1 }} onClick={confirmPick}>✓ Confirm</button>
+                                    <button className="dw-back" onClick={() => setPickerState(null)}>✕</button>
+                                  </div>
+                                </div>
+                              );
+                            })()
+
+                          ) : hasTodayTasks ? (
+                            <>
+                              {relevantTasks.map((t, i) => (
+                                <div key={t.id} className="tl-task-row" style={{ padding:"8px 0", borderBottom: i < relevantTasks.length-1 ? "1px solid var(--border2)" : "none" }}>
+                                  <div className={`tl-check ${t.done ? "done" : ""} ${recentlyChecked.has(t.id) ? "bounce" : ""}`}
+                                    style={{ width:20, height:20, flexShrink:0 }}
+                                    onClick={e => {
+                                      e.stopPropagation();
+                                      toggleTask(proj.id, t.id);
+                                      const wasAlreadyDone = t.done;
+                                      if (!wasAlreadyDone) {
+                                        const remaining = relevantTasks.filter(rt => rt.id !== t.id && !rt.done);
+                                        if (remaining.length === 0) {
+                                          logSession(proj.id, slot.durationMin, null);
+                                          markManualDone(slot.id, proj.id, slot.todayTasks);
+                                        }
+                                      }
+                                    }}>
+                                    {t.done && <span style={{fontSize:10,color:"#fff",fontWeight:700}}>✓</span>}
+                                  </div>
+                                  {editingDwTaskId === t.id ? (
+                                    <input autoFocus
+                                      style={{ flex:1, background:"transparent", border:"none", borderBottom:"1.5px solid var(--accent)", outline:"none", color:"var(--text)", fontSize:14, fontFamily:"'DM Sans',sans-serif", padding:"1px 0" }}
+                                      value={editingDwTaskText}
+                                      onChange={e => setEditingDwTaskText(e.target.value)}
+                                      onBlur={() => {
+                                        const txt = editingDwTaskText.trim();
+                                        if (txt && txt !== t.text) setData(d => ({ ...d, projects: d.projects.map(p => p.id !== proj.id ? p : { ...p, tasks: p.tasks.map(tk => tk.id !== t.id ? tk : { ...tk, text: txt }) }) }));
+                                        setEditingDwTaskId(null);
+                                      }}
+                                      onKeyDown={e => { if (e.key === "Enter" || e.key === "Escape") e.target.blur(); }}
+                                      onClick={e => e.stopPropagation()} />
+                                  ) : (
+                                    <span className={`tl-task-txt ${t.done ? "done" : ""}`} style={{ fontSize:14, cursor:"text" }}
+                                      onClick={e => { e.stopPropagation(); if (!t.done) { setEditingDwTaskId(t.id); setEditingDwTaskText(t.text); } }}>
+                                      {t.text}
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                              <TimerBlock onDone={() => doneTimer(slot, proj)} />
+                            </>
+
+                          ) : (
+                            <div onClick={e => e.stopPropagation()}>
+                              <div style={{ fontSize:13, color:"var(--text3)", marginBottom:10 }}>No tasks picked yet.</div>
+                              <button className="tl-start-btn"
+                                onClick={e => { e.stopPropagation(); setPickerState({ blockId: slot.id, projectId: proj.id, selected: new Set(), newText: "" }); }}>
+                                Pick tasks
+                              </button>
+                              <TimerBlock onDone={() => doneTimer(slot, proj)} />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               }
@@ -2498,6 +2575,14 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                   loose.map(t => {
                     const dom = data.domains?.find(d => d.id === t.domainId);
                     const isEditing = looseEditId === t.id;
+                    const isPickedToday = ((data.todayLoosePicks||{})[toISODate()]||[]).includes(t.id);
+                    const addToToday = () => {
+                      if (isPickedToday) return;
+                      setData(d => {
+                        const cur = (d.todayLoosePicks||{})[toISODate()] || [];
+                        return { ...d, todayLoosePicks: { ...(d.todayLoosePicks||{}), [toISODate()]: [...cur, t.id] } };
+                      });
+                    };
                     return (
                       <div key={t.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 0", borderBottom:"1px solid var(--border2)" }}>
                         {/* Circle — tap to check */}
@@ -2519,6 +2604,14 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                           )}
                           {dom && !isEditing && <div style={{ fontSize:11, color:"var(--text3)", marginTop:2 }}>{dom.name}</div>}
                         </div>
+                        {/* ↓ Do Today button */}
+                        <button onClick={addToToday} title="Do today"
+                          style={{ flexShrink:0, width:28, height:28, borderRadius:8, border: isPickedToday ? "1.5px solid rgba(232,160,48,.4)" : "1px solid var(--border)", background: isPickedToday ? "rgba(232,160,48,.12)" : "none", display:"flex", alignItems:"center", justifyContent:"center", cursor: isPickedToday ? "default" : "pointer", transition:"all .15s" }}>
+                          {isPickedToday
+                            ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                            : <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="var(--text3)" strokeWidth="2" strokeLinecap="round"/><path d="M19 16l-7 7-7-7" stroke="var(--text3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                          }
+                        </button>
                       </div>
                     );
                   })
@@ -3638,7 +3731,7 @@ function PlanScreen({ data, setData, onGoToSeason, lightMode, toggleTheme }) {
                         </div>
                         {isExpFilled && !isPastDay && (
                           <div style={{ borderTop:"1px solid var(--border2)" }} onClick={e => e.stopPropagation()}>
-                            {projTasks3.length > 0 && (
+                            {projTasks3.length > 0 && proj2?.mode !== "sessions" && (
                               <div style={{ padding:"10px 14px 4px" }}>
                                 <div style={{ fontSize:11, fontWeight:700, letterSpacing:".07em", textTransform:"uppercase", color:"var(--text3)", marginBottom:6 }}>
                                   Focus tasks <span style={{ color:"var(--text3)", fontWeight:400, textTransform:"none", letterSpacing:0 }}>(optional)</span>
@@ -4417,23 +4510,37 @@ function ShutdownSheet({ onClose, onComplete, alreadyDone, data, onCategorizeLoo
   const [checked, setChecked] = useState(alreadyDone ? [0,1,2,3] : []);
   const { projects, domains } = data;
 
-  // Uncategorized loose tasks added today
+  // Today's date
   const todayStr = new Date().toDateString();
+  const todayISO = new Date().toISOString().slice(0,10);
+
+  // Loose tasks picked for today that are still undone
+  const todayPickIds = (data.todayLoosePicks || {})[todayISO] || [];
+  const undoneToday = todayPickIds
+    .map(id => (data.looseTasks||[]).find(t => t.id === id))
+    .filter(t => t && !t.done);
+
+  // Uncategorized loose tasks (no domain) added today but NOT in today picks
   const uncategorized = (data.looseTasks || []).filter(t =>
     !t.done && t.domainId === null && t.createdAt && new Date(t.createdAt).toDateString() === todayStr
+    && !todayPickIds.includes(t.id)
   );
+
+  // All tasks needing attention in shutdown = undone today picks + uncategorized
+  const needsAttention = [...undoneToday, ...uncategorized.filter(t => !undoneToday.find(u => u.id === t.id))];
+
   const [localDomains, setLocalDomains] = useState(() => {
     const m = {};
-    uncategorized.forEach(t => { m[t.id] = null; });
+    needsAttention.forEach(t => { m[t.id] = t.domainId || null; });
     return m;
   });
-  const allCategorized = uncategorized.every(t => localDomains[t.id] !== null && localDomains[t.id] !== undefined);
+  const allCategorized = needsAttention.every(t => localDomains[t.id] !== null && localDomains[t.id] !== undefined);
   const assignDomain = (taskId, domainId) => {
     setLocalDomains(m => ({ ...m, [taskId]: domainId }));
     onCategorizeLoose(taskId, domainId);
   };
 
-  const allDone = checked.length === SD_ITEMS.length && (uncategorized.length === 0 || allCategorized);
+  const allDone = checked.length === SD_ITEMS.length && (needsAttention.length === 0 || allCategorized);
 
   const toggle = i => setChecked(p => p.includes(i) ? p.filter(x=>x!==i) : [...p, i]);
 
@@ -4495,8 +4602,8 @@ function ShutdownSheet({ onClose, onComplete, alreadyDone, data, onCategorizeLoo
           ))}
 
 
-                    {/* UNCATEGORIZED LOOSE TASKS */}
-          {uncategorized.length > 0 && (
+                    {/* UNFINISHED TODAY PICKS + UNCATEGORIZED LOOSE TASKS */}
+          {needsAttention.length > 0 && (
             <div style={{ margin:"4px 0 14px" }}>
               <div style={{ height:1, background:"var(--border2)", marginBottom:14 }} />
               <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10 }}>
@@ -4508,25 +4615,31 @@ function ShutdownSheet({ onClose, onComplete, alreadyDone, data, onCategorizeLoo
                 }}>
                   {allCategorized
                     ? <span style={{fontSize:10,color:"#fff",fontWeight:700}}>✓</span>
-                    : <span style={{fontSize:10,color:"var(--accent)",fontWeight:700}}>{uncategorized.filter(t => !localDomains[t.id]).length}</span>
+                    : <span style={{fontSize:10,color:"var(--accent)",fontWeight:700}}>{needsAttention.filter(t => !localDomains[t.id]).length}</span>
                   }
                 </div>
                 <span style={{ fontSize:14, color:"var(--text)", fontWeight:500 }}>
-                  Categorize today's loose tasks
+                  Assign unfinished tasks to a domain
                 </span>
               </div>
               <div style={{ marginLeft:28, display:"flex", flexDirection:"column", gap:8 }}>
-                {uncategorized.map(task => {
+                {needsAttention.map(task => {
                   const assigned = localDomains[task.id];
+                  const isFromToday = todayPickIds.includes(task.id);
                   return (
                     <div key={task.id} style={{ background:"var(--bg3)", borderRadius:12, padding:"12px 14px" }}>
-                      <div style={{ fontSize:13, color:"var(--text)", marginBottom:10, fontWeight:500 }}>{task.text}</div>
-                      <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:8 }}>
+                        {isFromToday && (
+                          <span style={{ fontSize:10, fontWeight:700, color:"var(--accent)", background:"rgba(232,160,48,.1)", border:"1px solid rgba(232,160,48,.25)", borderRadius:6, padding:"2px 6px", flexShrink:0 }}>Today</span>
+                        )}
+                        <div style={{ fontSize:13, color:"var(--text)", fontWeight:500 }}>{task.text}</div>
+                      </div>
+                      <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
                         {domains.map(d => (
                           <button key={d.id} onClick={() => assignDomain(task.id, d.id)}
                             style={{
-                              display:"flex", alignItems:"center", gap:6,
-                              padding:"6px 12px", borderRadius:20,
+                              display:"flex", alignItems:"center", gap:5,
+                              padding:"5px 11px", borderRadius:20,
                               border: assigned === d.id ? `1.5px solid ${d.color}` : "1.5px solid var(--border)",
                               background: assigned === d.id ? `${d.color}22` : "var(--bg4)",
                               color: assigned === d.id ? d.color : "var(--text2)",
@@ -4534,7 +4647,7 @@ function ShutdownSheet({ onClose, onComplete, alreadyDone, data, onCategorizeLoo
                               fontFamily:"'DM Sans',sans-serif", transition:"all .12s",
                             }}
                           >
-                            <span style={{ width:7, height:7, borderRadius:"50%", background:d.color, flexShrink:0, display:"inline-block" }} />
+                            <span style={{ width:6, height:6, borderRadius:"50%", background:d.color, flexShrink:0, display:"inline-block" }} />
                             {d.name}
                           </button>
                         ))}
@@ -5361,7 +5474,17 @@ export default function App() {
           {tab==="plan"     && <PlanScreen     data={data} setData={setData} onGoToSeason={()=>setTab("season")} lightMode={lightMode} toggleTheme={toggleTheme} />}
           {tab==="season"  && <SeasonScreen   data={data} setData={setData} />}
 
-          {sheet==="shutdown"  && <ShutdownSheet    onClose={closeSheet} onComplete={()=>setData(d=>({...d,shutdownDone:true,shutdownDate:toISODate()}))} alreadyDone={data.shutdownDone} data={data} onCategorizeLoose={(taskId, domainId) => setData(d => ({ ...d, looseTasks: (d.looseTasks||[]).map(t => t.id === taskId ? { ...t, domainId } : t) }))} />}
+          {sheet==="shutdown"  && <ShutdownSheet    onClose={closeSheet} onComplete={()=>setData(d=>({...d,shutdownDone:true,shutdownDate:toISODate()}))} alreadyDone={data.shutdownDone} data={data} onCategorizeLoose={(taskId, domainId) => setData(d => {
+              const todayISO = new Date().toISOString().slice(0,10);
+              // Assign domain + remove from todayLoosePicks (it's now categorized)
+              const picks = (d.todayLoosePicks||{})[todayISO] || [];
+              const newPicks = picks.filter(id => id !== taskId);
+              return {
+                ...d,
+                looseTasks: (d.looseTasks||[]).map(t => t.id === taskId ? { ...t, domainId } : t),
+                todayLoosePicks: { ...(d.todayLoosePicks||{}), [todayISO]: newPicks }
+              };
+            })} />}
           {sheet==="addblock"  && <AddBlockSheet    data={data} onClose={closeSheet} onAddRoutine={handleAddRoutine} />}
 
           {sheet==="categorize"&& <CategorizeSheet  data={data} onClose={closeSheet} onCategorize={handleCategorize} onDismiss={handleDismissInbox} onDoToday={handleDoToday} />}
