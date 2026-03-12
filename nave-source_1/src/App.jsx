@@ -1021,43 +1021,7 @@ const css = `
 
 // ─── STATUS BAR (no time) ─────────────────────────────────────────────────────
 // ─── ONBOARDING FLOW ──────────────────────────────────────────────────────────
-const ONBOARDING_CARDS = [
-  {
-    eyebrow: "Welcome to Clearwork",
-    headline: "Built on two\nbig ideas.",
-    body: "Clearwork isn't a to-do app. It's a system built around how your brain actually works — drawing on the research of Cal Newport and Andrew Huberman.",
-    accent: "#E8A030",
-    illustration: "welcome",
-  },
-  {
-    eyebrow: "Cal Newport · Deep Work",
-    headline: "Your best thinking needs\nprotected time.",
-    body: "Shallow tasks — email, admin, quick replies — expand to fill whatever time you give them. Deep Work blocks carve out uninterrupted 60–90 minute windows for the work that actually moves things forward.",
-    accent: "#5B8AF0",
-    illustration: "deepwork",
-  },
-  {
-    eyebrow: "Task Fatigue",
-    headline: "A long list is\ndemotivating by design.",
-    body: "Seeing 40 tasks creates decision paralysis before you've started. Clearwork keeps tasks inside projects, projects inside domains — and Today only shows what's actually scheduled. The rest is out of sight until you need it.",
-    accent: "#45C17A",
-    illustration: "tasks",
-  },
-  {
-    eyebrow: "Cal Newport · Seasons",
-    headline: "Big goals need\na longer horizon.",
-    body: "Weeks are too short for meaningful progress. Clearwork uses a quarterly Season — up to 4 goals that define what this chapter is actually about. Everything else is in service of those.",
-    accent: "#9B72CF",
-    illustration: "season",
-  },
-  {
-    eyebrow: "Newport + Huberman · Shutdown",
-    headline: "Ending work deliberately\nprotects your recovery.",
-    body: "Without a clear stop signal, your brain keeps processing work problems into the evening. The Shutdown Ritual is a deliberate cognitive closure — a signal that the workday is done and recovery can begin.",
-    accent: "#4BAABB",
-    illustration: "shutdown",
-  },
-];
+
 
 function OnboardingIllustration({ type, accent }) {
   if (type === "welcome") return (
@@ -1131,6 +1095,44 @@ function OnboardingIllustration({ type, accent }) {
 }
 
 function OnboardingFlow({ onDone }) {
+const ONBOARDING_CARDS = [
+  {
+    eyebrow: "Welcome to Clearwork",
+    headline: "Built on two\nbig ideas.",
+    body: "Clearwork isn't a to-do app. It's a system built around how your brain actually works — drawing on the research of Cal Newport and Andrew Huberman.",
+    accent: "#E8A030",
+    illustration: "welcome",
+  },
+  {
+    eyebrow: "Cal Newport · Deep Work",
+    headline: "Your best thinking needs\nprotected time.",
+    body: "Shallow tasks — email, admin, quick replies — expand to fill whatever time you give them. Deep Work blocks carve out uninterrupted 60–90 minute windows for the work that actually moves things forward.",
+    accent: "#5B8AF0",
+    illustration: "deepwork",
+  },
+  {
+    eyebrow: "Task Fatigue",
+    headline: "A long list is\ndemotivating by design.",
+    body: "Seeing 40 tasks creates decision paralysis before you've started. Clearwork keeps tasks inside projects, projects inside domains — and Today only shows what's actually scheduled. The rest is out of sight until you need it.",
+    accent: "#45C17A",
+    illustration: "tasks",
+  },
+  {
+    eyebrow: "Cal Newport · Seasons",
+    headline: "Big goals need\na longer horizon.",
+    body: "Weeks are too short for meaningful progress. Clearwork uses a quarterly Season — up to 4 goals that define what this chapter is actually about. Everything else is in service of those.",
+    accent: "#9B72CF",
+    illustration: "season",
+  },
+  {
+    eyebrow: "Newport + Huberman · Shutdown",
+    headline: "Ending work deliberately\nprotects your recovery.",
+    body: "Without a clear stop signal, your brain keeps processing work problems into the evening. The Shutdown Ritual is a deliberate cognitive closure — a signal that the workday is done and recovery can begin.",
+    accent: "#4BAABB",
+    illustration: "shutdown",
+  },
+];
+
   const [card, setCard] = useState(0);
   const [animDir, setAnimDir] = useState(null); // "in" | null
   const touchStartX = useRef(null);
