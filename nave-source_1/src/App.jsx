@@ -296,7 +296,7 @@ const css = `
   /* Visual compensation: scale text down visually where needed without triggering zoom */
   input.small-input,textarea.small-input,select.small-input{transform-origin:left center;}
   :root{
-    --bg:#181A1B;--bg2:#1E2122;--bg3:#252829;--bg4:#2C3032;
+    --bg:#161514;--bg2:#1E1C1A;--bg3:#252220;--bg4:#2C2926;
     --border:#2E3235;--border2:#252829;
     --accent:#E8A030;--accent-s:rgba(232,160,48,0.12);
     --green:#45C17A;--red:#E05555;
@@ -970,18 +970,18 @@ const css = `
   /* QUICK REMINDERS MODAL */
   /* ── Capture panel ── */
   .cap-backdrop{position:absolute;inset:0;z-index:24;background:rgba(0,0,0,.55);backdrop-filter:blur(2px);}
-  .cap-panel{position:absolute;left:0;right:0;bottom:0;background:var(--bg2);border-radius:24px 24px 0 0;z-index:25;display:flex;flex-direction:column;max-height:72vh;animation:sheet-up .22s cubic-bezier(.4,0,.2,1);box-shadow:0 -4px 40px rgba(0,0,0,.5);}
+  .cap-panel{position:absolute;left:0;right:0;bottom:0;background:var(--bg2);border-radius:24px 24px 0 0;z-index:25;display:flex;flex-direction:column;height:75vh;animation:sheet-up .22s cubic-bezier(.4,0,.2,1);box-shadow:0 -4px 40px rgba(0,0,0,.5);}
   .cap-handle-row{display:flex;justify-content:center;padding-top:10px;flex-shrink:0;}
   .cap-handle{width:36px;height:4px;border-radius:2px;background:var(--border);}
   .cap-header{display:flex;align-items:center;justify-content:space-between;padding:10px 20px 12px;flex-shrink:0;border-bottom:1px solid var(--border2);}
   .cap-title{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);}
   .cap-close{background:none;border:none;cursor:pointer;padding:4px;color:var(--text3);display:flex;align-items:center;justify-content:center;}
-  .cap-items{flex:1;overflow-y:auto;padding:6px 18px 4px;}
+  .cap-items{max-height:40%;overflow-y:auto;padding:6px 18px 4px;flex-shrink:0;}
   .cap-item{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid var(--border2);}
   .cap-item-dot{width:5px;height:5px;border-radius:50%;background:var(--text3);flex-shrink:0;margin-top:7px;}
   .cap-item-text{flex:1;font-size:15px;color:var(--text);line-height:1.4;}
-  .cap-textarea-row{padding:10px 18px 6px;flex-shrink:0;}
-  .cap-textarea{width:100%;background:transparent;border:none;outline:none;resize:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:16px;line-height:1.55;box-sizing:border-box;min-height:52px;}
+  .cap-textarea-row{padding:10px 18px 6px;flex:1;display:flex;flex-direction:column;}
+  .cap-textarea{width:100%;background:transparent;border:none;outline:none;resize:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:16px;line-height:1.55;box-sizing:border-box;min-height:52px;flex:1;}
   .cap-textarea::placeholder{color:var(--text3);}
   .cap-footer{padding:8px 18px 28px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
   .cap-count{font-size:12px;color:var(--text3);}
@@ -2086,6 +2086,42 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                     {/* Colour stripe */}
                     {domainColor && <div style={{ position:"absolute", left:0, top:0, bottom:0, width:3, background: isCompleted ? "var(--border)" : domainColor, borderRadius:"18px 0 0 18px", transition:"background .3s" }} />}
 
+                    {/* ── Overflow overlay — fills card, X to close ── */}
+                    {dwOverflowOpen === slot.id && (
+                      <div style={{ position:"absolute", inset:0, background:"var(--bg2)", borderRadius:18, zIndex:10, display:"flex", flexDirection:"column", padding:"16px 16px 14px" }} onClick={e => e.stopPropagation()}>
+                        {/* Header row */}
+                        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
+                          <span style={{ fontSize:13, fontWeight:700, color:"var(--text2)" }}>{proj?.name}</span>
+                          <button onClick={() => setDwOverflowOpen(null)}
+                            style={{ background:"var(--bg3)", border:"1px solid var(--border)", borderRadius:"50%", width:28, height:28, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"var(--text3)", flexShrink:0 }}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></svg>
+                          </button>
+                        </div>
+                        {/* Options */}
+                        <div style={{ display:"flex", flexDirection:"column", gap:8, flex:1 }}>
+                          <button
+                            onClick={() => { mutateDWSlot(viewDateKeyISO, slot.slotIndex, null); setExpandedId(null); setDwOverflowOpen(null); }}
+                            style={{ flex:1, background:"var(--bg3)", border:"1px solid var(--border)", borderRadius:14, padding:"0 16px", fontSize:14, fontWeight:600, color:"var(--text2)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", display:"flex", alignItems:"center", gap:12 }}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/></svg>
+                            Unassign
+                          </button>
+                          {!viewingTomorrow && (
+                            <button
+                              onClick={() => {
+                                const tomorrowISO = toISODate(new Date(Date.now() + 86400000));
+                                mutateDWSlot(toISODate(), slot.slotIndex, null);
+                                mutateDWSlot(tomorrowISO, slot.slotIndex, { projectId: slot.projectId, startHour: slot.startHour, startMin: slot.startMin, durationMin: slot.durationMin, todayTasks: slot.todayTasks });
+                                setExpandedId(null); setDwOverflowOpen(null);
+                              }}
+                              style={{ flex:1, background:"var(--bg3)", border:"1px solid var(--border)", borderRadius:14, padding:"0 16px", fontSize:14, fontWeight:600, color:"var(--text2)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", display:"flex", alignItems:"center", gap:12 }}>
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                              Move to Tomorrow
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Collapsed header — visible always, bigger when now */}
                     <div style={{ padding: isExp ? "14px 16px 10px 20px" : "14px 16px 12px 20px", flex: isExp ? "none" : 1, display:"flex", alignItems:"flex-start", gap:12, minHeight:0 }}>
                       {/* Mode icon */}
@@ -2194,10 +2230,6 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                                 {isRunning ? "Stop ■" : "Start →"}
                               </button>
                             )}
-                            <button className="tl-start-btn" style={{ background:"rgba(69,193,122,.12)", color:"var(--green)", borderColor:"rgba(69,193,122,.3)" }}
-                              onClick={e => { e.stopPropagation(); logSession(proj.id, slot.durationMin, null); setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }); markManualDone(slot.id, proj.id, null); }}>
-                              Done ✓
-                            </button>
                           </div>
                         ) : isPicking ? (
                           (() => {
@@ -2312,28 +2344,7 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                           </>
                         )}
 
-                        {/* Overflow menu */}
-                        {dwOverflowOpen === slot.id && (
-                          <div style={{ marginTop:12, background:"var(--bg3)", borderRadius:10, border:"1px solid var(--border)", overflow:"hidden" }} onClick={e => e.stopPropagation()}>
-                            <button style={{ width:"100%", background:"none", border:"none", borderBottom:"1px solid var(--border2)", padding:"11px 14px", textAlign:"left", fontSize:13, color:"var(--text2)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontWeight:500, display:"flex", alignItems:"center", gap:10 }}
-                              onClick={() => { mutateDWSlot(viewDateKeyISO, slot.slotIndex, null); setExpandedId(null); setDwOverflowOpen(null); }}>
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/></svg>
-                              Unassign
-                            </button>
-                            {!viewingTomorrow && (
-                              <button style={{ width:"100%", background:"none", border:"none", padding:"11px 14px", textAlign:"left", fontSize:13, color:"var(--text2)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontWeight:500, display:"flex", alignItems:"center", gap:10 }}
-                                onClick={() => {
-                                  const tomorrowISO = toISODate(new Date(Date.now() + 86400000));
-                                  mutateDWSlot(toISODate(), slot.slotIndex, null);
-                                  mutateDWSlot(tomorrowISO, slot.slotIndex, { projectId: slot.projectId, startHour: slot.startHour, startMin: slot.startMin, durationMin: slot.durationMin, todayTasks: slot.todayTasks });
-                                  setExpandedId(null); setDwOverflowOpen(null);
-                                }}>
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                                Move to Tomorrow
-                              </button>
-                            )}
-                          </div>
-                        )}
+
                         {/* ── Green complete button — bottom right ── */}
                         {!isCompleted && (
                           <div style={{ display:"flex", justifyContent:"flex-end", marginTop:14 }} onClick={e => e.stopPropagation()}>
