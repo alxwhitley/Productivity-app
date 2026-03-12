@@ -1950,14 +1950,19 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                 const isCompleted = allTasksDone || manualCompleted.has(slot.id);
 
                 const lateInfo = lateStarted[slot.id];
-                const timerActive = !!lateInfo; // has been started at least once
+                const timerActive = !!lateInfo;
                 const isRunning = timerActive && !lateInfo.paused;
                 const isPaused = timerActive && !!lateInfo.paused;
                 const elapsedMs = getElapsedMs(lateInfo);
+                const totalMs = slot.durationMin * 60 * 1000;
+                const remainMs = timerActive ? Math.max(0, totalMs - elapsedMs) : totalMs;
+                const remainSec = Math.ceil(remainMs / 1000);
+                const cdM = Math.floor(remainSec / 60), cdS = remainSec % 60;
+                const cdStr = `${String(cdM).padStart(2,"0")}:${String(cdS).padStart(2,"0")}`;
+                // elapsedStr kept for Done label only
                 const elapsedSec = Math.floor(elapsedMs / 1000);
-                const elapsedM = Math.floor(elapsedSec / 60), elapsedS = elapsedSec % 60;
-                const elapsedStr = `${String(elapsedM).padStart(2,"0")}:${String(elapsedS).padStart(2,"0")}`;
-                const cdDone = false; // no auto-complete — user hits Done
+                const elapsedM2 = Math.floor(elapsedSec / 60), elapsedS2 = elapsedSec % 60;
+                const elapsedStr = `${String(elapsedM2).padStart(2,"0")}:${String(elapsedS2).padStart(2,"0")}`;
 
                 const isPicking = pickerState?.blockId === slot.id;
 
@@ -2172,7 +2177,7 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                       <div style={{ flex:1, minWidth:0 }}>
                         {/* Eyebrow */}
                         <div style={{ fontSize:10, fontWeight:700, letterSpacing:".08em", textTransform:"uppercase", color: isNow ? (domainColor||"var(--accent)") : "var(--text3)", marginBottom: isNow || isExp ? 4 : 2, opacity: isCompleted ? 0.5 : 1 }}>
-                          {isSessionMode ? "Deep Work · Session" : "Deep Work · Tasks"}{isRunning ? ` · ${elapsedStr}` : isPaused ? ` · ${elapsedStr} ⏸` : ""}
+                          {isSessionMode ? "Deep Work · Session" : "Deep Work · Tasks"}
                         </div>
                         <div style={{ fontSize: isNow && !isExp ? 20 : 15, fontWeight:800, color: isCompleted ? "var(--text3)" : "var(--text)", letterSpacing:"-.02em", lineHeight:1.15, overflow:"hidden", textOverflow:"ellipsis", whiteSpace: isExp ? "normal" : "nowrap" }}>{proj.name}</div>
                         {!isExp && (
@@ -2210,9 +2215,9 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                       {isCompleted && !isExp && <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                       {!isCompleted && !isExp && (
                         timerActive ? (
-                          <div style={{ display:"flex", alignItems:"center", gap:5, background:"var(--bg3)", border:`1px solid ${isRunning ? "rgba(232,160,48,.4)" : "rgba(232,160,48,.2)"}`, borderRadius:20, padding:"4px 8px 4px 6px", flexShrink:0 }}>
+                          <div style={{ display:"flex", alignItems:"center", gap:5, background:"var(--bg3)", border:`1px solid ${isRunning ? "rgba(232,160,48,.4)" : "rgba(232,160,48,.2)"}`, borderRadius:20, padding:"3px 8px 3px 6px", flexShrink:0 }}>
                             <div style={{ width:5, height:5, borderRadius:"50%", background: isRunning ? "var(--accent)" : "var(--text3)", flexShrink:0, opacity: isRunning ? 1 : 0.5 }} />
-                            <span style={{ fontSize:11, fontWeight:700, color: isRunning ? "var(--accent)" : "var(--text3)", fontVariantNumeric:"tabular-nums", letterSpacing:".02em" }}>{elapsedStr}</span>
+                            <span style={{ fontSize:11, fontWeight:700, color: isRunning ? "var(--accent)" : "var(--text3)", fontVariantNumeric:"tabular-nums", letterSpacing:".02em" }}>{cdStr}</span>
                           </div>
                         ) : hasTodayTasks ? (
                           <div style={{ width:32, height:32, borderRadius:"50%", background:"var(--bg3)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, border:"1px solid var(--border2)" }}>
@@ -2246,59 +2251,55 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                         : totalLoggedMin < 60 ? `${totalLoggedMin}m logged`
                         : `${totalLoggedHrs % 1 === 0 ? totalLoggedHrs : totalLoggedHrs.toFixed(1)}h logged`;
 
-                      // Compact timer bar — single row with elapsed + controls + done
+                      // Compact timer — countdown, minimal, reset only when paused
                       const TimerBlock = ({ onDone }) => {
-                        const iconBtn = (onClick, children, active, danger) => (
+                        const circBtn = (onClick, icon, bg, color) => (
                           <button onClick={e => { e.stopPropagation(); onClick(); }}
-                            style={{ width:32, height:32, borderRadius:"50%", border:"none", background: danger ? "var(--bg4)" : active ? "var(--bg4)" : "var(--bg3)", color: danger ? "var(--red)" : active ? "var(--text)" : "var(--text3)", display:"flex", alignItems:"center", justifyContent:"center", cursor: onClick ? "pointer" : "default", flexShrink:0, transition:"background .12s, color .12s", opacity: (!active && !danger) ? 0.45 : 1 }}>
-                            {children}
+                            style={{ width:28, height:28, borderRadius:"50%", border:"none", background:bg, color:color, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", flexShrink:0 }}>
+                            {icon}
                           </button>
                         );
                         return (
-                          <div onClick={e => e.stopPropagation()} style={{ marginTop:12, display:"flex", flexDirection:"column", gap:8 }}>
-                            {/* Single row: elapsed · reset · start/pause/resume */}
-                            <div style={{ display:"flex", alignItems:"center", gap:8, background:"var(--bg3)", borderRadius:12, padding:"8px 12px", border:"1px solid var(--border2)" }}>
-                              {/* Elapsed display */}
-                              <span style={{ fontSize:16, fontWeight:700, fontVariantNumeric:"tabular-nums", letterSpacing:".02em", color: isRunning ? "var(--text)" : isPaused ? "var(--accent)" : "var(--text3)", minWidth:40, fontFamily:"'DM Sans',sans-serif", lineHeight:1 }}>
-                                {elapsedStr}
+                          <div onClick={e => e.stopPropagation()} style={{ marginTop:10, display:"flex", flexDirection:"column", gap:6 }}>
+                            {/* Timer row */}
+                            <div style={{ display:"flex", alignItems:"center", gap:8, background:"var(--bg3)", borderRadius:10, padding:"6px 10px", border:"1px solid var(--border2)" }}>
+                              {/* Countdown */}
+                              <span style={{ fontSize:14, fontWeight:700, fontVariantNumeric:"tabular-nums", letterSpacing:".02em", color: isRunning ? "var(--text)" : isPaused ? "var(--accent)" : "var(--text3)", fontFamily:"'DM Sans',sans-serif", lineHeight:1, minWidth:36 }}>
+                                {cdStr}
                               </span>
-                              {/* Running dot */}
-                              {isRunning && <div style={{ width:6, height:6, borderRadius:"50%", background:"var(--accent)", flexShrink:0, animation:"pulse-dot 1.2s ease-in-out infinite" }} />}
+                              {isRunning && <div style={{ width:5, height:5, borderRadius:"50%", background:"var(--accent)", flexShrink:0, animation:"pulse-dot 1.2s ease-in-out infinite" }} />}
                               <div style={{ flex:1 }} />
-                              {/* Reset — only interactive when paused */}
+                              {/* Paused: show Reset + Resume side by side */}
                               {isPaused ? (
-                                iconBtn(() => resetTimer(slot.id),
-                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M1 4v6h6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/><path d="M3.51 15a9 9 0 1 0 .49-4.95" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>,
-                                  true, false)
+                                <>
+                                  <button onClick={e => { e.stopPropagation(); resetTimer(slot.id); }}
+                                    style={{ fontSize:11, fontWeight:600, color:"var(--text3)", background:"none", border:"none", cursor:"pointer", padding:"0 6px", fontFamily:"'DM Sans',sans-serif" }}>
+                                    Reset
+                                  </button>
+                                  {circBtn(() => startTimerSlot(slot.id),
+                                    <svg width="9" height="10" viewBox="0 0 16 18" fill="none"><path d="M1 1l14 8-14 8V1z" fill="currentColor"/></svg>,
+                                    "var(--green)", "#fff")}
+                                </>
+                              ) : isRunning ? (
+                                circBtn(() => pauseTimerSlot(slot.id),
+                                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor"/></svg>,
+                                  "var(--red)", "#fff")
                               ) : (
-                                <div style={{ width:32, height:32, borderRadius:"50%", background:"var(--bg3)", display:"flex", alignItems:"center", justifyContent:"center", opacity:0.25, color:"var(--text3)" }}>
-                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M1 4v6h6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/><path d="M3.51 15a9 9 0 1 0 .49-4.95" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                                </div>
-                              )}
-                              {/* Start / Pause / Resume */}
-                              {isRunning ? (
-                                <button onClick={e => { e.stopPropagation(); pauseTimerSlot(slot.id); }}
-                                  style={{ width:32, height:32, borderRadius:"50%", border:"none", background:"var(--red)", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", flexShrink:0 }}>
-                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor"/></svg>
-                                </button>
-                              ) : (
-                                <button onClick={e => { e.stopPropagation(); startTimerSlot(slot.id); }}
-                                  style={{ width:32, height:32, borderRadius:"50%", border:"none", background:"var(--green)", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", flexShrink:0 }}>
-                                  <svg width="11" height="12" viewBox="0 0 16 18" fill="none"><path d="M1 1l14 8-14 8V1z" fill="currentColor"/></svg>
-                                </button>
+                                circBtn(() => startTimerSlot(slot.id),
+                                  <svg width="9" height="10" viewBox="0 0 16 18" fill="none"><path d="M1 1l14 8-14 8V1z" fill="currentColor"/></svg>,
+                                  "var(--green)", "#fff")
                               )}
                             </div>
                             {/* Done bar */}
                             <button onClick={e => { e.stopPropagation(); onDone(); }}
-                              style={{ width:"100%", background: timerActive ? "rgba(69,193,122,.1)" : "var(--bg3)", border: timerActive ? "1px solid rgba(69,193,122,.3)" : "1px solid var(--border2)", borderRadius:10, padding:"8px 0", fontSize:12, fontWeight:700, color: timerActive ? "var(--green)" : "var(--text3)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", display:"flex", alignItems:"center", justifyContent:"center", gap:6, transition:"all .2s", boxSizing:"border-box" }}>
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                              Done{timerActive ? ` · ${elapsedStr}` : ""}
+                              style={{ width:"100%", background: timerActive ? "rgba(69,193,122,.1)" : "var(--bg3)", border: timerActive ? "1px solid rgba(69,193,122,.25)" : "1px solid var(--border2)", borderRadius:9, padding:"7px 0", fontSize:12, fontWeight:700, color: timerActive ? "var(--green)" : "var(--text3)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", display:"flex", alignItems:"center", justifyContent:"center", gap:5, transition:"all .2s", boxSizing:"border-box" }}>
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                              Done{timerActive ? ` · ${elapsedStr} worked` : ""}
                             </button>
                           </div>
                         );
                       };
 
-                      // Kept for task mode bottom area (just the timer block, no separate TimerRow)
                       const TimerRow = () => null;
 
                       return (
