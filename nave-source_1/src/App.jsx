@@ -1367,6 +1367,7 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
   const [dwNewTaskText, setDwNewTaskText] = useState("");
   const [editingDwTaskId, setEditingDwTaskId] = useState(null); // taskId being edited inline
   const [editingDwTaskText, setEditingDwTaskText] = useState("");
+  const [dwOverflowOpen, setDwOverflowOpen] = useState(null); // slotId with overflow menu open
   const [editingTaskId, setEditingTaskId] = useState(null); // { taskId, projectId, text }
   // manualCompleted derived from persisted data (today's date only)
   const todayStr = new Date().toDateString();
@@ -2062,7 +2063,7 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                     onClick={() => setExpandedId(isExp ? null : slot.id)}
                   >
                     {/* Colour stripe */}
-                    {domainColor && <div style={{ position:"absolute", left:0, top:0, bottom:0, width:3, background: domainColor, borderRadius:"18px 0 0 18px" }} />}
+                    {domainColor && <div style={{ position:"absolute", left:0, top:0, bottom:0, width:3, background: isCompleted ? "var(--border)" : domainColor, borderRadius:"18px 0 0 18px", transition:"background .3s" }} />}
 
                     {/* Collapsed header — visible always, bigger when now */}
                     <div style={{ padding: isExp ? "14px 16px 10px 20px" : "14px 16px 12px 20px", flex: isExp ? "none" : 1, display:"flex", alignItems:"flex-start", gap:12, minHeight:0 }}>
@@ -2117,7 +2118,19 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                           <span style={{ fontSize:11, fontWeight:800, color: relevantDone === relevantTasks.length ? "var(--green)" : "var(--text2)" }}>{relevantDone}/{relevantTasks.length}</span>
                         </div>
                       )}
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style={{ flexShrink:0, color:"var(--text3)", opacity:.4, transform: isExp ? "rotate(90deg)" : "none", transition:"transform .2s", cursor:"pointer" }} onClick={e => { e.stopPropagation(); setExpandedId(isExp ? null : slot.id); }}><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      <div style={{ display:"flex", alignItems:"center", gap:6, flexShrink:0 }}>
+                        {isExp && (
+                          <button style={{ background:"none", border:"none", cursor:"pointer", padding:"2px 4px", color:"var(--text3)", display:"flex", alignItems:"center" }}
+                            onClick={e => { e.stopPropagation(); setDwOverflowOpen(dwOverflowOpen === slot.id ? null : slot.id); }}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                              <circle cx="12" cy="5" r="1.5" fill="currentColor"/>
+                              <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+                              <circle cx="12" cy="19" r="1.5" fill="currentColor"/>
+                            </svg>
+                          </button>
+                        )}
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style={{ color:"var(--text3)", opacity:.4, transform: isExp ? "rotate(90deg)" : "none", transition:"transform .2s", cursor:"pointer" }} onClick={e => { e.stopPropagation(); setExpandedId(isExp ? null : slot.id); if (!isExp) setDwOverflowOpen(null); }}><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      </div>
                     </div>
 
                     {/* Expanded body */}
@@ -2146,7 +2159,7 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                             )}
                             <button className="tl-start-btn" style={{ background:"rgba(69,193,122,.12)", color:"var(--green)", borderColor:"rgba(69,193,122,.3)" }}
                               onClick={e => { e.stopPropagation(); logSession(proj.id, slot.durationMin, null); setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }); markManualDone(slot.id, proj.id, null); }}>
-                              I did this ✓
+                              Done ✓
                             </button>
                           </div>
                         ) : isPicking ? (
@@ -2213,18 +2226,14 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                                 )}
                               </div>
                             ))}
-                            <div style={{ display:"flex", gap:8, marginTop:10 }}>
-                              {isNow && (
+                            {isNow && (
+                              <div style={{ display:"flex", gap:8, marginTop:10 }}>
                                 <button className="tl-start-btn" style={{ ...(isRunning ? { background:"rgba(224,85,85,.12)", color:"var(--red)", borderColor:"rgba(224,85,85,.3)" } : {}) }}
                                   onClick={e => { e.stopPropagation(); isRunning ? setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }) : startBlock(slot.id); }}>
                                   {isRunning ? "Stop ■" : "Start →"}
                                 </button>
-                              )}
-                              <button className="tl-start-btn" style={{ background:"rgba(69,193,122,.12)", color:"var(--green)", borderColor:"rgba(69,193,122,.3)" }}
-                                onClick={e => { e.stopPropagation(); setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }); markManualDone(slot.id, proj.id, slot.todayTasks); }}>
-                                I did this ✓
-                              </button>
-                            </div>
+                              </div>
+                            )}
                           </>
                         ) : (
                           <>
@@ -2240,32 +2249,32 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                                   {isRunning ? "Stop ■" : "Start →"}
                                 </button>
                               )}
-                              <button className="tl-start-btn" style={{ background:"rgba(69,193,122,.12)", color:"var(--green)", borderColor:"rgba(69,193,122,.3)" }}
-                                onClick={e => { e.stopPropagation(); setLateStarted(prev => { const n={...prev}; delete n[slot.id]; return n; }); markManualDone(slot.id, proj.id, slot.todayTasks); }}>
-                                I did this ✓
-                              </button>
                             </div>
                           </>
                         )}
 
-                        {/* Gear actions */}
-                        <div style={{ marginTop:12, display:"flex", gap:8, flexWrap:"wrap" }}>
-                          <button style={{ background:"none", border:"none", fontSize:11, color:"var(--text3)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", padding:0, fontWeight:600 }}
-                            onClick={() => { mutateDWSlot(toISODate(), slot.slotIndex, null); setExpandedId(null); }}>
-                            ✕ Unassign
-                          </button>
-                          {!viewingTomorrow && (
-                            <button style={{ background:"none", border:"none", fontSize:11, color:"var(--text3)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", padding:0, fontWeight:600, marginLeft:8 }}
-                              onClick={() => {
-                                const tomorrowISO = toISODate(new Date(Date.now() + 86400000));
-                                mutateDWSlot(toISODate(), slot.slotIndex, null);
-                                mutateDWSlot(tomorrowISO, slot.slotIndex, { projectId: slot.projectId, startHour: slot.startHour, startMin: slot.startMin, durationMin: slot.durationMin, todayTasks: slot.todayTasks });
-                                setExpandedId(null);
-                              }}>
-                              → Tomorrow
+                        {/* Overflow menu */}
+                        {dwOverflowOpen === slot.id && (
+                          <div style={{ marginTop:12, background:"var(--bg3)", borderRadius:10, border:"1px solid var(--border)", overflow:"hidden" }}>
+                            <button style={{ width:"100%", background:"none", border:"none", borderBottom:"1px solid var(--border2)", padding:"11px 14px", textAlign:"left", fontSize:13, color:"var(--text2)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontWeight:500, display:"flex", alignItems:"center", gap:10 }}
+                              onClick={() => { mutateDWSlot(toISODate(), slot.slotIndex, null); setExpandedId(null); setDwOverflowOpen(null); }}>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/></svg>
+                              Unassign
                             </button>
-                          )}
-                        </div>
+                            {!viewingTomorrow && (
+                              <button style={{ width:"100%", background:"none", border:"none", padding:"11px 14px", textAlign:"left", fontSize:13, color:"var(--text2)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontWeight:500, display:"flex", alignItems:"center", gap:10 }}
+                                onClick={() => {
+                                  const tomorrowISO = toISODate(new Date(Date.now() + 86400000));
+                                  mutateDWSlot(toISODate(), slot.slotIndex, null);
+                                  mutateDWSlot(tomorrowISO, slot.slotIndex, { projectId: slot.projectId, startHour: slot.startHour, startMin: slot.startMin, durationMin: slot.durationMin, todayTasks: slot.todayTasks });
+                                  setExpandedId(null); setDwOverflowOpen(null);
+                                }}>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                Move to Tomorrow
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -2322,10 +2331,14 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
       {/* ── LOOSE TASKS BOTTOM SHEET ── */}
       {looseBlockExp && (
         <div style={{ position:"absolute", inset:0, zIndex:120 }} onClick={() => { setLooseBlockExp(false); setLooseEditId(null); }}>
-          <div style={{ position:"absolute", bottom:0, left:0, right:0, background:"rgba(30,22,10,1)", borderRadius:"20px 20px 0 0", border:"1px solid rgba(232,160,48,.18)", maxHeight:"70vh", display:"flex", flexDirection:"column", animation:"sheet-up .25s cubic-bezier(.4,0,.2,1)", boxShadow:"0 -8px 40px rgba(232,160,48,.08)" }}
+          <div style={{ position:"absolute", bottom:0, left:0, right:0, background:"var(--bg2)", borderRadius:"20px 20px 0 0", border:"none", borderTop:"3px solid var(--border)", maxHeight:"70vh", display:"flex", flexDirection:"column", animation:"sheet-up .25s cubic-bezier(.4,0,.2,1)", boxShadow:"0 -2px 0 var(--bg4), 0 -20px 60px rgba(0,0,0,.5)" }}
             onClick={e => e.stopPropagation()}>
+            {/* Drag handle */}
+            <div style={{ flexShrink:0, display:"flex", justifyContent:"center", paddingTop:10 }}>
+              <div style={{ width:36, height:4, borderRadius:2, background:"var(--border)" }} />
+            </div>
             {/* Header */}
-            <div style={{ flexShrink:0, padding:"14px 20px 10px", display:"flex", alignItems:"center", justifyContent:"space-between", borderBottom:"1px solid rgba(232,160,48,.1)" }}>
+            <div style={{ flexShrink:0, padding:"10px 20px 12px", display:"flex", alignItems:"center", justifyContent:"space-between", borderBottom:"2px solid var(--border)" }}>
               <div style={{ fontSize:15, fontWeight:800, color:"var(--text)", letterSpacing:"-.01em" }}>Loose Tasks</div>
               <button onClick={() => { setLooseBlockExp(false); setLooseEditId(null); }} style={{ background:"none", border:"none", cursor:"pointer", padding:4, color:"var(--text3)" }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></svg>
