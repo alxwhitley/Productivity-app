@@ -2254,59 +2254,34 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                         : totalLoggedMin < 60 ? `${totalLoggedMin}m logged`
                         : `${totalLoggedHrs % 1 === 0 ? totalLoggedHrs : totalLoggedHrs.toFixed(1)}h logged`;
 
-                      // ── Timer derived values ─────────────────────────────────────────
+                      // Timer derived values
                       const timerProgress = timerActive
                         ? Math.min(1, getElapsedMs(lateInfo) / (slot.durationMin * 60 * 1000))
                         : 0;
-                      // Ring geometry — centred SVG 80×80, r=34
+                      // Ring geometry
                       const RING_SIZE = 80, RING_R = 34, RING_CX = 40, RING_CY = 40;
                       const RING_CIRC = 2 * Math.PI * RING_R;
-
-                      // Long-press ref — safe across renders, cleared on release
-                      const lpRef = { current: null };
+                      // Ring stroke colour by state
+                      const ringStroke = isRunning ? "var(--purple)" : isPaused ? "var(--accent)" : "rgba(155,114,207,.25)";
+                      // Timer tap/long-press handlers (plain vars, safe in render body)
+                      let _lpTimer = null;
                       const onTimerPointerDown = (e) => {
                         e.stopPropagation();
-                        lpRef.current = setTimeout(() => {
-                          // long-press: reset if paused
+                        _lpTimer = setTimeout(() => {
                           if (isPaused) resetTimer(slot.id);
-                          lpRef.current = null;
+                          _lpTimer = null;
                         }, 600);
                       };
                       const onTimerPointerUp = (e) => {
                         e.stopPropagation();
-                        if (lpRef.current) {
-                          clearTimeout(lpRef.current);
-                          lpRef.current = null;
-                          // short tap: toggle start/pause
+                        if (_lpTimer) {
+                          clearTimeout(_lpTimer);
+                          _lpTimer = null;
                           if (isRunning) pauseTimerSlot(slot.id);
                           else startTimerSlot(slot.id);
                         }
                       };
-                      const onTimerPointerLeave = (e) => {
-                        clearTimeout(lpRef.current);
-                        lpRef.current = null;
-                      };
-
-                      // Ghost button shared style
-                      const ghostBtn = (label, onClick, danger) => (
-                        <button
-                          onClick={e => { e.stopPropagation(); onClick(); }}
-                          style={{
-                            fontSize:10, fontWeight:700, letterSpacing:".06em",
-                            textTransform:"uppercase", fontFamily:"'DM Sans',sans-serif",
-                            color: danger ? "var(--red)" : "var(--text3)",
-                            background:"none",
-                            border:`1px solid ${danger ? "rgba(224,85,85,.35)" : "var(--border)"}`,
-                            borderRadius:6, padding:"3px 9px", cursor:"pointer",
-                            opacity:.55, transition:"opacity .15s",
-                          }}
-                          onMouseEnter={e => e.currentTarget.style.opacity = "1"}
-                          onMouseLeave={e => e.currentTarget.style.opacity = ".55"}
-                        >{label}</button>
-                      );
-
-                      // Ring stroke colour by state
-                      const ringStroke = isRunning ? "var(--purple)" : isPaused ? "var(--accent)" : "rgba(155,114,207,.25)";
+                      const onTimerPointerLeave = () => { clearTimeout(_lpTimer); _lpTimer = null; };
 
                       const TimerBlock = ({ onDone, activeTaskLabel }) => (
                         <div onClick={e => e.stopPropagation()} style={{ marginTop:6 }}>
@@ -2328,12 +2303,24 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
 
                           {/* ── Secondary ghost actions — top right ── */}
                           <div style={{ display:"flex", justifyContent:"flex-end", gap:6, marginBottom:8 }}>
-                            {(isRunning || isPaused) && ghostBtn("+5m", () => {
-                              // extend slot duration by 5 min
-                              mutateDWSlot(toISODate(), slot.slotIndex, { durationMin: slot.durationMin + 5 });
-                            }, false)}
-                            {isPaused && ghostBtn("Reset", () => resetTimer(slot.id), false)}
-                            {isPaused && ghostBtn("Discard", () => { resetTimer(slot.id); onDone(); }, true)}
+                            {(isRunning || isPaused) && (
+                              <button onClick={e => { e.stopPropagation(); mutateDWSlot(toISODate(), slot.slotIndex, { durationMin: slot.durationMin + 5 }); }}
+                                style={{ fontSize:10, fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", fontFamily:"'DM Sans',sans-serif", color:"var(--text3)", background:"none", border:"1px solid var(--border)", borderRadius:6, padding:"3px 9px", cursor:"pointer", opacity:.55 }}>
+                                +5m
+                              </button>
+                            )}
+                            {isPaused && (
+                              <button onClick={e => { e.stopPropagation(); resetTimer(slot.id); }}
+                                style={{ fontSize:10, fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", fontFamily:"'DM Sans',sans-serif", color:"var(--text3)", background:"none", border:"1px solid var(--border)", borderRadius:6, padding:"3px 9px", cursor:"pointer", opacity:.55 }}>
+                                Reset
+                              </button>
+                            )}
+                            {isPaused && (
+                              <button onClick={e => { e.stopPropagation(); resetTimer(slot.id); onDone(); }}
+                                style={{ fontSize:10, fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", fontFamily:"'DM Sans',sans-serif", color:"var(--red)", background:"none", border:"1px solid rgba(224,85,85,.35)", borderRadius:6, padding:"3px 9px", cursor:"pointer", opacity:.55 }}>
+                                Discard
+                              </button>
+                            )}
                           </div>
 
                           {/* ── Hero: progress ring + countdown ── */}
