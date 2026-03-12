@@ -5049,83 +5049,76 @@ function ProjectsManageSheet({ data, setData, onClose }) {
 // ─── INBOX SWIPE ROW ─────────────────────────────────────────────────────────
 // swipe right → mark done (add to project as completed task)
 // swipe left  → delete from inbox
-function InboxSwipeRow({ item, projects, domains, onCategorize, onDismiss, onDoToday, defaultProjectId }) {
-  const [offset, setOffset] = useState(0);
-  const startX = useRef(null);
-  const THRESHOLD = 72;
-  const MAX = 90;
+function InboxSwipeRow({ item, projects, domains, onCategorize, onDismiss, onDoToday }) {
+  const [selectedProj, setSelectedProj] = useState(null); // null = grid, project obj = confirm
 
-  const direction = offset > 0 ? "right" : offset < 0 ? "left" : null;
-  const revealed  = Math.abs(offset) >= THRESHOLD;
-
-  const onTouchStart = e => { startX.current = e.touches[0].clientX; };
-  const onTouchMove  = e => {
-    if (startX.current === null) return;
-    const dx = e.touches[0].clientX - startX.current;
-    setOffset(Math.max(-MAX, Math.min(MAX, dx)));
-  };
-  const onTouchEnd = () => {
-    if (offset > THRESHOLD)  { onCategorize(item.id, defaultProjectId, true); return; }
-    if (offset < -THRESHOLD) { onDismiss(item.id); return; }
-    setOffset(0);
-    startX.current = null;
-  };
-
-  const [selectedProject, setSelectedProject] = useState(defaultProjectId || "");
+  const activeProjects = projects.filter(p => p.status === "active");
 
   return (
-    <div className="inbox-swipe-wrap">
-      {/* Left bg: complete */}
-      <div className="inbox-action-left" onClick={() => onCategorize(item.id, selectedProject || defaultProjectId, true)}>
-        <span className="inbox-action-ico">✓</span>
-        <span className="inbox-action-lbl">Done</span>
-      </div>
-      {/* Right bg: delete */}
-      <div className="inbox-action-right" onClick={() => onDismiss(item.id)}>
-        <span className="inbox-action-ico">✕</span>
-        <span className="inbox-action-lbl">Delete</span>
-      </div>
-      {/* Swipeable card */}
-      <div
-        className="inbox-item"
-        style={{ transform: `translateX(${offset}px)`,
-          transition: startX.current === null ? "transform .2s ease, box-shadow .15s" : "box-shadow .1s",
-          boxShadow: offset > 20 ? `0 0 0 1.5px ${offset > THRESHOLD ? "var(--green)" : "rgba(69,193,122,.3)"}` :
-                     offset < -20 ? `0 0 0 1.5px ${offset < -THRESHOLD ? "var(--red)" : "rgba(224,85,85,.3)"}` : "none"
-        }}
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
-      >
-        {offset > 20  && <div style={{ fontSize:11, color:"var(--green)", fontWeight:700, letterSpacing:".05em", textTransform:"uppercase", marginBottom:6, opacity: Math.min(1, offset/THRESHOLD) }}>→ Mark as done</div>}
-        {offset < -20 && <div style={{ fontSize:11, color:"var(--red)", fontWeight:700, letterSpacing:".05em", textTransform:"uppercase", marginBottom:6, opacity: Math.min(1, -offset/THRESHOLD) }}>← Delete</div>}
-        <div className="ii-text">{item.text}</div>
+    <div style={{ background:"var(--bg2)", borderRadius:16, border:"1px solid var(--border)", marginBottom:10, overflow:"hidden" }}>
+      {/* Item text */}
+      <div style={{ padding:"14px 16px 10px", fontSize:15, fontWeight:600, color:"var(--text)", lineHeight:1.4 }}>{item.text}</div>
 
-        {/* Do Today — prominent single action at top */}
-        <button
-          onClick={() => onDoToday(item.id)}
-          style={{ width:"100%", background:"var(--accent-s)", border:"1.5px solid rgba(232,160,48,.35)", borderRadius:10, padding:"10px", fontSize:13, fontWeight:700, color:"var(--accent)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", marginBottom:10, marginTop:4 }}
-        >
-          Do Today →
-        </button>
+      {!selectedProj ? (
+        /* ── STEP 1: action row + project grid ── */
+        <div style={{ padding:"0 12px 14px" }}>
+          {/* Do Today pill */}
+          <button onClick={() => onDoToday(item.id)}
+            style={{ width:"100%", background:"var(--accent-s)", border:"1.5px solid rgba(232,160,48,.3)", borderRadius:22, padding:"9px", fontSize:13, fontWeight:700, color:"var(--accent)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", marginBottom:12 }}>
+            Do Today →
+          </button>
 
-        <div className="ii-label">Or assign to project</div>
-        <select className="ii-select" value={selectedProject} onChange={e => setSelectedProject(e.target.value)}>
-          <option value="">— choose a project —</option>
-          {domains.map(d => (
-            <optgroup key={d.id} label={d.name}>
-              {projects.filter(p=>p.domainId===d.id).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </optgroup>
-          ))}
-        </select>
-        <div className="ii-actions">
-          <button className="ii-save" disabled={!selectedProject} onClick={() => selectedProject && onCategorize(item.id, selectedProject, false)}>Add to Project</button>
-          <button className="ii-dismiss" onClick={() => onDismiss(item.id)}>Dismiss</button>
+          {/* Domain label */}
+          <div style={{ fontSize:10, fontWeight:700, letterSpacing:".07em", textTransform:"uppercase", color:"var(--text3)", marginBottom:8 }}>Assign to project</div>
+
+          {/* 2-col project grid */}
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:7, marginBottom:10 }}>
+            {activeProjects.map(p => {
+              const dom = domains.find(d => d.id === p.domainId);
+              const incomp = (p.tasks||[]).filter(t => !t.done).length;
+              return (
+                <div key={p.id} onClick={() => setSelectedProj(p)}
+                  style={{ borderRadius:11, background:"var(--bg3)", border:"1.5px solid var(--border2)", padding:"10px 12px", cursor:"pointer", display:"flex", flexDirection:"column", gap:4 }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:7 }}>
+                    <div style={{ width:8, height:8, borderRadius:"50%", background:dom?.color||"var(--text3)", flexShrink:0 }} />
+                    <span style={{ fontSize:13, fontWeight:700, color:"var(--text)", lineHeight:1.2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{p.name}</span>
+                  </div>
+                  <div style={{ fontSize:11, color:"var(--text3)", paddingLeft:15 }}>{dom?.name}{incomp > 0 ? ` · ${incomp}t` : ""}</div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Dismiss */}
+          <button onClick={() => onDismiss(item.id)}
+            style={{ width:"100%", background:"none", border:"1px solid var(--border)", borderRadius:10, padding:"8px", fontSize:12, color:"var(--text3)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
+            Dismiss
+          </button>
         </div>
-        <div style={{ fontSize:11, color:"var(--text3)", marginTop:8, textAlign:"center", opacity:.5 }}>
-          Swipe → done · Swipe ← delete
+      ) : (
+        /* ── STEP 2: confirm assign ── */
+        <div style={{ padding:"0 12px 14px" }}>
+          <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:14 }}>
+            <button onClick={() => setSelectedProj(null)}
+              style={{ background:"none", border:"none", cursor:"pointer", color:"var(--text3)", padding:"2px 0", fontSize:13, fontFamily:"'DM Sans',sans-serif", display:"flex", alignItems:"center", gap:4 }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              Back
+            </button>
+            <div style={{ display:"flex", alignItems:"center", gap:6, flex:1 }}>
+              <div style={{ width:9, height:9, borderRadius:"50%", background: domains.find(d => d.id === selectedProj.domainId)?.color||"var(--text3)" }} />
+              <span style={{ fontSize:14, fontWeight:700, color:"var(--text)" }}>{selectedProj.name}</span>
+            </div>
+          </div>
+          <button onClick={() => onCategorize(item.id, selectedProj.id, false)}
+            style={{ width:"100%", background:"var(--accent)", border:"none", borderRadius:22, padding:"11px", fontSize:14, fontWeight:700, color:"#000", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", marginBottom:8 }}>
+            Add to {selectedProj.name}
+          </button>
+          <button onClick={() => onDismiss(item.id)}
+            style={{ width:"100%", background:"none", border:"1px solid var(--border)", borderRadius:10, padding:"8px", fontSize:12, color:"var(--text3)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
+            Dismiss
+          </button>
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -5157,7 +5150,6 @@ function CategorizeSheet({ data, onClose, onCategorize, onDismiss, onDoToday }) 
               item={item}
               projects={projects}
               domains={domains}
-              defaultProjectId={projects.find(p=>p.status==="active")?.id || projects[0]?.id || ""}
               onCategorize={onCategorize}
               onDismiss={onDismiss}
               onDoToday={onDoToday}
