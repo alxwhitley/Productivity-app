@@ -3,248 +3,9 @@
 
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "./supabase.js";
+import { DOMAIN_COLORS, STORAGE_KEY, THEME_KEY, FIELD_DEFAULTS } from "./constants.js";
+import { fmtTime, toISODate, fmtRange, getPct, uid, getRoutinesForDate, applyDefaults, loadData } from "./utils.js";
 
-// 5 colors mapped to Huberman's psychology of motivation:
-// Blue=deep focus, Amber=drive/dopamine, Green=completion/recovery, Purple=identity/seasons, Slate=neutral/admin
-const DOMAIN_COLORS = ["#5B8AF0","#E8A030","#45C17A","#9B72CF","#8A9BB0"];
-
-const INITIAL_DATA = {
-  domains: [
-    { id: "church", name: "Church", color: "#5B8AF0" },
-    { id: "work",   name: "Work",   color: "#9B72CF" },
-    { id: "life",   name: "Life",   color: "#45C17A" },
-  ],
-  projects: [
-    { id: "podcast",     domainId: "church", name: "Podcast",        status: "active",  tasks: [
-      { id: "t1", text: "Make intros",                    done: false },
-      { id: "t2", text: "Create script",                  done: true  },
-      { id: "t3", text: "Record intro segment",           done: false },
-      { id: "t4", text: "Send file to editor",            done: false },
-    ]},
-    { id: "socialmedia", domainId: "church", name: "Social Media",   status: "backlog", tasks: [
-      { id: "t5", text: "YouTube thumbnails",             done: false },
-      { id: "t6", text: "Schedule week posts",            done: false },
-      { id: "t7", text: "Algorithm research",             done: false },
-    ]},
-    { id: "afterhours",  domainId: "church", name: "After Hours",    status: "backlog", tasks: [
-      { id: "t8",  text: "Create way to give",            done: false },
-      { id: "t9",  text: "Visitor card design",           done: false },
-      { id: "t10", text: "Pizza poster scripts",          done: false },
-      { id: "t11", text: "Justin's testimony",            done: false },
-    ]},
-    { id: "freelance",   domainId: "work",   name: "Freelance",      status: "active",  tasks: [
-      { id: "t12", text: "Create remix link for landing page", done: true },
-      { id: "t13", text: "Reach out to Becky",            done: false },
-      { id: "t14", text: "Check in colleges to pitch",   done: false },
-    ]},
-    { id: "davidv",      domainId: "work",   name: "David Ventures", status: "backlog", tasks: [
-      { id: "t15", text: "Get into Wix",                  done: false },
-      { id: "t16", text: "Brand update",                  done: false },
-    ]},
-    { id: "personal",    domainId: "life",   name: "Personal Admin", status: "active",  tasks: [
-      { id: "t17", text: "Buy journal",                   done: true  },
-      { id: "t18", text: "Real ID",                       done: false },
-    ]},
-  ],
-  blocks: [],
-  inbox: [],
-  looseTasks: [], // [{id, domainId, text, done, doneAt}]
-  weekIntention: "Ship Podcast episode. At least one Freelance deliverable. Get Church Social Media unblocked.",
-  shutdownDone: false,
-  shutdownDate: null,
-  seasonGoals: [
-    { id: "sg1", text: "Launch Podcast to 100 listeners", domainId: "church", done: false },
-    { id: "sg2", text: "Land 2 new Freelance clients",    domainId: "work",   done: false },
-    { id: "sg3", text: "Rebuild After Hours community",   domainId: "church", done: false },
-  ],
-  workWeek: [2,3,4,5,6], // 0=Sun,1=Mon,2=Tue,3=Wed,4=Thu,5=Fri,6=Sat
-  emptyBlocks: [], // template ghost blocks: {id, dayOfWeek, startHour, startMin, durationMin, slotIndex, blockType}
-  reviewData: {
-    domainBlocks: { church: 5, work: 3, life: 1 },
-    projectProgress: { podcast: { pct: 65, delta: 45 }, freelance: { pct: 40, delta: 20 } },
-    daysWorked: [true, true, "half", true, true, false, false],
-  }
-};
-
-function fmtTime(h, m) {
-  const ampm = h >= 12 ? "PM" : "AM";
-  const hh = h > 12 ? h - 12 : h === 0 ? 12 : h;
-  return `${hh}:${m.toString().padStart(2,"0")} ${ampm}`;
-}
-
-// Returns "YYYY-MM-DD" for a given Date (or today if omitted)
-function toISODate(date = new Date()) {
-  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;
-}
-function fmtRange(h, m, dur) {
-  const end = h * 60 + m + dur;
-  return `${fmtTime(h, m)} – ${fmtTime(Math.floor(end/60), end%60)}`;
-}
-function getPct(tasks) {
-  if (!tasks.length) return 0;
-  return Math.round(tasks.filter(t=>t.done).length / tasks.length * 100);
-}
-function uid() { return `id${Date.now()}${Math.random().toString(36).slice(2,6)}`; }
-
-function getRoutinesForDate(routineBlocks, date) {
-  const dow = date.getDay();
-  const dateKey = date.toDateString();
-  return (routineBlocks || []).filter(rb => {
-    if (!rb.recurring) {
-      // one-time: show only on its specific date
-      return rb.targetDate === dateKey;
-    }
-    return rb.dayOfWeek === dow;
-  });
-}
-
-
-// ═══════════════════════════════════════════════════════════════════════════
-// DATA LAYER — versioned, migration-safe, Supabase-ready
-//
-// HOW TO ADD A NEW FIELD IN FUTURE:
-//   1. Add it to SCHEMA_VERSION (bump the number)
-//   2. Add a default value in FIELD_DEFAULTS
-//   3. Add a migration step in MIGRATIONS if needed
-//   4. That's it — existing user data is preserved automatically
-//
-// HOW TO SWAP IN SUPABASE LATER:
-//   1. Set USE_SUPABASE = true
-//   2. Fill in SUPABASE_URL and SUPABASE_ANON_KEY
-//   3. The rest of the app is unchanged
-// ═══════════════════════════════════════════════════════════════════════════
-
-const SCHEMA_VERSION = 3;
-const STORAGE_KEY    = "nave_data_v1";       // new key — clean break from momentum_v2
-const THEME_KEY      = "nave_theme";
-
-// ── Supabase config (fill in when ready) ────────────────────────────────────
-const USE_SUPABASE    = true;
-const SUPABASE_URL    = "https://fezgmuhrgbtzlworbsep.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZlemdtdWhyZ2J0emx3b3Jic2VwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNjgyNTEsImV4cCI6MjA4ODc0NDI1MX0.YxHafnW1m287XRDiiRWTIPF2rKA1xEsQ4ArCeJO0ul8";
-
-// ── Field defaults — merged over any saved data so new fields always exist ──
-const FIELD_DEFAULTS = {
-  schemaVersion:  SCHEMA_VERSION,
-  domains:        INITIAL_DATA.domains,
-  projects:       INITIAL_DATA.projects,
-  blocks:         INITIAL_DATA.blocks,
-  inbox:          [],
-  looseTasks:     [],
-  weekIntention:  "",
-  shutdownDone:   false,
-  seasonGoals:    INITIAL_DATA.seasonGoals,
-  workWeek:       [2,3,4,5,6],
-  deepBlockDefaults: [
-    { startHour:9,  startMin:0, durationMin:90 },
-    { startHour:13, startMin:0, durationMin:90 },
-    { startHour:15, startMin:0, durationMin:60 },
-  ],
-  emptyBlocks:    [],
-  routineBlocks:  [],
-  reviewData:     INITIAL_DATA.reviewData,
-  todayPrefs:     { name:"", showShutdown:true, defaultBlock:"9", hideTimes:false },
-  blockCompletions: [], // [{ blockId, date, durationMin }] — "I did this" / Done logs
-  deepWorkTargets: { dailyHours: 4, weeklyHours: 20, maxDeepBlocks: 3 }, // user-configurable
-  deepWorkSlots: {}, // { [dateStr]: [{ projectId, startHour, startMin, durationMin, todayTasks }] }
-  todayLoosePicks: {}, // { [dateStr]: [looseTaskId, ...] } — tasks picked for today's loose block
-  onboardingDone: false,
-  sessionLog: [], // [{ id, projectId, date, durationMin, note }]
-  captured: [], // [{ id, text, createdAt }] — raw unprocessed brain-dump items
-};
-
-// ── Migrations — run in order when schema version is behind ─────────────────
-// Each entry: { version: N, up: (data) => newData }
-// Add a new entry here whenever SCHEMA_VERSION bumps.
-const MIGRATIONS = [
-  // v1: initial version — migrate from old "momentum_v2" key if present
-  {
-    version: 1,
-    up: (data) => {
-      // Pull in any data saved under the old Momentum key
-      try {
-        const old = localStorage.getItem("momentum_v2");
-        if (old) {
-          const parsed = JSON.parse(old);
-          // Merge old user data over defaults (preserves their projects/tasks)
-          return { ...FIELD_DEFAULTS, ...parsed, schemaVersion: 1 };
-        }
-      } catch {}
-      return { ...FIELD_DEFAULTS, schemaVersion: 1 };
-    }
-  },
-  // v2: clear todayTasks from all DW slots (force re-pick; old code set all tasks)
-  {
-    version: 2,
-    up: (data) => {
-      const deepWorkSlots = data.deepWorkSlots || {};
-      const cleared = {};
-      for (const [date, slots] of Object.entries(deepWorkSlots)) {
-        cleared[date] = slots.map(s => s ? { ...s, todayTasks: null } : s);
-      }
-      return { ...data, deepWorkSlots: cleared, schemaVersion: 2 };
-    }
-  },
-  // v3: add mode field to all existing projects, initialize sessionLog
-  {
-    version: 3,
-    up: (data) => ({
-      ...data,
-      projects: (data.projects || []).map(p => ({ mode: "tasks", ...p })),
-      sessionLog: data.sessionLog || [],
-      schemaVersion: 3,
-    })
-  },
-];
-
-// ── Deep merge: add missing keys from defaults without touching existing ones ─
-function applyDefaults(saved, defaults) {
-  const result = { ...saved };
-  for (const key of Object.keys(defaults)) {
-    if (result[key] === undefined || result[key] === null) {
-      result[key] = defaults[key];
-    }
-    // Ensure nested objects also get new keys (one level deep)
-    if (
-      typeof defaults[key] === "object" &&
-      !Array.isArray(defaults[key]) &&
-      defaults[key] !== null &&
-      typeof result[key] === "object" &&
-      !Array.isArray(result[key]) &&
-      result[key] !== null
-    ) {
-      result[key] = { ...defaults[key], ...result[key] };
-    }
-  }
-  return result;
-}
-
-// ── Load: run migrations then apply any missing defaults ────────────────────
-function loadData() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    let data = raw ? JSON.parse(raw) : null;
-
-    if (!data) {
-      // First ever load — run v1 migration which may import momentum_v2
-      data = MIGRATIONS[0].up({});
-    } else {
-      // Run any migrations the saved data hasn't seen yet
-      const savedVersion = data.schemaVersion || 0;
-      for (const migration of MIGRATIONS) {
-        if (migration.version > savedVersion) {
-          data = migration.up(data);
-        }
-      }
-    }
-
-    // Always fill in any fields added since last save
-    return applyDefaults(data, FIELD_DEFAULTS);
-  } catch (e) {
-    console.warn("Data load failed, using defaults:", e);
-    return { ...FIELD_DEFAULTS };
-  }
-}
 
 // ── Save: localStorage cache + Supabase sync ────────────────────────────────
 async function saveData(data, userId) {
@@ -1688,6 +1449,7 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
   const [dwPickerTime, setDwPickerTime] = useState({}); // { [slotId]: { startHour, startMin, durationMin } }
   const [workMode, setWorkMode] = useState(false); // false=Plan, true=Work
   const [earlierOpen, setEarlierOpen] = useState(false); // "Earlier today" disclosure
+  const [planningMode, setPlanningMode] = useState(false); // guided Plan My Day flow
 
 
   const rescheduleToTomorrow = (blockId) => {
@@ -2218,10 +1980,19 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
             <span onClick={() => setTab("plan")} style={{ fontSize:12, color:"var(--text3)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>Edit today's plan</span>
           </div>
         ) : (
-          <div onClick={() => setTab("plan")} style={{ margin:"0 16px 12px", background:"var(--bg2)", borderRadius:14, borderLeft:"4px solid var(--accent)", padding:"14px 16px", cursor:"pointer", flexShrink:0 }}>
+          <div onClick={() => {
+            setPlanningMode(true);
+            const firstEmpty = todayDWSlots.find(s => !s.projectId);
+            if (firstEmpty) setExpandedId(firstEmpty.id);
+          }} style={{ margin:"0 16px 12px", background:"var(--bg2)", borderRadius:14, borderLeft:"4px solid var(--accent)", padding:"14px 16px", cursor:"pointer", flexShrink:0 }}>
             <div style={{ fontSize:15, fontWeight:600, color:"var(--text)", lineHeight:1.3 }}>Plan your deep work</div>
             <div style={{ fontSize:12, color:"var(--text2)", marginTop:4 }}>Assign your focus blocks for today</div>
-            <button onClick={(e) => { e.stopPropagation(); setTab("plan"); }} style={{ display:"block", width:"100%", marginTop:12, padding:"12px 0", background:"var(--accent)", color:"#000", border:"none", borderRadius:12, fontSize:14, fontWeight:700, fontFamily:"'DM Sans',sans-serif", cursor:"pointer" }}>
+            <button onClick={(e) => {
+              e.stopPropagation();
+              setPlanningMode(true);
+              const firstEmpty = todayDWSlots.find(s => !s.projectId);
+              if (firstEmpty) setExpandedId(firstEmpty.id);
+            }} style={{ display:"block", width:"100%", marginTop:12, padding:"12px 0", background:"var(--accent)", color:"#000", border:"none", borderRadius:12, fontSize:14, fontWeight:700, fontFamily:"'DM Sans',sans-serif", cursor:"pointer" }}>
               Plan My Day →
             </button>
           </div>
@@ -2426,9 +2197,20 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                                 const t = dwPickerTime[ptKey] || { startHour:slot.startHour, startMin:slot.startMin, durationMin:slot.durationMin };
                                 const tasks = (t._tasks && t._tasks.length > 0) ? t._tasks : null;
                                 saveDWSlot(slot.id, slot.slotIndex, selProjId, t.startHour, t.startMin, t.durationMin, tasks);
-                                setExpandedId(null);
                                 setDwPickerProj(s => { const n={...s}; delete n[ptKey]; return n; });
                                 setDwPickerTime(s => { const n={...s}; delete n[ptKey]; return n; });
+                                // Planning mode: auto-advance to next empty slot
+                                if (planningMode) {
+                                  const nextEmpty = todayDWSlots.find(s => !s.projectId && s.id !== slot.id);
+                                  if (nextEmpty) {
+                                    setExpandedId(nextEmpty.id);
+                                  } else {
+                                    setExpandedId(null);
+                                    setPlanningMode(false);
+                                  }
+                                } else {
+                                  setExpandedId(null);
+                                }
                               };
                               return (
                                 <>
