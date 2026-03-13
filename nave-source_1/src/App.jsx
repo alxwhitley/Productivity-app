@@ -1310,7 +1310,7 @@ function StatusBar() {
 
 
 // ─── TODAY SCREEN ─────────────────────────────────────────────────────────────
-function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onClearJump }) {
+function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onClearJump, setTab }) {
   const [showTodaySettings, setShowTodaySettings] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
   const [celebratingId, setCelebratingId] = useState(null);
@@ -1715,6 +1715,8 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
   const deepDefaults = getDeepSlots(data);
   const savedDWSlots = (data.deepWorkSlots || {})[viewDateKeyISO] || [];
   const maxDeepBlocks = data.deepWorkTargets?.maxDeepBlocks ?? 3;
+  const filledSlots = ((data.deepWorkSlots || {})[dateKeyISO] || []).filter(s => s && s.projectId).length;
+  const isPlanned = filledSlots >= maxDeepBlocks;
   // For tomorrow: show all slots (don't hide past since nowMins doesn't apply)
   const viewBlocks = viewingTomorrow ? blocks.filter(b => b.dayOffset === 1) : todayBlocks;
   const viewRoutines = viewingTomorrow ? getRoutinesForDate(data.routineBlocks || [], tomorrow) : todayRoutines;
@@ -1847,6 +1849,23 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
           }
         </div>
       </div>
+
+      {/* ── PLAN MY DAY CTA ── */}
+      {!viewingTomorrow && (
+        isPlanned ? (
+          <div style={{ textAlign:"center", padding:"8px 0", flexShrink:0 }}>
+            <span onClick={() => setTab("plan")} style={{ fontSize:12, color:"var(--text3)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>Edit today's plan</span>
+          </div>
+        ) : (
+          <div onClick={() => setTab("plan")} style={{ margin:"0 16px 12px", background:"var(--bg2)", borderRadius:14, borderLeft:"4px solid var(--accent)", padding:"14px 16px", cursor:"pointer", flexShrink:0 }}>
+            <div style={{ fontSize:15, fontWeight:600, color:"var(--text)", lineHeight:1.3 }}>Plan your deep work</div>
+            <div style={{ fontSize:12, color:"var(--text2)", marginTop:4 }}>Assign your focus blocks for today</div>
+            <button onClick={(e) => { e.stopPropagation(); setTab("plan"); }} style={{ display:"block", width:"100%", marginTop:12, padding:"12px 0", background:"var(--accent)", color:"#000", border:"none", borderRadius:12, fontSize:14, fontWeight:700, fontFamily:"'DM Sans',sans-serif", cursor:"pointer" }}>
+              Plan My Day →
+            </button>
+          </div>
+        )
+      )}
 
       {/* ── CARD STACK — fills remaining screen height ── */}
       {(() => {
@@ -5650,7 +5669,7 @@ export default function App() {
           {!data.onboardingDone && (
             <OnboardingFlow onDone={() => setData(d => ({ ...d, onboardingDone: true }))} />
           )}
-          {tab==="today"    && <TodayScreen    data={data} setData={setData} openShutdown={()=>setSheet("shutdown")} onSignOut={() => supabase.auth.signOut()} jumpToBlock={jumpToBlock} onClearJump={() => setJumpToBlock(null)} />}
+          {tab==="today"    && <TodayScreen    data={data} setData={setData} openShutdown={()=>setSheet("shutdown")} onSignOut={() => supabase.auth.signOut()} jumpToBlock={jumpToBlock} onClearJump={() => setJumpToBlock(null)} setTab={setTab} />}
           {tab==="projects" && <ProjectsScreen data={data} setData={setData} openCategorize={()=>setSheet("categorize")} />}
           {tab==="plan"     && <PlanScreen     data={data} setData={setData} onGoToSeason={()=>setTab("season")} lightMode={lightMode} toggleTheme={toggleTheme} />}
           {tab==="season"  && <SeasonScreen   data={data} setData={setData} />}
