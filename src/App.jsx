@@ -1597,6 +1597,19 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
   const [workMode, setWorkMode] = useState(false); // false=Plan, true=Work
   const [earlierOpen, setEarlierOpen] = useState(false); // "Earlier today" disclosure
 
+  // ── Date/time constants hoisted so all handlers below can reference them ──
+  const today = new Date();
+  const nowMins = today.getHours() * 60 + today.getMinutes();
+  const blocks = data.blocks || [];
+  const todayStr = today.toDateString();
+  const dateKey = today.toDateString();
+  const dateKeyISO = toISODate(today);
+  const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
+  const tomorrowDateKey = tomorrow.toDateString();
+  const tomorrowDateKeyISO = toISODate(tomorrow);
+  const viewDate = viewingTomorrow ? tomorrow : today;
+  const viewDateKey = viewingTomorrow ? tomorrowDateKey : dateKey;
+  const viewDateKeyISO = viewingTomorrow ? tomorrowDateKeyISO : dateKeyISO;
 
   const rescheduleToTomorrow = (blockId) => {
     setData(d => ({ ...d, blocks: d.blocks.map(b => b.id === blockId ? { ...b, dayOffset: (b.dayOffset || 0) + 1 } : b) }));
@@ -1711,7 +1724,6 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
   const [dwOverflowOpen, setDwOverflowOpen] = useState(null); // slotId with overflow menu open
   const [editingTaskId, setEditingTaskId] = useState(null); // { taskId, projectId, text }
   // manualCompleted derived from persisted data (today's date only)
-  const todayStr = new Date().toDateString();
   const manualCompleted = new Set(
     (data.blockCompletions || []).filter(c => c.date === todayStr).map(c => c.blockId)
   );
@@ -1725,7 +1737,7 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
   const [looseQuickDraft, setLooseQuickDraft] = useState("");
   const [looseEditId, setLooseEditId] = useState(null);
   const [looseEditText, setLooseEditText] = useState("");
-  const { domains, projects, blocks, shutdownDone } = data;
+  const { domains, projects, shutdownDone } = data;
 
 
 
@@ -1744,10 +1756,8 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
   }, [data.shutdownDone, data.shutdownDate]);
 
   const now   = new Date();
-  const today = new Date();
   const days   = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
   const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-  const nowMins = now.getHours() * 60 + now.getMinutes();
   const isAfter4 = now.getHours() >= 16;
 
   const getProject = id => projects.find(p => p.id === id);
@@ -1967,18 +1977,6 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
   const todayBlocks = blocks.filter(b => b.dayOffset === 0);
   const todayBlocksSorted = [...todayBlocks].sort((a,b) => a.startHour*60+a.startMin - (b.startHour*60+b.startMin));
   const todayRoutines = getRoutinesForDate(data.routineBlocks || [], today);
-  const dateKey = today.toDateString();
-  const dateKeyISO = toISODate(today);
-
-  // Tomorrow date keys
-  const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
-  const tomorrowDateKey = tomorrow.toDateString();
-  const tomorrowDateKeyISO = toISODate(tomorrow);
-
-  // Active view date (today or tomorrow)
-  const viewDate = viewingTomorrow ? tomorrow : today;
-  const viewDateKey = viewingTomorrow ? tomorrowDateKey : dateKey;
-  const viewDateKeyISO = viewingTomorrow ? tomorrowDateKeyISO : dateKeyISO;
 
   // Build deep work slots for active view (today or tomorrow)
   const deepDefaults = getDeepSlots(data);
@@ -2258,6 +2256,7 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                 const isPicking = pickerState?.blockId === slot.id;
 
                 const cardBg = "var(--bg2)";
+                const cardRunningBorder = isRunning ? "1.5px solid rgba(155,114,207,.6)" : null;
                 const cardBorder = cardRunningBorder || (isCompleted
                   ? "1px solid rgba(69,193,122,.25)"
                   : isNow && domainColor
@@ -2267,7 +2266,6 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                       : "1px solid var(--border)");
                 const cardShadow = isRunning ? "none" : isNow && domainColor ? `0 0 32px ${domainColor}20` : "none";
                 const cardAnimation = isRunning ? "dw-running-pulse 2.4s ease-in-out infinite" : "none";
-                const cardRunningBorder = isRunning ? "1.5px solid rgba(155,114,207,.6)" : null;
 
                 if (!isFilled) {
                   // ── UNASSIGNED CARD ──
@@ -4288,14 +4286,15 @@ function getQuarterLabel() {
 
 // ─── SEASON SCREEN ────────────────────────────────────────────────────────────
 function SeasonScreen({ data, setData }) {
-  const { domains, projects, seasonGoals = [], reviewData } = data;
+  const { domains, projects, seasonGoals = [], reviewData = {} } = data;
+  const domainBlocks = reviewData.domainBlocks || {};
   const [newText, setNewText]       = useState("");
   const [newDomainId, setNewDomainId] = useState(domains[0]?.id || "");
   const today     = new Date();
   const months    = ["January","February","March","April","May","June","July","August","September","October","November","December"];
   const totalTasks = projects.reduce((s,p) => s + p.tasks.filter(t=>t.done).length, 0);
-  const totalDW    = Object.values(reviewData.domainBlocks).reduce((a,b)=>a+b,0);
-  const maxBlocks  = Math.max(...Object.values(reviewData.domainBlocks), 1);
+  const totalDW    = Object.values(domainBlocks).reduce((a,b)=>a+b,0);
+  const maxBlocks  = Math.max(...Object.values(domainBlocks), 1);
   const getDomain  = id => domains.find(d => d.id === id);
 
   const toggleGoal = id => setData(d => ({
@@ -4398,7 +4397,7 @@ function SeasonScreen({ data, setData }) {
         <div className="sh"><span className="sh-label">Domain Coverage</span></div>
         <div className="cov-card">
           {domains.map(d => {
-            const count = reviewData.domainBlocks[d.id] || 0;
+            const count = domainBlocks[d.id] || 0;
             return (
               <div key={d.id} className="cov-row">
                 <div className="cov-dot" style={{ background: d.color }} />
@@ -5442,6 +5441,7 @@ export default function App() {
     sessionLog: data.sessionLog || [],
     emptyBlocks: data.emptyBlocks || [],
     workWeek: data.workWeek || [2,3,4,5,6],
+    reviewData: data.reviewData || { domainBlocks: {}, projectProgress: {}, daysWorked: [] },
   };
 
   const closeSheet = () => setSheet(null);
