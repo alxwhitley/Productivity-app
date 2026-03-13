@@ -114,6 +114,23 @@ export const FIELD_DEFAULTS = {
   captured: [], // [{ id, text, createdAt }] — raw unprocessed brain-dump items
 };
 
+// ── Deep work slot defaults ──────────────────────────────────────────────────
+export const DEFAULT_DEEP_SLOTS = [
+  { slotIndex: 0, startHour: 9,  startMin: 0,  durationMin: 90, blockType: "analytical",
+    hint: "Block 1", hintDetail: "Peak neurochemical window — best for hard analysis, complex decisions, and deep problem-solving." },
+  { slotIndex: 1, startHour: 12, startMin: 0,  durationMin: 90, blockType: "creative",
+    hint: "Block 2",   hintDetail: "Post-peak window — excellent for generative work, writing, and ideation." },
+  { slotIndex: 2, startHour: 15, startMin: 0,  durationMin: 90, blockType: "generative",
+    hint: "Block 3", hintDetail: "Third block — strong for execution-focused work: building, shipping, tasks you know well." },
+];
+
+// Resolve the live slot definitions: user's saved deepBlockDefaults override the built-in defaults
+export function getDeepSlots(data) {
+  const saved = data.deepBlockDefaults;
+  if (!saved || !saved.length) return DEFAULT_DEEP_SLOTS;
+  return saved.map((s, i) => ({ ...(DEFAULT_DEEP_SLOTS[i] || DEFAULT_DEEP_SLOTS[0]), ...s, slotIndex: i }));
+}
+
 // ── Migrations — run in order when schema version is behind ─────────────────
 // Each entry: { version: N, up: (data) => newData }
 // Add a new entry here whenever SCHEMA_VERSION bumps.
