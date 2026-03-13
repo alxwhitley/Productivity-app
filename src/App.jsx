@@ -1,3 +1,6 @@
+// ARCHITECTURE RULE: All components must be defined at the top level as function declarations.
+// Never define components inside other components, render functions, or IIFEs.
+
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "./supabase.js";
 
@@ -285,6 +288,31 @@ function useData(userId) {
   }, [data]);
 
   return [data, setData];
+}
+
+// ─── HOOKS ────────────────────────────────────────────────────────────────────
+function useSwipeDown(onClose) {
+  const startY = useRef(null);
+  const [dy, setDy] = useState(0);
+
+  const onTouchStart = e => { startY.current = e.touches[0].clientY; };
+  const onTouchMove  = e => {
+    if (startY.current === null) return;
+    const d = e.touches[0].clientY - startY.current;
+    if (d > 0) { e.preventDefault(); setDy(d); }
+  };
+  const onTouchEnd = () => {
+    if (dy > 80) onClose();
+    setDy(0);
+    startY.current = null;
+  };
+
+  const style = {
+    transform: `translateY(${dy}px)`,
+    transition: dy === 0 ? "transform .25s ease" : "none",
+  };
+
+  return { onTouchStart, onTouchMove, onTouchEnd, style };
 }
 
 // ─── CSS ──────────────────────────────────────────────────────────────────────
@@ -1094,7 +1122,6 @@ function OnboardingIllustration({ type, accent }) {
   return null;
 }
 
-function OnboardingFlow({ onDone }) {
 const ONBOARDING_CARDS = [
   {
     eyebrow: "Welcome to Clearwork",
@@ -1133,6 +1160,7 @@ const ONBOARDING_CARDS = [
   },
 ];
 
+function OnboardingFlow({ onDone }) {
   const [card, setCard] = useState(0);
   const [animDir, setAnimDir] = useState(null); // "in" | null
   const touchStartX = useRef(null);
@@ -1308,6 +1336,222 @@ function StatusBar() {
   );
 }
 
+
+// ─── TIMER BLOCK (extracted top-level component) ─────────────────────────────
+function TimerBlock({ onDone, activeTaskLabel, isRunning, isPaused, timerActive, timerProgress, ringStroke, cdStr, elapsedStr, slot, mutateDWSlot, resetTimer, startTimerSlot, pauseTimerSlot }) {
+  // Ring geometry
+  var RING_SIZE = 80, RING_R = 34, RING_CX = 40, RING_CY = 40;
+  var RING_CIRC = 2 * Math.PI * RING_R;
+  // Timer tap/long-press handlers
+  var _lpTimer = null;
+  var onTimerPointerDown = function(e) {
+    e.stopPropagation();
+    _lpTimer = setTimeout(function() {
+      if (isPaused) resetTimer(slot.id);
+      _lpTimer = null;
+    }, 600);
+  };
+  var onTimerPointerUp = function(e) {
+    e.stopPropagation();
+    if (_lpTimer) {
+      clearTimeout(_lpTimer);
+      _lpTimer = null;
+      if (isRunning) pauseTimerSlot(slot.id);
+      else startTimerSlot(slot.id);
+    }
+  };
+  var onTimerPointerLeave = function() { clearTimeout(_lpTimer); _lpTimer = null; };
+
+  return (
+                        <div onClick={e => e.stopPropagation()} style={{ marginTop:6 }}>
+
+                          {/* ── Pinned active task context ── */}
+                          {activeTaskLabel && (
+                            <div style={{
+                              display:"flex", alignItems:"center", gap:6, marginBottom:10,
+                              padding:"6px 10px", borderRadius:8,
+                              background:"rgba(155,114,207,.08)",
+                              border:"1px solid rgba(155,114,207,.18)",
+                            }}>
+                              <div style={{ width:5, height:5, borderRadius:"50%", background:"var(--purple)", flexShrink:0 }}/>
+                              <span style={{ fontSize:12, fontWeight:600, color:"var(--text2)", flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                                {activeTaskLabel}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* ── Secondary ghost actions — top right ── */}
+                          <div style={{ display:"flex", justifyContent:"flex-end", gap:6, marginBottom:8 }}>
+                            {(isRunning || isPaused) && (
+                              <button onClick={e => { e.stopPropagation(); mutateDWSlot(toISODate(), slot.slotIndex, { durationMin: slot.durationMin + 5 }); }}
+                                style={{ fontSize:10, fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", fontFamily:"'DM Sans',sans-serif", color:"var(--text3)", background:"none", border:"1px solid var(--border)", borderRadius:6, padding:"3px 9px", cursor:"pointer", opacity:.55 }}>
+                                +5m
+                              </button>
+                            )}
+                            {isPaused && (
+                              <button onClick={e => { e.stopPropagation(); resetTimer(slot.id); }}
+                                style={{ fontSize:10, fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", fontFamily:"'DM Sans',sans-serif", color:"var(--text3)", background:"none", border:"1px solid var(--border)", borderRadius:6, padding:"3px 9px", cursor:"pointer", opacity:.55 }}>
+                                Reset
+                              </button>
+                            )}
+                            {isPaused && (
+                              <button onClick={e => { e.stopPropagation(); resetTimer(slot.id); onDone(); }}
+                                style={{ fontSize:10, fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", fontFamily:"'DM Sans',sans-serif", color:"var(--red)", background:"none", border:"1px solid rgba(224,85,85,.35)", borderRadius:6, padding:"3px 9px", cursor:"pointer", opacity:.55 }}>
+                                Discard
+                              </button>
+                            )}
+                          </div>
+
+                          {/* ── Hero: progress ring + countdown ── */}
+                          <div
+                            onPointerDown={onTimerPointerDown}
+                            onPointerUp={onTimerPointerUp}
+                            onPointerLeave={onTimerPointerLeave}
+                            style={{
+                              display:"flex", flexDirection:"column", alignItems:"center",
+                              justifyContent:"center", cursor:"pointer", padding:"4px 0 14px",
+                              userSelect:"none", WebkitUserSelect:"none",
+                            }}
+                          >
+                            {/* SVG progress ring */}
+                            <div style={{ position:"relative", width:RING_SIZE, height:RING_SIZE }}>
+                              <svg
+                                width={RING_SIZE} height={RING_SIZE}
+                                viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}
+                                style={{ position:"absolute", top:0, left:0 }}
+                              >
+                                {/* Track */}
+                                <circle cx={RING_CX} cy={RING_CY} r={RING_R}
+                                  fill="none" stroke="var(--bg4)" strokeWidth="4"/>
+                                {/* Depleting progress arc */}
+                                <circle cx={RING_CX} cy={RING_CY} r={RING_R}
+                                  fill="none"
+                                  stroke={ringStroke}
+                                  strokeWidth="4"
+                                  strokeDasharray={RING_CIRC}
+                                  strokeDashoffset={RING_CIRC * timerProgress}
+                                  strokeLinecap="round"
+                                  transform={`rotate(-90 ${RING_CX} ${RING_CY})`}
+                                  style={{ transition:"stroke-dashoffset .9s linear, stroke .3s" }}
+                                />
+                              </svg>
+                              {/* Countdown — centred over ring */}
+                              <div style={{
+                                position:"absolute", inset:0,
+                                display:"flex", flexDirection:"column",
+                                alignItems:"center", justifyContent:"center", gap:1,
+                              }}>
+                                <span style={{
+                                  fontSize:22, fontWeight:800,
+                                  fontVariantNumeric:"tabular-nums",
+                                  letterSpacing:"-.02em",
+                                  fontFamily:"'DM Sans',sans-serif",
+                                  color: isRunning ? "var(--text)" : isPaused ? "var(--accent)" : "var(--text3)",
+                                  lineHeight:1,
+                                }}>
+                                  {cdStr}
+                                </span>
+                                {isRunning && (
+                                  <div style={{ display:"flex", alignItems:"center", gap:3, marginTop:2 }}>
+                                    <div style={{
+                                      width:4, height:4, borderRadius:"50%",
+                                      background:"var(--purple)",
+                                      animation:"pulse-dot 1.2s ease-in-out infinite",
+                                    }}/>
+                                  </div>
+                                )}
+                                {isPaused && (
+                                  <span style={{ fontSize:9, fontWeight:700, letterSpacing:".06em", color:"var(--accent)", textTransform:"uppercase", marginTop:2 }}>
+                                    Paused
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            {/* Tap hint — idle only */}
+                            {!timerActive && (
+                              <span style={{ fontSize:10, color:"var(--text3)", marginTop:6, letterSpacing:".04em" }}>
+                                tap to start
+                              </span>
+                            )}
+                          </div>
+
+                          {/* ── State-aware primary button + Done ── */}
+                          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                            {isPaused ? (
+                              // Paused: Resume is primary, Finish is secondary in-row
+                              <button
+                                onClick={e => { e.stopPropagation(); startTimerSlot(slot.id); }}
+                                style={{
+                                  flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:7,
+                                  background:"var(--purple)", border:"none", borderRadius:22,
+                                  padding:"11px 0", fontSize:13, fontWeight:700,
+                                  color:"#fff", cursor:"pointer",
+                                  fontFamily:"'DM Sans',sans-serif", transition:"opacity .15s",
+                                }}
+                              >
+                                <svg width="10" height="11" viewBox="0 0 16 18" fill="none">
+                                  <path d="M1 1l14 8-14 8V1z" fill="currentColor"/>
+                                </svg>
+                                Resume
+                              </button>
+                            ) : isRunning ? (
+                              <button
+                                onClick={e => { e.stopPropagation(); pauseTimerSlot(slot.id); }}
+                                style={{
+                                  flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:7,
+                                  background:"var(--bg3)", border:"1px solid var(--border)", borderRadius:22,
+                                  padding:"11px 0", fontSize:13, fontWeight:700,
+                                  color:"var(--text2)", cursor:"pointer",
+                                  fontFamily:"'DM Sans',sans-serif", transition:"all .15s",
+                                }}
+                              >
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+                                  <rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor"/>
+                                  <rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor"/>
+                                </svg>
+                                Pause
+                              </button>
+                            ) : (
+                              // Idle: big purple Start Session
+                              <button
+                                onClick={e => { e.stopPropagation(); startTimerSlot(slot.id); }}
+                                style={{
+                                  flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:7,
+                                  background:"var(--purple)", border:"none", borderRadius:22,
+                                  padding:"11px 0", fontSize:13, fontWeight:700,
+                                  color:"#fff", cursor:"pointer",
+                                  fontFamily:"'DM Sans',sans-serif", transition:"opacity .15s",
+                                }}
+                              >
+                                <svg width="10" height="11" viewBox="0 0 16 18" fill="none">
+                                  <path d="M1 1l14 8-14 8V1z" fill="currentColor"/>
+                                </svg>
+                                Start Session
+                              </button>
+                            )}
+
+                            {/* Done — always present, lights up green once timer has run */}
+                            <button
+                              onClick={e => { e.stopPropagation(); onDone(); }}
+                              title={timerActive ? `Finish — ${elapsedStr} logged` : "Mark done (full duration logged)"}
+                              style={{
+                                width:44, height:44, borderRadius:"50%",
+                                border: timerActive ? "none" : "1px solid var(--border)",
+                                background: timerActive ? "var(--green)" : "var(--bg3)",
+                                color: timerActive ? "#fff" : "var(--text3)",
+                                display:"flex", alignItems:"center", justifyContent:"center",
+                                cursor:"pointer", flexShrink:0,
+                                transition:"background .2s, border-color .2s, color .2s",
+                              }}
+                            >
+                              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                                <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+  );
+}
 
 // ─── TODAY SCREEN ─────────────────────────────────────────────────────────────
 function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onClearJump, setTab }) {
@@ -2279,222 +2523,8 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                       var timerProgress = timerActive
                         ? Math.min(1, getElapsedMs(lateInfo) / (slot.durationMin * 60 * 1000))
                         : 0;
-                      // Ring geometry
-                      var RING_SIZE = 80, RING_R = 34, RING_CX = 40, RING_CY = 40;
-                      var RING_CIRC = 2 * Math.PI * RING_R;
                       // Ring stroke colour by state
                       var ringStroke = isRunning ? "var(--purple)" : isPaused ? "var(--accent)" : "rgba(155,114,207,.25)";
-                      // Timer tap/long-press handlers (var, safe in render body — no TDZ)
-                      var _lpTimer = null;
-                      var onTimerPointerDown = function(e) {
-                        e.stopPropagation();
-                        _lpTimer = setTimeout(function() {
-                          if (isPaused) resetTimer(slot.id);
-                          _lpTimer = null;
-                        }, 600);
-                      };
-                      var onTimerPointerUp = function(e) {
-                        e.stopPropagation();
-                        if (_lpTimer) {
-                          clearTimeout(_lpTimer);
-                          _lpTimer = null;
-                          if (isRunning) pauseTimerSlot(slot.id);
-                          else startTimerSlot(slot.id);
-                        }
-                      };
-                      var onTimerPointerLeave = function() { clearTimeout(_lpTimer); _lpTimer = null; };
-
-                      function TimerBlock({ onDone, activeTaskLabel }) { return (
-                        <div onClick={e => e.stopPropagation()} style={{ marginTop:6 }}>
-
-                          {/* ── Pinned active task context ── */}
-                          {activeTaskLabel && (
-                            <div style={{
-                              display:"flex", alignItems:"center", gap:6, marginBottom:10,
-                              padding:"6px 10px", borderRadius:8,
-                              background:"rgba(155,114,207,.08)",
-                              border:"1px solid rgba(155,114,207,.18)",
-                            }}>
-                              <div style={{ width:5, height:5, borderRadius:"50%", background:"var(--purple)", flexShrink:0 }}/>
-                              <span style={{ fontSize:12, fontWeight:600, color:"var(--text2)", flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                                {activeTaskLabel}
-                              </span>
-                            </div>
-                          )}
-
-                          {/* ── Secondary ghost actions — top right ── */}
-                          <div style={{ display:"flex", justifyContent:"flex-end", gap:6, marginBottom:8 }}>
-                            {(isRunning || isPaused) && (
-                              <button onClick={e => { e.stopPropagation(); mutateDWSlot(toISODate(), slot.slotIndex, { durationMin: slot.durationMin + 5 }); }}
-                                style={{ fontSize:10, fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", fontFamily:"'DM Sans',sans-serif", color:"var(--text3)", background:"none", border:"1px solid var(--border)", borderRadius:6, padding:"3px 9px", cursor:"pointer", opacity:.55 }}>
-                                +5m
-                              </button>
-                            )}
-                            {isPaused && (
-                              <button onClick={e => { e.stopPropagation(); resetTimer(slot.id); }}
-                                style={{ fontSize:10, fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", fontFamily:"'DM Sans',sans-serif", color:"var(--text3)", background:"none", border:"1px solid var(--border)", borderRadius:6, padding:"3px 9px", cursor:"pointer", opacity:.55 }}>
-                                Reset
-                              </button>
-                            )}
-                            {isPaused && (
-                              <button onClick={e => { e.stopPropagation(); resetTimer(slot.id); onDone(); }}
-                                style={{ fontSize:10, fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", fontFamily:"'DM Sans',sans-serif", color:"var(--red)", background:"none", border:"1px solid rgba(224,85,85,.35)", borderRadius:6, padding:"3px 9px", cursor:"pointer", opacity:.55 }}>
-                                Discard
-                              </button>
-                            )}
-                          </div>
-
-                          {/* ── Hero: progress ring + countdown ── */}
-                          <div
-                            onPointerDown={onTimerPointerDown}
-                            onPointerUp={onTimerPointerUp}
-                            onPointerLeave={onTimerPointerLeave}
-                            style={{
-                              display:"flex", flexDirection:"column", alignItems:"center",
-                              justifyContent:"center", cursor:"pointer", padding:"4px 0 14px",
-                              userSelect:"none", WebkitUserSelect:"none",
-                            }}
-                          >
-                            {/* SVG progress ring */}
-                            <div style={{ position:"relative", width:RING_SIZE, height:RING_SIZE }}>
-                              <svg
-                                width={RING_SIZE} height={RING_SIZE}
-                                viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}
-                                style={{ position:"absolute", top:0, left:0 }}
-                              >
-                                {/* Track */}
-                                <circle cx={RING_CX} cy={RING_CY} r={RING_R}
-                                  fill="none" stroke="var(--bg4)" strokeWidth="4"/>
-                                {/* Depleting progress arc */}
-                                <circle cx={RING_CX} cy={RING_CY} r={RING_R}
-                                  fill="none"
-                                  stroke={ringStroke}
-                                  strokeWidth="4"
-                                  strokeDasharray={RING_CIRC}
-                                  strokeDashoffset={RING_CIRC * timerProgress}
-                                  strokeLinecap="round"
-                                  transform={`rotate(-90 ${RING_CX} ${RING_CY})`}
-                                  style={{ transition:"stroke-dashoffset .9s linear, stroke .3s" }}
-                                />
-                              </svg>
-                              {/* Countdown — centred over ring */}
-                              <div style={{
-                                position:"absolute", inset:0,
-                                display:"flex", flexDirection:"column",
-                                alignItems:"center", justifyContent:"center", gap:1,
-                              }}>
-                                <span style={{
-                                  fontSize:22, fontWeight:800,
-                                  fontVariantNumeric:"tabular-nums",
-                                  letterSpacing:"-.02em",
-                                  fontFamily:"'DM Sans',sans-serif",
-                                  color: isRunning ? "var(--text)" : isPaused ? "var(--accent)" : "var(--text3)",
-                                  lineHeight:1,
-                                }}>
-                                  {cdStr}
-                                </span>
-                                {isRunning && (
-                                  <div style={{ display:"flex", alignItems:"center", gap:3, marginTop:2 }}>
-                                    <div style={{
-                                      width:4, height:4, borderRadius:"50%",
-                                      background:"var(--purple)",
-                                      animation:"pulse-dot 1.2s ease-in-out infinite",
-                                    }}/>
-                                  </div>
-                                )}
-                                {isPaused && (
-                                  <span style={{ fontSize:9, fontWeight:700, letterSpacing:".06em", color:"var(--accent)", textTransform:"uppercase", marginTop:2 }}>
-                                    Paused
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                            {/* Tap hint — idle only */}
-                            {!timerActive && (
-                              <span style={{ fontSize:10, color:"var(--text3)", marginTop:6, letterSpacing:".04em" }}>
-                                tap to start
-                              </span>
-                            )}
-                          </div>
-
-                          {/* ── State-aware primary button + Done ── */}
-                          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                            {isPaused ? (
-                              // Paused: Resume is primary, Finish is secondary in-row
-                              <button
-                                onClick={e => { e.stopPropagation(); startTimerSlot(slot.id); }}
-                                style={{
-                                  flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:7,
-                                  background:"var(--purple)", border:"none", borderRadius:22,
-                                  padding:"11px 0", fontSize:13, fontWeight:700,
-                                  color:"#fff", cursor:"pointer",
-                                  fontFamily:"'DM Sans',sans-serif", transition:"opacity .15s",
-                                }}
-                              >
-                                <svg width="10" height="11" viewBox="0 0 16 18" fill="none">
-                                  <path d="M1 1l14 8-14 8V1z" fill="currentColor"/>
-                                </svg>
-                                Resume
-                              </button>
-                            ) : isRunning ? (
-                              <button
-                                onClick={e => { e.stopPropagation(); pauseTimerSlot(slot.id); }}
-                                style={{
-                                  flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:7,
-                                  background:"var(--bg3)", border:"1px solid var(--border)", borderRadius:22,
-                                  padding:"11px 0", fontSize:13, fontWeight:700,
-                                  color:"var(--text2)", cursor:"pointer",
-                                  fontFamily:"'DM Sans',sans-serif", transition:"all .15s",
-                                }}
-                              >
-                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
-                                  <rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor"/>
-                                  <rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor"/>
-                                </svg>
-                                Pause
-                              </button>
-                            ) : (
-                              // Idle: big purple Start Session
-                              <button
-                                onClick={e => { e.stopPropagation(); startTimerSlot(slot.id); }}
-                                style={{
-                                  flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:7,
-                                  background:"var(--purple)", border:"none", borderRadius:22,
-                                  padding:"11px 0", fontSize:13, fontWeight:700,
-                                  color:"#fff", cursor:"pointer",
-                                  fontFamily:"'DM Sans',sans-serif", transition:"opacity .15s",
-                                }}
-                              >
-                                <svg width="10" height="11" viewBox="0 0 16 18" fill="none">
-                                  <path d="M1 1l14 8-14 8V1z" fill="currentColor"/>
-                                </svg>
-                                Start Session
-                              </button>
-                            )}
-
-                            {/* Done — always present, lights up green once timer has run */}
-                            <button
-                              onClick={e => { e.stopPropagation(); onDone(); }}
-                              title={timerActive ? `Finish — ${elapsedStr} logged` : "Mark done (full duration logged)"}
-                              style={{
-                                width:44, height:44, borderRadius:"50%",
-                                border: timerActive ? "none" : "1px solid var(--border)",
-                                background: timerActive ? "var(--green)" : "var(--bg3)",
-                                color: timerActive ? "#fff" : "var(--text3)",
-                                display:"flex", alignItems:"center", justifyContent:"center",
-                                cursor:"pointer", flexShrink:0,
-                                transition:"background .2s, border-color .2s, color .2s",
-                              }}
-                            >
-                              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-                                <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"/>
-                              </svg>
-                            </button>
-                          </div>
-                        </div>
-                      ); }
-
-                      function TimerRow() { return null; }
 
                       return (
                         <div style={{ flex:1, overflowY:"auto", padding:"0 16px 14px 20px" }} onClick={() => setExpandedId(null)}>
@@ -2540,7 +2570,7 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                                   </span>
                                 </div>
                               )}
-                              <TimerBlock onDone={() => doneTimer(slot, proj)} activeTaskLabel={(relevantTasks.find(t => !t.done)?.text) || proj?.name || null} />
+                              <TimerBlock onDone={() => doneTimer(slot, proj)} activeTaskLabel={(relevantTasks.find(t => !t.done)?.text) || proj?.name || null} isRunning={isRunning} isPaused={isPaused} timerActive={timerActive} timerProgress={timerProgress} ringStroke={ringStroke} cdStr={cdStr} elapsedStr={elapsedStr} slot={slot} mutateDWSlot={mutateDWSlot} resetTimer={resetTimer} startTimerSlot={startTimerSlot} pauseTimerSlot={pauseTimerSlot} />
                             </div>
 
                           ) : isPicking ? (
@@ -2619,7 +2649,7 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                                   )}
                                 </div>
                               ))}
-                              <TimerBlock onDone={() => doneTimer(slot, proj)} activeTaskLabel={(relevantTasks.find(t => !t.done)?.text) || proj?.name || null} />
+                              <TimerBlock onDone={() => doneTimer(slot, proj)} activeTaskLabel={(relevantTasks.find(t => !t.done)?.text) || proj?.name || null} isRunning={isRunning} isPaused={isPaused} timerActive={timerActive} timerProgress={timerProgress} ringStroke={ringStroke} cdStr={cdStr} elapsedStr={elapsedStr} slot={slot} mutateDWSlot={mutateDWSlot} resetTimer={resetTimer} startTimerSlot={startTimerSlot} pauseTimerSlot={pauseTimerSlot} />
                             </>
 
                           ) : (
@@ -2629,7 +2659,7 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                                 onClick={e => { e.stopPropagation(); setPickerState({ blockId: slot.id, projectId: proj.id, selected: new Set(), newText: "" }); }}>
                                 Pick tasks
                               </button>
-                              <TimerBlock onDone={() => doneTimer(slot, proj)} activeTaskLabel={(relevantTasks.find(t => !t.done)?.text) || proj?.name || null} />
+                              <TimerBlock onDone={() => doneTimer(slot, proj)} activeTaskLabel={(relevantTasks.find(t => !t.done)?.text) || proj?.name || null} isRunning={isRunning} isPaused={isPaused} timerActive={timerActive} timerProgress={timerProgress} ringStroke={ringStroke} cdStr={cdStr} elapsedStr={elapsedStr} slot={slot} mutateDWSlot={mutateDWSlot} resetTimer={resetTimer} startTimerSlot={startTimerSlot} pauseTimerSlot={pauseTimerSlot} />
                             </div>
                           )}
                         </div>
@@ -2991,7 +3021,7 @@ function LooseTasksSection({ domainId, domain, data, setData, onAddProject }) {
                 <div className="loose-assign-pop" onClick={e => e.stopPropagation()}>
                   <div className="lap-title">Move to project</div>
                   {domainProjects.map(p => {
-                    const dom = data.domains.find(d => d.id === p.domainId);
+                    const dom = (data.domains||[]).find(d => d.id === p.domainId);
                     return (
                       <div key={p.id} className="lap-proj" onClick={() => assignToProject(t.id, p.id)}>
                         <div className="lap-dot" style={{ background: dom?.color }} />
@@ -3842,7 +3872,7 @@ function PlanScreen({ data, setData, onGoToSeason, lightMode, toggleTheme }) {
               </div>
 
               {(() => {
-                const routinesForDay = getRoutinesForDate(data.routineBlocks, dayDate);
+                const routinesForDay = getRoutinesForDate(data.routineBlocks || [], dayDate);
                 const allRows = [
                   ...routinesForDay.map(rb => ({ type: "routine", routine: rb })),
                   ...mergedRows.map(r => ({ ...r }))
@@ -4136,173 +4166,6 @@ function PlanScreen({ data, setData, onGoToSeason, lightMode, toggleTheme }) {
   );
 }
 
-// ─── ASSIGN GHOST SHEET ───────────────────────────────────────────────────────
-function AssignGhostSheet({ data, ghost, onClose, onAssign, onUpdateSlotDefault, onCreateProject }) {
-  const swipe = useSwipeDown(onClose);
-  const { projects, domains } = data;
-  const { dayOffset, slot, origSlot } = ghost;
-  const today = new Date();
-  const dayDate = new Date(today); dayDate.setDate(today.getDate() + dayOffset);
-  const dow = dayDate.getDay();
-  const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
-
-  const activeProjects = projects.filter(p => p.status === "active");
-  const [projectId, setProjectId] = useState(activeProjects[0]?.id || projects[0]?.id || "");
-  const [startHour, setStartHour] = useState(slot.startHour);
-  const [startMin,  setStartMin]  = useState(slot.startMin);
-  const [duration,  setDuration]  = useState(slot.durationMin);
-  const [saveAsDefault, setSaveAsDefault] = useState(false);
-
-  // New project inline creation
-  const [addingNew, setAddingNew] = useState(false);
-  const [newProjName, setNewProjName] = useState("");
-  const [newProjDomain, setNewProjDomain] = useState(domains[0]?.id || "");
-
-  const timeChanged = startHour !== slot.startHour || startMin !== slot.startMin || duration !== slot.durationMin;
-  const is90 = duration === 90;
-  const proj = projects.find(p => p.id === projectId);
-  const domain = proj ? domains.find(d => d.id === proj.domainId) : null;
-
-  const createAndSelect = (onProjectCreated) => {
-    const name = newProjName.trim();
-    if (!name || !newProjDomain) return;
-    const newId = uid();
-    onProjectCreated({ id: newId, domainId: newProjDomain, name, status: "active", tasks: [] });
-    setProjectId(newId);
-    setAddingNew(false);
-    setNewProjName("");
-  };
-
-  const submit = () => {
-    if (timeChanged && saveAsDefault) {
-      onUpdateSlotDefault(origSlot.slotIndex, { startHour, startMin, durationMin: duration });
-    }
-    onAssign({ id: uid(), projectId, startHour, startMin, durationMin: duration, dayOffset, isAdmin: false });
-  };
-
-  const timeOptions = [];
-  for (let h = 6; h <= 20; h++) {
-    for (let m of [0, 15, 30, 45]) {
-      timeOptions.push({ h, m });
-    }
-  }
-
-  return (
-    <>
-      <div className="backdrop" onClick={onClose} />
-      <div className="sheet">
-        <div className="sheet-pull" />
-        <div className="sheet-title">Assign Deep Work</div>
-        <div className="sheet-sub">{days[dow]} · {fmtTime(slot.startHour, slot.startMin)} slot</div>
-        <div className="sheet-scroll">
-
-          <div className="form-row">
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
-              <label className="form-label" style={{ marginBottom:0 }}>Project</label>
-              <button
-                style={{ background:"none", border:"none", color:"var(--accent)", fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:"'DM Sans',sans-serif", padding:"2px 0" }}
-                onClick={() => { setAddingNew(v => !v); setNewProjName(""); }}
-              >
-                {addingNew ? "Cancel" : "＋ New Project"}
-              </button>
-            </div>
-
-            {addingNew ? (
-              <div style={{ background:"var(--bg3)", borderRadius:10, padding:"12px", display:"flex", flexDirection:"column", gap:8 }}>
-                <input
-                  className="form-input"
-                  placeholder="Project name…"
-                  value={newProjName}
-                  onChange={e => setNewProjName(e.target.value)}
-                  autoFocus
-                  style={{ marginBottom:0 }}
-                />
-                <select className="form-select" value={newProjDomain} onChange={e => setNewProjDomain(e.target.value)} style={{ marginBottom:0 }}>
-                  {domains.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                </select>
-                <button
-                  className="form-btn"
-                  style={{ marginTop:0, opacity: newProjName.trim() ? 1 : 0.4 }}
-                  disabled={!newProjName.trim()}
-                  onClick={() => onCreateProject && onCreateProject({ id: uid(), domainId: newProjDomain, name: newProjName.trim(), status: "active", tasks: [] }, (newId) => { setProjectId(newId); setAddingNew(false); setNewProjName(""); })}
-                >
-                  Create &amp; Select
-                </button>
-              </div>
-            ) : (
-              <div>
-                {domains.map(domain => {
-                  const domProjects = projects.filter(p => p.domainId === domain.id);
-                  if (!domProjects.length) return null;
-                  return (
-                    <div key={domain.id} className="proj-pills-group">
-                      <div className="proj-pills-domain-label" style={{ color: domain.color }}>{domain.name}</div>
-                      <div className="proj-pills-row">
-                        {domProjects.map(p => {
-                          const selected = projectId === p.id;
-                          return (
-                            <div
-                              key={p.id}
-                              className={`proj-pill ${selected ? "selected" : ""}`}
-                              style={{
-                                borderColor: domain.color,
-                                background: selected ? domain.color : `${domain.color}18`,
-                                color: selected ? "#000" : domain.color,
-                                opacity: p.status === "backlog" ? 0.6 : 1,
-                              }}
-                              onClick={() => setProjectId(p.id)}
-                            >
-                              {p.name}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          <div className="form-row">
-            <label className="form-label">Start Time</label>
-            <select className="form-select" value={`${startHour}:${startMin}`} onChange={e => { const [h,m] = e.target.value.split(":").map(Number); setStartHour(h); setStartMin(m); }}>
-              {timeOptions.map(({h,m}) => {
-                const label = fmtTime(h,m);
-                const isDefault = h===slot.startHour && m===slot.startMin;
-                return <option key={`${h}:${m}`} value={`${h}:${m}`}>{label}</option>;
-              })}
-            </select>
-          </div>
-
-          <div className="form-row">
-            <label className="form-label">Duration</label>
-            <select className="form-select" value={duration} onChange={e => setDuration(Number(e.target.value))}>
-              <option value={45}>45 min</option>
-              <option value={60}>60 min</option>
-              <option value={90}>90 min</option>
-              <option value={120}>2 hours</option>
-            </select>
-          </div>
-
-          {timeChanged && (
-            <div style={{ display:"flex", alignItems:"center", gap:8, padding:"8px 0 4px", marginBottom:4, cursor:"pointer" }} onClick={() => setSaveAsDefault(v=>!v)}>
-              <div style={{ width:18, height:18, borderRadius:5, border:`1.5px solid ${saveAsDefault?"var(--accent)":"var(--border)"}`, background:saveAsDefault?"var(--accent)":"transparent", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, transition:"all .15s" }}>
-                {saveAsDefault && <span style={{ fontSize:11, color:"#000", fontWeight:700 }}>✓</span>}
-              </div>
-              <span style={{ fontSize:12, color:"var(--text2)" }}>Save as my default time for Block {origSlot.slotIndex+1}</span>
-            </div>
-          )}
-
-          <button className="form-btn" onClick={submit}>
-            Assign to {proj?.name || "—"}
-          </button>
-        </div>
-      </div>
-    </>
-  );
-}
-
 // ─── WORK WEEK SHEET ──────────────────────────────────────────────────────────
 function WorkWeekSheet({ workWeek, data, onClose, onSave, lightMode, onToggleTheme }) {
   const swipe = useSwipeDown(onClose);
@@ -4407,58 +4270,6 @@ function getQuarterLabel() {
   const q = Math.floor(m / 3) + 1;
   const seasons = ["Winter","Spring","Summer","Fall"];
   return `Q${q} · ${seasons[Math.floor(m/3)]} ${new Date().getFullYear()}`;
-}
-
-// ─── THIS SEASON CARD (Plan tab pull-forward widget) ──────────────────────────
-function ThisSeasonCard({ data, setData, onGoToSeason }) {
-  const { seasonGoals = [], domains } = data;
-  const getDomain = id => domains.find(d => d.id === id);
-  const activeGoals = seasonGoals.filter(g => !g.done);
-  const doneCount   = seasonGoals.filter(g => g.done).length;
-
-  const toggleGoal = id => setData(d => ({
-    ...d,
-    seasonGoals: (d.seasonGoals||[]).map(g => g.id === id ? { ...g, done: !g.done } : g)
-  }));
-
-  if (seasonGoals.length === 0) {
-    return (
-      <div className="season-pull-card" style={{ cursor: "pointer" }} onClick={onGoToSeason}>
-        <div className="spc-head">
-          <span className="spc-eyebrow">This Season</span>
-          <button className="spc-edit" onClick={e => { e.stopPropagation(); onGoToSeason(); }}>Set goals →</button>
-        </div>
-        <div className="spc-empty">No season goals set yet. Tap to add some.</div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="season-pull-card">
-      <div className="spc-head">
-        <span className="spc-eyebrow">This Season · {getQuarterLabel()}</span>
-        <button className="spc-edit" onClick={onGoToSeason}>
-          {doneCount}/{seasonGoals.length} done →
-        </button>
-      </div>
-      {activeGoals.slice(0,3).map(g => {
-        const domain = getDomain(g.domainId);
-        return (
-          <div key={g.id} className="spc-goal">
-            <div className="spc-dot" style={{ background: domain?.color || "var(--text3)" }} />
-            <span className="spc-text">{g.text}</span>
-            <div
-              className={`spc-check ${g.done ? "checked" : ""}`}
-              onClick={() => toggleGoal(g.id)}
-            >✓</div>
-          </div>
-        );
-      })}
-      {activeGoals.length === 0 && (
-        <div className="spc-empty">All season goals complete!</div>
-      )}
-    </div>
-  );
 }
 
 // ─── SEASON SCREEN ────────────────────────────────────────────────────────────
@@ -4673,30 +4484,6 @@ function SeasonScreen({ data, setData }) {
 }
 
 // ─── SWIPE DOWN TO CLOSE ─────────────────────────────────────────────────────
-function useSwipeDown(onClose) {
-  const startY = useRef(null);
-  const [dy, setDy] = useState(0);
-
-  const onTouchStart = e => { startY.current = e.touches[0].clientY; };
-  const onTouchMove  = e => {
-    if (startY.current === null) return;
-    const d = e.touches[0].clientY - startY.current;
-    if (d > 0) { e.preventDefault(); setDy(d); }
-  };
-  const onTouchEnd = () => {
-    if (dy > 80) onClose();
-    setDy(0);
-    startY.current = null;
-  };
-
-  const style = {
-    transform: `translateY(${dy}px)`,
-    transition: dy === 0 ? "transform .25s ease" : "none",
-  };
-
-  return { onTouchStart, onTouchMove, onTouchEnd, style };
-}
-
 // ─── SHUTDOWN SHEET ───────────────────────────────────────────────────────────
 const SD_ITEMS = [
   "Reviewed tomorrow's calendar",
