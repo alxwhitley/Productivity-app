@@ -1160,6 +1160,31 @@ const ONBOARDING_CARDS = [
   },
 ];
 
+const PROJ_COLORS = DOMAIN_COLORS;
+
+const DEFAULT_DEEP_SLOTS = [
+  { slotIndex: 0, startHour: 9,  startMin: 0,  durationMin: 90, blockType: "analytical",
+    hint: "Block 1", hintDetail: "Peak neurochemical window — best for hard analysis, complex decisions, and deep problem-solving." },
+  { slotIndex: 1, startHour: 12, startMin: 0,  durationMin: 90, blockType: "creative",
+    hint: "Block 2",   hintDetail: "Post-peak window — excellent for generative work, writing, and ideation." },
+  { slotIndex: 2, startHour: 15, startMin: 0,  durationMin: 90, blockType: "generative",
+    hint: "Block 3", hintDetail: "Third block — strong for execution-focused work: building, shipping, tasks you know well." },
+];
+
+const SD_ITEMS = [
+  "Reviewed tomorrow's calendar",
+  "Captured all loose tasks",
+  "No urgent emails unaddressed",
+  "Mind cleared — nothing left open",
+];
+
+const NAV_ITEMS = [
+  { id:"today",    lbl:"Today"    },
+  { id:"projects", lbl:"Projects" },
+  { id:"plan",     lbl:"Week"     },
+  { id:"season",   lbl:"Season"   },
+];
+
 function OnboardingFlow({ onDone }) {
   const [card, setCard] = useState(0);
   const [animDir, setAnimDir] = useState(null); // "in" | null
@@ -3139,7 +3164,6 @@ function SwipeTask({ task, onToggle, onDelete, onSave }) {
 }
 
 // ─── PROJECT CARD ────────────────────────────────────────────────────────────
-const PROJ_COLORS = DOMAIN_COLORS;
 
 function ProjectCard({ proj, domain, isExp, newTaskText,
   onToggleExpand, onToggleStatus, onDelete, onEditSave,
@@ -3699,16 +3723,6 @@ function DomainEditSheet({ data, setData, onClose, activeDomain, setActiveDomain
 }
 
 // ─── PLAN SCREEN ──────────────────────────────────────────────────────────────
-// ─── HUBERMAN SLOT DEFINITIONS ────────────────────────────────────────────────
-// 3 deep work slots — defaults used when no user customisation saved
-const DEFAULT_DEEP_SLOTS = [
-  { slotIndex: 0, startHour: 9,  startMin: 0,  durationMin: 90, blockType: "analytical",
-    hint: "Block 1", hintDetail: "Peak neurochemical window — best for hard analysis, complex decisions, and deep problem-solving." },
-  { slotIndex: 1, startHour: 12, startMin: 0,  durationMin: 90, blockType: "creative",
-    hint: "Block 2",   hintDetail: "Post-peak window — excellent for generative work, writing, and ideation." },
-  { slotIndex: 2, startHour: 15, startMin: 0,  durationMin: 90, blockType: "generative",
-    hint: "Block 3", hintDetail: "Third block — strong for execution-focused work: building, shipping, tasks you know well." },
-];
 
 // Resolve the live slot definitions: user's saved deepBlockDefaults override the built-in defaults
 function getDeepSlots(data) {
@@ -4483,14 +4497,7 @@ function SeasonScreen({ data, setData }) {
   );
 }
 
-// ─── SWIPE DOWN TO CLOSE ─────────────────────────────────────────────────────
 // ─── SHUTDOWN SHEET ───────────────────────────────────────────────────────────
-const SD_ITEMS = [
-  "Reviewed tomorrow's calendar",
-  "Captured all loose tasks",
-  "No urgent emails unaddressed",
-  "Mind cleared — nothing left open",
-];
 
 function ShutdownSheet({ onClose, onComplete, alreadyDone, data, onCategorizeLoose }) {
   const swipe = useSwipeDown(onClose);
@@ -5288,12 +5295,6 @@ function CategorizeSheet({ data, onClose, onCategorize, onDismiss, onDoToday }) 
 }
 
 // ─── APP ──────────────────────────────────────────────────────────────────────
-const NAV_ITEMS = [
-  { id:"today",    lbl:"Today"    },
-  { id:"projects", lbl:"Projects" },
-  { id:"plan",     lbl:"Week"     },
-  { id:"season",   lbl:"Season"   },
-];
 
 // ── Login Screen ─────────────────────────────────────────────────────────────
 function LoginScreen() {
