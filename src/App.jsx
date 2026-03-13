@@ -1578,6 +1578,98 @@ function TimerBlock({ onDone, activeTaskLabel, isRunning, isPaused, timerActive,
   );
 }
 
+
+function getTodayBlockCardStyles({ isRunning, isCompleted, isNow, domainColor }) {
+  const background = "var(--bg2)";
+  const runningBorder = isRunning ? "1.5px solid rgba(155,114,207,.6)" : null;
+
+  let border = "1px solid var(--border)";
+  if (runningBorder) {
+    border = runningBorder;
+  } else if (isCompleted) {
+    border = "1px solid rgba(69,193,122,.25)";
+  } else if (isNow && domainColor) {
+    border = `2px solid ${domainColor}90`;
+  } else if (domainColor) {
+    border = `1px solid ${domainColor}50`;
+  }
+
+  const shadow = isRunning
+    ? "none"
+    : isNow && domainColor
+      ? `0 0 32px ${domainColor}20`
+      : "none";
+
+  const animation = isRunning ? "dw-running-pulse 2.4s ease-in-out infinite" : "none";
+
+  return {
+    background,
+    runningBorder,
+    border,
+    shadow,
+    animation,
+  };
+}
+
+
+
+function getTodayBlockCompletionState({ slot, project, manualCompleted }) {
+  const isSessionMode = project?.mode === "sessions";
+  const todayTaskIds = slot.todayTasks;
+  const hasTodayTasks = Array.isArray(todayTaskIds) && todayTaskIds.length > 0;
+  const relevantTasks = hasTodayTasks
+    ? todayTaskIds.map(id => project?.tasks.find(t => t.id === id)).filter(Boolean)
+    : [];
+  const relevantDone = relevantTasks.filter(t => t.done).length;
+  const allTasksDone = isSessionMode
+    ? manualCompleted.has(slot.id)
+    : (relevantTasks.length > 0 && relevantDone === relevantTasks.length);
+  const isCompleted = allTasksDone || manualCompleted.has(slot.id);
+
+  return {
+    isSessionMode,
+    todayTaskIds,
+    hasTodayTasks,
+    relevantTasks,
+    relevantDone,
+    allTasksDone,
+    isCompleted,
+  };
+}
+
+function getTodayBlockTimingState({ slot, lateStarted, getElapsedMs }) {
+  const lateInfo = lateStarted[slot.id];
+  const timerActive = !!lateInfo;
+  const isRunning = timerActive && !lateInfo.paused;
+  const isPaused = timerActive && !!lateInfo.paused;
+  const elapsedMs = getElapsedMs(lateInfo);
+  const totalMs = slot.durationMin * 60 * 1000;
+  const remainMs = timerActive ? Math.max(0, totalMs - elapsedMs) : totalMs;
+  const remainSec = Math.ceil(remainMs / 1000);
+  const cdM = Math.floor(remainSec / 60);
+  const cdS = remainSec % 60;
+  const countdownLabel = `${String(cdM).padStart(2, "0")}:${String(cdS).padStart(2, "0")}`;
+
+  const elapsedSec = Math.floor(elapsedMs / 1000);
+  const elapsedM = Math.floor(elapsedSec / 60);
+  const elapsedS = elapsedSec % 60;
+  const elapsedLabel = `${String(elapsedM).padStart(2, "0")}:${String(elapsedS).padStart(2, "0")}`;
+
+  return {
+    lateInfo,
+    timerActive,
+    isRunning,
+    isPaused,
+    elapsedMs,
+    totalMs,
+    remainMs,
+    remainSec,
+    countdownLabel,
+    elapsedLabel,
+  };
+}
+
+
 // ─── TODAY SCREEN ─────────────────────────────────────────────────────────────
 function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onClearJump, setTab }) {
   const [showTodaySettings, setShowTodaySettings] = useState(false);
@@ -2232,42 +2324,51 @@ function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onCl
                 const pickerTime = dwPickerTime[slot.id] || { startHour: slot.startHour, startMin: slot.startMin, durationMin: slot.durationMin };
 
                 // Completion state
-                const isSessionMode = proj?.mode === "sessions";
-                const todayTaskIds = slot.todayTasks;
-                const hasTodayTasks = Array.isArray(todayTaskIds) && todayTaskIds.length > 0;
-                const relevantTasks = hasTodayTasks ? todayTaskIds.map(id => proj?.tasks.find(t => t.id === id)).filter(Boolean) : [];
-                const relevantDone = relevantTasks.filter(t => t.done).length;
-                const allTasksDone = isSessionMode ? manualCompleted.has(slot.id) : (relevantTasks.length > 0 && relevantDone === relevantTasks.length);
-                const isCompleted = allTasksDone || manualCompleted.has(slot.id);
+                const {
+                  isSessionMode,
+                  todayTaskIds,
+                  hasTodayTasks,
+                  relevantTasks,
+                  relevantDone,
+                  allTasksDone,
+                  isCompleted,
+                } = getTodayBlockCompletionState({
+                  slot,
+                  project: proj,
+                  manualCompleted,
+                });
 
-                const lateInfo = lateStarted[slot.id];
-                const timerActive = !!lateInfo;
-                const isRunning = timerActive && !lateInfo.paused;
-                const isPaused = timerActive && !!lateInfo.paused;
-                const elapsedMs = getElapsedMs(lateInfo);
-                const totalMs = slot.durationMin * 60 * 1000;
-                const remainMs = timerActive ? Math.max(0, totalMs - elapsedMs) : totalMs;
-                const remainSec = Math.ceil(remainMs / 1000);
-                const cdM = Math.floor(remainSec / 60), cdS = remainSec % 60;
-                const cdStr = `${String(cdM).padStart(2,"0")}:${String(cdS).padStart(2,"0")}`;
-                // elapsedStr kept for Done label only
-                const elapsedSec = Math.floor(elapsedMs / 1000);
-                const elapsedM2 = Math.floor(elapsedSec / 60), elapsedS2 = elapsedSec % 60;
-                const elapsedStr = `${String(elapsedM2).padStart(2,"0")}:${String(elapsedS2).padStart(2,"0")}`;
+                const {
+                  lateInfo,
+                  timerActive,
+                  isRunning,
+                  isPaused,
+                  elapsedMs,
+                  totalMs,
+                  remainMs,
+                  remainSec,
+                  countdownLabel: cdStr,
+                  elapsedLabel: elapsedStr,
+                } = getTodayBlockTimingState({
+                  slot,
+                  lateStarted,
+                  getElapsedMs,
+                });
 
                 const isPicking = pickerState?.blockId === slot.id;
 
-                const cardBg = "var(--bg2)";
-                const cardRunningBorder = isRunning ? "1.5px solid rgba(155,114,207,.6)" : null;
-                const cardBorder = cardRunningBorder || (isCompleted
-                  ? "1px solid rgba(69,193,122,.25)"
-                  : isNow && domainColor
-                    ? `2px solid ${domainColor}90`
-                    : domainColor
-                      ? `1px solid ${domainColor}50`
-                      : "1px solid var(--border)");
-                const cardShadow = isRunning ? "none" : isNow && domainColor ? `0 0 32px ${domainColor}20` : "none";
-                const cardAnimation = isRunning ? "dw-running-pulse 2.4s ease-in-out infinite" : "none";
+                const {
+                  background: cardBg,
+                  runningBorder: cardRunningBorder,
+                  border: cardBorder,
+                  shadow: cardShadow,
+                  animation: cardAnimation,
+                } = getTodayBlockCardStyles({
+                  isRunning,
+                  isCompleted,
+                  isNow,
+                  domainColor,
+                });
 
                 if (!isFilled) {
                   // ── UNASSIGNED CARD ──
