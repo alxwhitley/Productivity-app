@@ -5423,6 +5423,26 @@ export default function App() {
   }
   if (!session) return <LoginScreen />;
 
+  const safeData = {
+    ...data,
+    domains: data.domains || [],
+    projects: data.projects || [],
+    blocks: data.blocks || [],
+    inbox: data.inbox || [],
+    looseTasks: data.looseTasks || [],
+    deepWorkSlots: data.deepWorkSlots || {},
+    deepWorkTargets: data.deepWorkTargets || { dailyHours: 4, weeklyHours: 20, maxDeepBlocks: 3 },
+    todayPrefs: data.todayPrefs || { name: '', showShutdown: true },
+    routineBlocks: data.routineBlocks || [],
+    seasonGoals: data.seasonGoals || [],
+    blockCompletions: data.blockCompletions || [],
+    todayLoosePicks: data.todayLoosePicks || {},
+    captured: data.captured || [],
+    sessionLog: data.sessionLog || [],
+    emptyBlocks: data.emptyBlocks || [],
+    workWeek: data.workWeek || [2,3,4,5,6],
+  };
+
   const closeSheet = () => setSheet(null);
 
   const handleAddRoutine = r => setData(d => ({ ...d, routineBlocks: [...(d.routineBlocks||[]), r] }));
@@ -5453,15 +5473,15 @@ export default function App() {
       <style>{css}</style>
       <div style={{ height:"100%", display:"flex", alignItems:"center", justifyContent:"center", background: lightMode ? "#E8E4DE" : "#101213" }}>
         <div className={`phone ${lightMode ? "light" : ""}`}>
-          {!data.onboardingDone && (
+          {!safeData.onboardingDone && (
             <OnboardingFlow onDone={() => setData(d => ({ ...d, onboardingDone: true }))} />
           )}
-          {tab==="today"    && <TodayScreen    data={data} setData={setData} openShutdown={()=>setSheet("shutdown")} onSignOut={() => supabase.auth.signOut()} jumpToBlock={jumpToBlock} onClearJump={() => setJumpToBlock(null)} setTab={setTab} />}
-          {tab==="projects" && <ProjectsScreen data={data} setData={setData} openCategorize={()=>setSheet("categorize")} />}
-          {tab==="plan"     && <PlanScreen     data={data} setData={setData} onGoToSeason={()=>setTab("season")} lightMode={lightMode} toggleTheme={toggleTheme} />}
-          {tab==="season"  && <SeasonScreen   data={data} setData={setData} />}
+          {tab==="today"    && <TodayScreen    data={safeData} setData={setData} openShutdown={()=>setSheet("shutdown")} onSignOut={() => supabase.auth.signOut()} jumpToBlock={jumpToBlock} onClearJump={() => setJumpToBlock(null)} setTab={setTab} />}
+          {tab==="projects" && <ProjectsScreen data={safeData} setData={setData} openCategorize={()=>setSheet("categorize")} />}
+          {tab==="plan"     && <PlanScreen     data={safeData} setData={setData} onGoToSeason={()=>setTab("season")} lightMode={lightMode} toggleTheme={toggleTheme} />}
+          {tab==="season"  && <SeasonScreen   data={safeData} setData={setData} />}
 
-          {sheet==="shutdown"  && <ShutdownSheet    onClose={closeSheet} onComplete={()=>setData(d=>({...d,shutdownDone:true,shutdownDate:toISODate()}))} alreadyDone={data.shutdownDone} data={data} onCategorizeLoose={(taskId, domainId) => setData(d => {
+          {sheet==="shutdown"  && <ShutdownSheet    onClose={closeSheet} onComplete={()=>setData(d=>({...d,shutdownDone:true,shutdownDate:toISODate()}))} alreadyDone={safeData.shutdownDone} data={safeData} onCategorizeLoose={(taskId, domainId) => setData(d => {
               const todayISO = new Date().toISOString().slice(0,10);
               // Assign domain + remove from todayLoosePicks (it's now categorized)
               const picks = (d.todayLoosePicks||{})[todayISO] || [];
@@ -5472,15 +5492,15 @@ export default function App() {
                 todayLoosePicks: { ...(d.todayLoosePicks||{}), [todayISO]: newPicks }
               };
             })} />}
-          {sheet==="addblock"  && <AddBlockSheet    data={data} onClose={closeSheet} onAddRoutine={handleAddRoutine} />}
+          {sheet==="addblock"  && <AddBlockSheet    data={safeData} onClose={closeSheet} onAddRoutine={handleAddRoutine} />}
 
-          {sheet==="categorize"&& <CategorizeSheet  data={data} onClose={closeSheet} onCategorize={handleCategorize} onDismiss={handleDismissInbox} onDoToday={handleDoToday} />}
+          {sheet==="categorize"&& <CategorizeSheet  data={safeData} onClose={closeSheet} onCategorize={handleCategorize} onDismiss={handleDismissInbox} onDoToday={handleDoToday} />}
 
           {captureOpen && (
             <QuickReminders
               onClose={() => setCaptureOpen(false)}
               onAddCaptured={item => setData(d => ({ ...d, captured: [...(d.captured||[]), item] }))}
-              existingCaptured={data.captured||[]}
+              existingCaptured={safeData.captured}
             />
           )}
 
@@ -5488,8 +5508,8 @@ export default function App() {
             {/* Today + Projects */}
             {NAV_ITEMS.slice(0,2).map(n => (
               <div key={n.id} className={`nav-btn ${tab===n.id?"on":""}`} onClick={()=>setTab(n.id)}>
-                {n.id === "projects" && ((data.inbox||[]).length > 0 || (data.captured||[]).length > 0) && (
-                  <span className={`nav-dot${(data.inbox||[]).some(i => i.createdAt && Date.now() - i.createdAt > 2 * 24 * 60 * 60 * 1000) ? " urgent" : ""}`} />
+                {n.id === "projects" && (safeData.inbox.length > 0 || safeData.captured.length > 0) && (
+                  <span className={`nav-dot${safeData.inbox.some(i => i.createdAt && Date.now() - i.createdAt > 2 * 24 * 60 * 60 * 1000) ? " urgent" : ""}`} />
                 )}
                 <span className="nav-ico"><NavIcon id={n.id} active={tab===n.id} /></span>
                 <span className="nav-lbl">{n.lbl}</span>
