@@ -9,6 +9,12 @@ export default function TasksScreen({ data, setData }) {
   const [filter, setFilter] = useState("all");
   const [showSwipeHint, setShowSwipeHint] = useState(false);
   const [qwFlashId, setQwFlashId] = useState(null);
+  const [editingId, setEditingId] = useState(null);
+  const [editingText, setEditingText] = useState("");
+  const [newItemId, setNewItemId] = useState(null);
+  const [processedToday, setProcessedToday] = useState(0);
+  const [showClearMsg, setShowClearMsg] = useState(false);
+  const [removingId, setRemovingId] = useState(null);
 
   // Swipe state per row
   const swipeRefs = useRef({});
@@ -34,7 +40,7 @@ export default function TasksScreen({ data, setData }) {
     try { localStorage.setItem(SWIPE_HINT_KEY, "1"); } catch {}
   };
 
-  // Shallow work reset logic on mount (moves undone manual tasks back to fabQueue)
+  // Shallow work reset logic on mount
   useEffect(() => {
     const todayISO = toISODate();
     if (data.swClearDate === todayISO) return;
@@ -57,11 +63,21 @@ export default function TasksScreen({ data, setData }) {
     }
   }, []);
 
-  // ── Swipe handlers ──
-  // Swipe LEFT (negative dx) → reveal action buttons on RIGHT
-  // Swipe RIGHT (positive dx) → toggle quickWin
+  // Show "Queue clear" when queue empties
+  const fabQueue = data.fabQueue || [];
+  const prevLenRef = useRef(fabQueue.length);
+  useEffect(() => {
+    if (prevLenRef.current > 0 && fabQueue.length === 0) {
+      setShowClearMsg(true);
+      const t = setTimeout(() => setShowClearMsg(false), 2000);
+      return () => clearTimeout(t);
+    }
+    prevLenRef.current = fabQueue.length;
+  }, [fabQueue.length]);
 
+  // ── Swipe handlers ──
   const handleTouchStart = (id, e) => {
+    if (editingId || newItemId) return;
     const touch = e.touches[0];
     swipeRefs.current[id] = { startX: touch.clientX, startY: touch.clientY, moved: false };
     setSwipingId(id);
@@ -81,28 +97,22 @@ export default function TasksScreen({ data, setData }) {
       return;
     }
     ref.moved = true;
-    if (swipingId === id) {
-      setSwipeX(dx);
-    }
+    if (swipingId === id) setSwipeX(dx);
   };
 
   const handleTouchEnd = (id, e) => {
     const ref = swipeRefs.current[id];
     if (!ref) return;
     const dx = swipeX;
-
-    // Any swipe dismisses the hint
     if (ref.moved && showSwipeHint) dismissSwipeHint();
 
     if (dx > 60) {
-      // Swipe right → toggle quickWin with flash
       toggleQuickWin(id);
       setQwFlashId(id);
       setTimeout(() => setQwFlashId(null), 400);
       setSwipingId(null);
       setSwipeX(0);
     } else if (dx < -40) {
-      // Swipe left → snap open to show action buttons on right
       setSwipeX(-220);
     } else {
       setSwipingId(null);
@@ -117,14 +127,26 @@ export default function TasksScreen({ data, setData }) {
     setSortPanelId(null);
   };
 
+  // ── Animate-out helper ──
+  const animateOut = (itemId, callback) => {
+    setRemovingId(itemId);
+    setTimeout(() => {
+      callback();
+      setRemovingId(null);
+      setProcessedToday(c => c + 1);
+    }, 300);
+  };
+
   // ── Data helpers ──
 
   const deleteFabItem = (itemId) => {
-    setData(d => ({
-      ...d,
-      fabQueue: (d.fabQueue || []).filter(i => i.id !== itemId),
-    }));
     closeSwipe();
+    animateOut(itemId, () => {
+      setData(d => ({
+        ...d,
+        fabQueue: (d.fabQueue || []).filter(i => i.id !== itemId),
+      }));
+    });
   };
 
   const toggleQuickWin = (itemId) => {
@@ -137,57 +159,104 @@ export default function TasksScreen({ data, setData }) {
   };
 
   const routeToToday = (item) => {
-    const todayISO = toISODate();
-    setData(d => ({
-      ...d,
-      fabQueue: (d.fabQueue || []).filter(i => i.id !== item.id),
-      shallowWork: {
-        ...(d.shallowWork || {}),
-        [todayISO]: [...((d.shallowWork || {})[todayISO] || []), {
-          id: item.id, text: item.text, domainId: null,
-          sourceType: "manual", sourceId: null, done: false, doneAt: null, addedAt: Date.now(),
-        }],
-      },
-    }));
     closeSwipe();
+    const todayISO = toISODate();
+    animateOut(item.id, () => {
+      setData(d => ({
+        ...d,
+        fabQueue: (d.fabQueue || []).filter(i => i.id !== item.id),
+        shallowWork: {
+          ...(d.shallowWork || {}),
+          [todayISO]: [...((d.shallowWork || {})[todayISO] || []), {
+            id: item.id, text: item.text, domainId: null,
+            sourceType: "manual", sourceId: null, done: false, doneAt: null, addedAt: Date.now(),
+          }],
+        },
+      }));
+    });
   };
 
   const routeToProject = (item, projectId) => {
-    setData(d => ({
-      ...d,
-      fabQueue: (d.fabQueue || []).filter(i => i.id !== item.id),
-      projects: d.projects.map(p => p.id === projectId
-        ? { ...p, tasks: [...p.tasks, { id: uid(), text: item.text, done: false }] }
-        : p
-      ),
-    }));
     setSortPanelId(null);
     closeSwipe();
+    animateOut(item.id, () => {
+      setData(d => ({
+        ...d,
+        fabQueue: (d.fabQueue || []).filter(i => i.id !== item.id),
+        projects: d.projects.map(p => p.id === projectId
+          ? { ...p, tasks: [...p.tasks, { id: uid(), text: item.text, done: false }] }
+          : p
+        ),
+      }));
+    });
   };
 
   const routeToLoose = (item, domainId) => {
-    setData(d => ({
-      ...d,
-      fabQueue: (d.fabQueue || []).filter(i => i.id !== item.id),
-      looseTasks: [...(d.looseTasks || []), { id: uid(), domainId, text: item.text, done: false, doneAt: null }],
-    }));
     setSortPanelId(null);
     closeSwipe();
+    animateOut(item.id, () => {
+      setData(d => ({
+        ...d,
+        fabQueue: (d.fabQueue || []).filter(i => i.id !== item.id),
+        looseTasks: [...(d.looseTasks || []), { id: uid(), domainId, text: item.text, done: false, doneAt: null }],
+      }));
+    });
+  };
+
+  // ── Tap empty space to capture ──
+  const handleEmptyTap = () => {
+    if (editingId || newItemId) return;
+    const id = uid();
+    setData(d => ({
+      ...d,
+      fabQueue: [...(d.fabQueue || []), { id, text: "", createdAt: Date.now(), quickWin: false }],
+    }));
+    setNewItemId(id);
+    setEditingId(id);
+    setEditingText("");
+  };
+
+  const saveEdit = (itemId, text) => {
+    const trimmed = text.trim();
+    if (!trimmed) {
+      // Discard empty items
+      setData(d => ({
+        ...d,
+        fabQueue: (d.fabQueue || []).filter(i => i.id !== itemId),
+      }));
+    } else {
+      setData(d => ({
+        ...d,
+        fabQueue: (d.fabQueue || []).map(i =>
+          i.id === itemId ? { ...i, text: trimmed } : i
+        ),
+      }));
+    }
+    setEditingId(null);
+    setEditingText("");
+    setNewItemId(null);
+  };
+
+  const startEditing = (item) => {
+    if (editingId) return;
+    setEditingId(item.id);
+    setEditingText(item.text);
   };
 
   // ── Render ──
 
-  const fabQueue = data.fabQueue || [];
   const { domains, projects } = data;
 
   const filteredFab = filter === "quickwins"
     ? fabQueue.filter(i => i.quickWin ?? false)
     : fabQueue;
 
+  const totalProcessed = fabQueue.length + processedToday;
+
   return (
-    <div className="screen active" onClick={() => { if (swipingId) closeSwipe(); }}>
+    <div className="screen active" style={{ display: "flex", flexDirection: "column" }} onClick={() => { if (swipingId) closeSwipe(); }}>
       <StatusBar />
-      <div className="scroll" style={{ paddingBottom: 100 }}>
+      <div className="scroll" style={{ flex: 1, display: "flex", flexDirection: "column", paddingBottom: 100 }}>
 
         {/* ── PILL FILTERS ── */}
         <div className="tasks-filter-row">
@@ -202,8 +271,18 @@ export default function TasksScreen({ data, setData }) {
             {fabQueue.length > 0 && <span className="tasks-count-badge">{fabQueue.length}</span>}
           </span>
         </div>
+        {processedToday > 0 && fabQueue.length > 0 && (
+          <div style={{ padding: "0 16px 4px 26px", fontSize: 12, color: "var(--text3)" }}>
+            Processed {processedToday} of {totalProcessed} today
+          </div>
+        )}
 
         <div style={{ padding: "0 16px" }}>
+          {/* Queue clear message */}
+          {fabQueue.length === 0 && showClearMsg && (
+            <div className="tasks-clear-msg">Queue clear ✓</div>
+          )}
+
           {filteredFab.map((item, idx) => {
             const isQuickWin = item.quickWin ?? false;
             const isSwiping = swipingId === item.id;
@@ -211,23 +290,24 @@ export default function TasksScreen({ data, setData }) {
             const showActions = dx < -40;
             const isSortOpen = sortPanelId === item.id;
             const isFlashing = qwFlashId === item.id;
+            const isEditing = editingId === item.id;
+            const isRemoving = removingId === item.id;
 
             return (
-              <div key={item.id} className="tasks-row-divider" onClick={e => e.stopPropagation()}>
+              <div key={item.id}
+                className={`tasks-row-divider ${isRemoving ? "tasks-removing" : ""}`}
+                onClick={e => e.stopPropagation()}>
                 <div className="tasks-swipe-wrap">
-                  {/* Quick Win flash indicator — left side */}
                   {isFlashing && (
                     <div className="tasks-qw-flash">★</div>
                   )}
 
-                  {/* Action buttons revealed on RIGHT side */}
                   <div className="tasks-swipe-actions-right" style={{ opacity: showActions ? 1 : 0 }}>
                     <button className="tasks-swipe-btn sort" onClick={() => { setSortPanelId(isSortOpen ? null : item.id); setSwipingId(null); setSwipeX(0); }}>Sort</button>
                     <button className="tasks-swipe-btn today" onClick={() => routeToToday(item)}>Today</button>
                     <button className="tasks-swipe-btn delete" onClick={() => deleteFabItem(item.id)}>Delete</button>
                   </div>
 
-                  {/* Row content */}
                   <div
                     className={`tasks-row ${isSwiping ? "swiping" : ""}`}
                     style={{ transform: `translateX(${Math.min(0, dx)}px)` }}
@@ -237,30 +317,53 @@ export default function TasksScreen({ data, setData }) {
                   >
                     <div className="tasks-circle" />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div className="tasks-text">{item.text}</div>
+                      {isEditing ? (
+                        <input
+                          autoFocus
+                          className="tasks-inline-input"
+                          value={editingText}
+                          onChange={e => setEditingText(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === "Enter") saveEdit(item.id, editingText);
+                            if (e.key === "Escape") {
+                              if (newItemId === item.id) {
+                                // Discard new empty item
+                                setData(d => ({ ...d, fabQueue: (d.fabQueue || []).filter(i => i.id !== item.id) }));
+                              }
+                              setEditingId(null);
+                              setEditingText("");
+                              setNewItemId(null);
+                            }
+                          }}
+                          onBlur={() => saveEdit(item.id, editingText)}
+                          placeholder="What's on your mind…"
+                        />
+                      ) : (
+                        <div className="tasks-text"
+                          onClick={() => startEditing(item)}
+                          style={{ cursor: "text" }}>
+                          {item.text}
+                        </div>
+                      )}
                     </div>
-                    {isQuickWin && (
+                    {!isEditing && isQuickWin && (
                       <span className="tasks-qw-badge">Quick Win</span>
                     )}
                   </div>
                 </div>
 
-                {/* Swipe hint — beneath first queue item only */}
                 {idx === 0 && showSwipeHint && (
-                  <div className="tasks-swipe-hint">{"\u2192"} Quick Win  ·  Sort Today Delete {"\u2190"}</div>
+                  <div className="tasks-swipe-hint">{"\u2192"} Quick Win  ·  Sort  Today  Delete {"\u2190"}</div>
                 )}
 
-                {/* Sort panel — inline below row */}
                 {isSortOpen && (
                   <div className="tasks-sort-panel">
-                    <div className="tasks-sort-section">Domains</div>
                     {domains.map(domain => (
                       <div key={domain.id} className="tasks-sort-row" onClick={() => routeToLoose(item, domain.id)}>
                         <div className="tasks-sort-dot" style={{ background: domain.color }} />
                         <span className="tasks-sort-name">{domain.name}</span>
                       </div>
                     ))}
-                    <div className="tasks-sort-section" style={{ marginTop: 8 }}>Projects</div>
                     {projects.filter(p => p.status === "active").map(proj => {
                       const dom = domains.find(d => d.id === proj.domainId);
                       return (
@@ -268,7 +371,7 @@ export default function TasksScreen({ data, setData }) {
                           <div className="tasks-sort-dot" style={{ background: dom?.color || "var(--text3)" }} />
                           <div style={{ flex: 1 }}>
                             <span className="tasks-sort-name">{proj.name}</span>
-                            <span className="tasks-sort-domain">{dom?.name}</span>
+                            <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 1 }}>{dom?.name}</div>
                           </div>
                         </div>
                       );
@@ -280,7 +383,11 @@ export default function TasksScreen({ data, setData }) {
           })}
         </div>
 
-        <div className="spacer" />
+        {/* ── TAP EMPTY SPACE TO CAPTURE ── */}
+        <div
+          style={{ flex: 1, minHeight: 120, cursor: "pointer" }}
+          onClick={handleEmptyTap}
+        />
       </div>
     </div>
   );
