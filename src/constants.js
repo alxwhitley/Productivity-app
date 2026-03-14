@@ -91,7 +91,7 @@ export const FIELD_DEFAULTS = {
   projects:       INITIAL_DATA.projects,
   blocks:         INITIAL_DATA.blocks,
   looseTasks:     [],
-  fabQueue:       [], // [{ id, text, createdAt }]
+  fabQueue:       [], // [{ id, text, createdAt, quickWin: false }]
   shallowWork:    {}, // { [dateISO]: [{ id, text, domainId, sourceType, sourceId, done, doneAt, addedAt }] }
   deepWorkHours:  {}, // { [dateISO]: number } — minutes of deep work logged per day
   weekIntention:  "",

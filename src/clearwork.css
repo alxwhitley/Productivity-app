@@ -766,8 +766,54 @@
   .profile-stat-number{font-size:32px;font-weight:800;color:var(--accent);letter-spacing:-.03em;line-height:1;margin-bottom:6px;}
   .profile-stat-label{font-size:12px;color:var(--text2);font-weight:600;line-height:1.3;}
 
-  /* Shallow work section */
+  /* Shallow work section (legacy) */
   .sw-section-header{font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;padding:16px 16px 8px;}
   .sw-task-row{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border2);position:relative;overflow:hidden;}
   .sw-add-row{display:flex;align-items:center;gap:10px;padding:12px 16px;border-top:1px solid var(--border);}
   .sw-add-input{flex:1;background:none;border:none;outline:none;color:var(--text);font-size:14px;font-family:'DM Sans',sans-serif;}
+
+  /* ── Tasks tab — iOS Reminders style ── */
+  .tasks-filter-row{display:flex;gap:6px;padding:12px 16px 8px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+  .tasks-filter-row::-webkit-scrollbar{display:none;}
+  .tasks-filter-pill{border-radius:22px;padding:6px 14px;font-size:13px;font-weight:600;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;transition:background .15s,color .15s;background:var(--bg3);color:var(--text2);flex-shrink:0;}
+  .tasks-filter-pill.active{background:var(--accent);color:#000;}
+
+  /* Task row — plain, no card background */
+  .tasks-row{display:flex;align-items:flex-start;gap:12px;padding:13px 0;min-height:0;}
+  .tasks-row-divider{border-bottom:1px solid var(--border2);}
+  .tasks-row-divider:last-of-type{border-bottom:none;}
+
+  /* Circle checkbox */
+  .tasks-circle{width:24px;height:24px;border-radius:50%;border:1.5px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .2s;margin-top:1px;}
+  .tasks-circle.clickable{cursor:pointer;}
+  .tasks-circle.done{background:var(--green);border-color:var(--green);animation:tasks-check-fill .25s cubic-bezier(.22,.68,0,1.4);}
+  @keyframes tasks-check-fill{0%{transform:scale(0.7);opacity:.5;}60%{transform:scale(1.2);}100%{transform:scale(1);opacity:1;}}
+
+  /* Task text */
+  .tasks-text{font-size:15px;color:var(--text);line-height:1.4;word-break:break-word;}
+  .tasks-text.done{color:var(--text3);text-decoration:line-through;}
+
+  /* Domain dot below text */
+  .tasks-domain-dot{width:6px;height:6px;border-radius:50%;margin-top:4px;flex-shrink:0;}
+
+  /* Quick Win badge */
+  .tasks-qw-badge{font-size:10px;font-weight:700;color:var(--accent);background:var(--accent-s);border-radius:22px;padding:2px 8px;flex-shrink:0;white-space:nowrap;align-self:center;}
+
+  /* Swipe wrapper */
+  .tasks-swipe-wrap{position:relative;overflow:hidden;}
+  .tasks-swipe-actions{position:absolute;left:0;top:0;bottom:0;display:flex;align-items:stretch;z-index:0;transition:opacity .15s;}
+  .tasks-swipe-btn{border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;padding:0 16px;display:flex;align-items:center;justify-content:center;}
+  .tasks-swipe-btn.sort{background:var(--bg3);color:var(--text2);}
+  .tasks-swipe-btn.today{background:var(--accent);color:#000;}
+  .tasks-swipe-btn.delete{background:var(--red);color:#fff;}
+  .tasks-row.swiping{transition:none;}
+  .tasks-row:not(.swiping){transition:transform .25s cubic-bezier(.25,.46,.45,.94);}
+
+  /* Sort panel — inline */
+  .tasks-sort-panel{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:8px 12px;margin:4px 0 8px;}
+  .tasks-sort-section{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);padding:6px 0 4px;}
+  .tasks-sort-row{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--border2);cursor:pointer;}
+  .tasks-sort-row:last-child{border-bottom:none;}
+  .tasks-sort-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+  .tasks-sort-name{font-size:13px;color:var(--text);font-weight:500;}
+  .tasks-sort-domain{font-size:11px;color:var(--text3);margin-left:6px;}
