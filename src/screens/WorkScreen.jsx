@@ -119,18 +119,6 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
     });
   };
 
-  const doneTimer = (slot, proj) => {
-    const info = lateStarted[slot.id];
-    const elapsedMs = getElapsedMs(info);
-    const elapsedMin = Math.round(elapsedMs / 60000);
-    if (elapsedMin > 0) logSession(proj.id, elapsedMin, null);
-    markManualDone(slot.id, proj.id, slot.todayTasks);
-    setLateStarted(prev => { const n = { ...prev }; delete n[slot.id]; return n; });
-  };
-
-  const resetTimer = (slotId) => {
-    setLateStarted(prev => { const n = { ...prev }; delete n[slotId]; return n; });
-  };
 
   const mutateDWSlot = (dateStr, slotIndex, patch) => {
     setData(prev => {
@@ -217,10 +205,6 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
     });
   };
 
-  const startBlock = (slotId) => {
-    startTimerSlot(slotId);
-    setExpandedId(slotId);
-  };
 
   // Live tick every second
   useEffect(() => {
@@ -421,15 +405,14 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
     const domainColor = domain?.color || null;
 
     const { isSessionMode, hasTodayTasks, relevantTasks, relevantDone, isCompleted } = getTodayBlockCompletionState({ slot, project: proj, manualCompleted });
-    const { timerActive, isRunning, isPaused, countdownLabel: cdStr, elapsedLabel: elapsedStr } = getTodayBlockTimingState({ slot, lateStarted, getElapsedMs });
+    const { timerActive, isRunning, countdownLabel: cdStr } = getTodayBlockTimingState({ slot, lateStarted, getElapsedMs });
 
     const isExp = expandedId === slot.id;
-    const isActive = timerActive;
-    const showBody = isActive || (isExp && !isCompleted);
+    const showBody = isExp && !isCompleted;
     const isPicking = pickerState?.blockId === slot.id;
 
     // Done card
-    if (isCompleted && !isActive) {
+    if (isCompleted) {
       return (
         <div key={slot.id} className="work-card" style={{
           background: "var(--bg2)", border: "1px solid var(--border)", opacity: 0.5, position: "relative",
@@ -447,13 +430,21 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
       );
     }
 
+    const handleDone = () => {
+      const info = lateStarted[slot.id];
+      const elapsedMs = getElapsedMs(info);
+      const elapsedMin = Math.round(elapsedMs / 60000);
+      if (elapsedMin > 0) logSession(proj.id, elapsedMin, null);
+      markManualDone(slot.id, proj.id, slot.todayTasks);
+      setLateStarted(prev => { const n = { ...prev }; delete n[slot.id]; return n; });
+    };
+
     return (
       <div key={slot.id} className="work-card" style={{
         background: "var(--bg2)",
-        border: isActive ? `2px solid ${domainColor || "var(--accent)"}` : "1px solid var(--border)",
-        boxShadow: isActive && domainColor ? `0 0 18px ${domainColor}33` : "none",
+        border: "1px solid var(--border)",
         position: "relative",
-      }} onClick={() => { if (!isActive) setExpandedId(isExp ? null : slot.id); }}>
+      }} onClick={() => setExpandedId(isExp ? null : slot.id)}>
         <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: domainColor || "var(--text3)", borderRadius: "14px 0 0 14px" }} />
 
         {/* Overflow menu overlay */}
@@ -503,10 +494,10 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
         {/* Header row */}
         <div style={{ padding: "14px 16px 12px 20px", display: "flex", alignItems: "flex-start", gap: 12 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: isActive ? "var(--accent)" : (domainColor || "var(--text3)"), marginBottom: 4 }}>
-              {isActive ? "IN PROGRESS" : (domain?.name || "Deep Work")}
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: domainColor || "var(--text3)", marginBottom: 4 }}>
+              {domain?.name || "Deep Work"}
             </div>
-            <div style={{ fontSize: isActive ? 20 : 18, fontWeight: 800, color: "var(--text)", letterSpacing: "-.02em", lineHeight: 1.15 }}>{proj?.name}</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: "var(--text)", letterSpacing: "-.02em", lineHeight: 1.15 }}>{proj?.name}</div>
             {!showBody && (
               <>
                 <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 4 }}>
@@ -523,8 +514,16 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
               </>
             )}
           </div>
-          {/* Right controls */}
+          {/* Right controls — compact timer + overflow + chevron */}
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+            <button style={{ width: 20, height: 20, background: "none", border: "none", cursor: "pointer", color: "var(--text2)", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, flexShrink: 0 }}
+              onClick={e => { e.stopPropagation(); isRunning ? pauseTimerSlot(slot.id) : startTimerSlot(slot.id); }}>
+              {isRunning
+                ? <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor"/></svg>
+                : <svg width="10" height="11" viewBox="0 0 16 18" fill="none"><path d="M1 1l14 8-14 8V1z" fill="currentColor"/></svg>
+              }
+            </button>
+            <span style={{ fontSize: 12, color: "var(--text2)", fontVariantNumeric: "tabular-nums", fontFamily: "'DM Sans', sans-serif" }}>{cdStr}</span>
             {showBody && (
               <button style={{ background: "none", border: "none", cursor: "pointer", padding: "2px 4px", color: "var(--text3)", display: "flex", alignItems: "center" }}
                 onClick={e => { e.stopPropagation(); setDwOverflowOpen(dwOverflowOpen === slot.id ? null : slot.id); }}>
@@ -535,78 +534,12 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
                 </svg>
               </button>
             )}
-            {!isActive && (
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style={{ color: "var(--text3)", opacity: .4, transform: isExp ? "rotate(90deg)" : "none", transition: "transform .2s" }}><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            )}
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style={{ color: "var(--text3)", opacity: .4, transform: isExp ? "rotate(90deg)" : "none", transition: "transform .2s" }}><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </div>
         </div>
 
-        {/* ── ACTIVE STATE: Timer + tasks + buttons ── */}
-        {isActive && (
-          <div style={{ padding: "0 16px 16px 20px" }} onClick={e => e.stopPropagation()}>
-            {/* 48px countdown */}
-            <div style={{ textAlign: "center", padding: "12px 0 2px" }}>
-              <div style={{ fontSize: 48, fontWeight: 800, fontVariantNumeric: "tabular-nums", fontFamily: "'DM Sans', sans-serif", color: isPaused ? "var(--accent)" : "var(--text)", letterSpacing: "-.02em", lineHeight: 1 }}>
-                {cdStr}
-              </div>
-              {isRunning && (
-                <div style={{ marginTop: 4, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
-                  <div style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--accent)", animation: "pulse-dot 1.2s ease-in-out infinite" }} />
-                </div>
-              )}
-              {isPaused && (
-                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".06em", color: "var(--accent)", textTransform: "uppercase", marginTop: 4 }}>Paused</div>
-              )}
-              <button onClick={() => mutateDWSlot(toISODate(), slot.slotIndex, { durationMin: slot.durationMin + 5 })}
-                style={{ fontSize: 12, color: "var(--text3)", background: "none", border: "none", cursor: "pointer", padding: "8px 0", fontFamily: "'DM Sans',sans-serif" }}>+ 5 min</button>
-            </div>
-
-            {/* Task list */}
-            {!isSessionMode && hasTodayTasks && (
-              <div style={{ margin: "4px 0 8px" }}>
-                {relevantTasks.map((t, i) => (
-                  <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: i < relevantTasks.length - 1 ? "1px solid var(--border2)" : "none" }}>
-                    <div className={`tl-check ${t.done ? "done" : ""} ${recentlyChecked.has(t.id) ? "bounce" : ""}`} style={{ width: 20, height: 20, flexShrink: 0 }}
-                      onClick={() => {
-                        toggleTask(proj.id, t.id);
-                        if (!t.done) {
-                          const remaining = relevantTasks.filter(rt => rt.id !== t.id && !rt.done);
-                          if (remaining.length === 0) { logSession(proj.id, slot.durationMin, null); markManualDone(slot.id, proj.id, slot.todayTasks); }
-                        }
-                      }}>
-                      {t.done && <span style={{ fontSize: 10, color: "#fff", fontWeight: 700 }}>✓</span>}
-                    </div>
-                    <span style={{ fontSize: 14, color: t.done ? "var(--text3)" : "var(--text)", textDecoration: t.done ? "line-through" : "none", flex: 1 }}>{t.text}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Pause/Resume + Done */}
-            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              {isRunning ? (
-                <button onClick={() => pauseTimerSlot(slot.id)}
-                  style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 0", fontSize: 13, fontWeight: 700, color: "var(--text2)", cursor: "pointer", fontFamily: "'DM Sans',sans-serif" }}>
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor"/></svg>
-                  Pause
-                </button>
-              ) : (
-                <button onClick={() => startTimerSlot(slot.id)}
-                  style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 0", fontSize: 13, fontWeight: 700, color: "var(--text2)", cursor: "pointer", fontFamily: "'DM Sans',sans-serif" }}>
-                  <svg width="10" height="11" viewBox="0 0 16 18" fill="none"><path d="M1 1l14 8-14 8V1z" fill="currentColor"/></svg>
-                  Resume
-                </button>
-              )}
-              <button onClick={() => doneTimer(slot, proj)}
-                style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "var(--green)", border: "none", borderRadius: 12, padding: "12px 0", fontSize: 13, fontWeight: 700, color: "#fff", cursor: "pointer", fontFamily: "'DM Sans',sans-serif" }}>
-                Done ✓
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ── EXPANDED UPCOMING: tasks + start ── */}
-        {showBody && !isActive && (
+        {/* ── EXPANDED BODY: tasks + done ── */}
+        {showBody && (
           <div style={{ padding: "0 16px 14px 20px" }} onClick={e => e.stopPropagation()}>
             <div style={{ fontSize: 12, color: "var(--text2)", marginBottom: 10 }}>{domain?.name}{data.todayPrefs?.hideTimes ? "" : ` · ${fmtTime(slot.startHour, slot.startMin)}`} · {slot.durationMin} min</div>
 
@@ -676,27 +609,21 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
                     )}
                   </div>
                 ))}
-                {/* Start session button */}
-                <button onClick={() => startBlock(slot.id)}
-                  style={{ width: "100%", marginTop: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, background: "var(--purple)", border: "none", borderRadius: 12, padding: "12px 0", fontSize: 13, fontWeight: 700, color: "#fff", cursor: "pointer", fontFamily: "'DM Sans',sans-serif" }}>
-                  <svg width="10" height="11" viewBox="0 0 16 18" fill="none"><path d="M1 1l14 8-14 8V1z" fill="currentColor"/></svg>
-                  Start Session
-                </button>
+                {/* Done button — only after timer has been started */}
+                {timerActive && (
+                  <button onClick={handleDone}
+                    style={{ width: "100%", marginTop: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "var(--green)", border: "none", borderRadius: 10, padding: "12px 0", fontSize: 13, fontWeight: 700, color: "#fff", cursor: "pointer", fontFamily: "'DM Sans',sans-serif" }}>
+                    Done ✓
+                  </button>
+                )}
               </>
             ) : (
               <div>
                 <div style={{ fontSize: 13, color: "var(--text3)", marginBottom: 10 }}>No tasks picked yet.</div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button className="tl-start-btn" style={{ flex: 1 }}
-                    onClick={() => setPickerState({ blockId: slot.id, projectId: proj.id, selected: new Set(), newText: "" })}>
-                    Pick tasks
-                  </button>
-                  <button onClick={() => startBlock(slot.id)}
-                    style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "var(--purple)", border: "none", borderRadius: 10, padding: "8px 12px", fontSize: 12, fontWeight: 700, color: "#fff", cursor: "pointer", fontFamily: "'DM Sans',sans-serif" }}>
-                    <svg width="8" height="9" viewBox="0 0 16 18" fill="none"><path d="M1 1l14 8-14 8V1z" fill="currentColor"/></svg>
-                    Start
-                  </button>
-                </div>
+                <button className="tl-start-btn" style={{ width: "100%" }}
+                  onClick={() => setPickerState({ blockId: slot.id, projectId: proj.id, selected: new Set(), newText: "" })}>
+                  Pick tasks
+                </button>
               </div>
             )}
           </div>
