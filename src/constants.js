@@ -75,7 +75,7 @@ export const INITIAL_DATA = {
 //   3. The rest of the app is unchanged
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 export const STORAGE_KEY    = "nave_data_v1";       // new key — clean break from momentum_v2
 export const THEME_KEY      = "nave_theme";
 
@@ -90,8 +90,10 @@ export const FIELD_DEFAULTS = {
   domains:        INITIAL_DATA.domains,
   projects:       INITIAL_DATA.projects,
   blocks:         INITIAL_DATA.blocks,
-  inbox:          [],
   looseTasks:     [],
+  fabQueue:       [], // [{ id, text, createdAt }]
+  shallowWork:    {}, // { [dateISO]: [{ id, text, domainId, sourceType, sourceId, done, doneAt, addedAt }] }
+  deepWorkHours:  {}, // { [dateISO]: number } — minutes of deep work logged per day
   weekIntention:  "",
   shutdownDone:   false,
   seasonGoals:    INITIAL_DATA.seasonGoals,
@@ -111,7 +113,6 @@ export const FIELD_DEFAULTS = {
   todayLoosePicks: {}, // { [dateStr]: [looseTaskId, ...] } — tasks picked for today's loose block
   onboardingDone: false,
   sessionLog: [], // [{ id, projectId, date, durationMin, note }]
-  captured: [], // [{ id, text, createdAt }] — raw unprocessed brain-dump items
 };
 
 // ── Deep work slot defaults ──────────────────────────────────────────────────
@@ -172,5 +173,21 @@ export const MIGRATIONS = [
       sessionLog: data.sessionLog || [],
       schemaVersion: 3,
     })
+  },
+  // v4: move inbox → fabQueue, add shallowWork + deepWorkHours, remove captured
+  {
+    version: 4,
+    up: (data) => {
+      const inbox = data.inbox || [];
+      const captured = data.captured || [];
+      const fabQueue = [
+        ...inbox.map(i => ({ id: i.id, text: i.text, createdAt: i.createdAt || Date.now() })),
+        ...captured.map(c => ({ id: c.id, text: c.text, createdAt: c.createdAt || Date.now() })),
+      ];
+      const next = { ...data, fabQueue, shallowWork: data.shallowWork || {}, deepWorkHours: data.deepWorkHours || {}, schemaVersion: 4 };
+      delete next.inbox;
+      delete next.captured;
+      return next;
+    }
   },
 ];

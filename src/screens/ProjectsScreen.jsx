@@ -3,10 +3,9 @@ import { uid } from "../utils.js";
 import GearIcon from "../components/GearIcon.jsx";
 import StatusBar from "../components/StatusBar.jsx";
 import ProjectCard from "../components/ProjectCard.jsx";
-import LooseTasksSection from "../components/LooseTasksSection.jsx";
 import ProjectsManageSheet from "../sheets/ProjectsManageSheet.jsx";
 
-export default function ProjectsScreen({ data, setData, openCategorize }) {
+export default function ProjectsScreen({ data, setData }) {
   const { domains, projects } = data;
   const [activeDomain, setActiveDomain] = useState(domains[0]?.id || null);
   const [collapsedProjs, setCollapsedProjs] = useState(new Set());
@@ -97,34 +96,7 @@ export default function ProjectsScreen({ data, setData, openCategorize }) {
             <div className="ph-eye">Your Work</div>
             <div className="ph-title">Projects</div>
           </div>
-          <div style={{ display:"flex", alignItems:"center", gap:10, paddingTop:2 }}>
-            {/* Captured inbox icon */}
-            <button onClick={openCategorize}
-              style={{ position:"relative", background:"none", border:"none", cursor:"pointer", padding:4, color:"var(--text3)", display:"flex", alignItems:"center", justifyContent:"center" }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <path d="M22 12h-6l-2 3H10l-2-3H2" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              {((data.inbox||[]).length > 0 || (data.captured||[]).length > 0) && (() => {
-                const total = (data.inbox||[]).length + (data.captured||[]).length;
-                const isUrgent = (data.inbox||[]).some(i => i.createdAt && Date.now() - i.createdAt > 2*24*60*60*1000);
-                return (
-                  <span style={{
-                    position:"absolute", top:0, right:0,
-                    minWidth:16, height:16, borderRadius:8,
-                    background: isUrgent ? "var(--red)" : "var(--accent)",
-                    color:"#000", fontSize:10, fontWeight:800,
-                    display:"flex", alignItems:"center", justifyContent:"center",
-                    padding:"0 4px", lineHeight:1,
-                    border:"2px solid var(--bg)"
-                  }}>
-                    {total}
-                  </span>
-                );
-              })()}
-            </button>
-            <button className="tab-gear" onClick={() => setShowManage(true)}><GearIcon size={20} /></button>
-          </div>
+          <button className="tab-gear" onClick={() => setShowManage(true)}><GearIcon size={20} /></button>
         </div>
         <div className="ph-sub">{activeCount} active · {projects.length - activeCount} in backlog</div>
       </div>
@@ -222,7 +194,32 @@ export default function ProjectsScreen({ data, setData, openCategorize }) {
           />
         ))}
 
-        <LooseTasksSection domainId={activeDomain} domain={domain} data={data} setData={setData} onAddProject={addProject} />
+        {/* Loose Tasks for this domain */}
+        {(() => {
+          const domainLoose = (data.looseTasks || []).filter(t => t.domainId === activeDomain && !t.done);
+          if (domainLoose.length === 0) return null;
+          return (
+            <div className="loose-section">
+              <div className="loose-header">
+                <span className="loose-title">Loose Tasks</span>
+                <span className="loose-count">{domainLoose.length}</span>
+              </div>
+              {domainLoose.map(t => (
+                <div key={t.id} className="loose-task-row"
+                  onClick={() => setData(d => ({ ...d, looseTasks: (d.looseTasks||[]).map(lt => lt.id === t.id ? { ...lt, done: true, doneAt: new Date().toISOString() } : lt) }))}>
+                  <div className="loose-check" />
+                  <span className="loose-task-text">{t.text}</span>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+
+        {/* Add project button */}
+        <div className="add-proj-row" onClick={addProject}>
+          <span className="add-proj-ico">+</span>
+          <span className="add-proj-txt">Add project</span>
+        </div>
 
         <div className="spacer" />
       </div>

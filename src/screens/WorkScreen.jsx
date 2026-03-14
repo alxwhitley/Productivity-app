@@ -1,10 +1,8 @@
 import { useState, useEffect, useRef } from "react";
-import { fmtTime, toISODate, uid, getRoutinesForDate } from "../utils.js";
+import { fmtTime, toISODate, uid, getRoutinesForDate, getBioPhase, getSlotBioPhase } from "../utils.js";
 import { getDeepSlots } from "../constants.js";
-import GearIcon from "../components/GearIcon.jsx";
 import StatusBar from "../components/StatusBar.jsx";
 import TimerBlock from "../components/TimerBlock.jsx";
-import TodaySettingsSheet from "../sheets/TodaySettingsSheet.jsx";
 
 function getTodayBlockCardStyles({ isRunning, isCompleted, isNow, domainColor }) {
   const background = "var(--bg2)";
@@ -37,8 +35,6 @@ function getTodayBlockCardStyles({ isRunning, isCompleted, isNow, domainColor })
     animation,
   };
 }
-
-
 
 function getTodayBlockCompletionState({ slot, project, manualCompleted }) {
   const isSessionMode = project?.mode === "sessions";
@@ -96,80 +92,39 @@ function getTodayBlockTimingState({ slot, lateStarted, getElapsedMs }) {
   };
 }
 
-export default function TodayScreen({ data, setData, openShutdown, onSignOut, jumpToBlock, onClearJump, setTab }) {
-  const [showTodaySettings, setShowTodaySettings] = useState(false);
+export default function WorkScreen({ data, setData, onGoToTasks }) {
   const [expandedId, setExpandedId] = useState(null);
   const [celebratingId, setCelebratingId] = useState(null);
-  const [recentlyChecked, setRecentlyChecked] = useState(new Set()); // taskIds with bounce animation
-  const [blockMenuOpen, setBlockMenuOpen] = useState(null); // blockId with gear menu open
-  const [blockMenuMode, setBlockMenuMode] = useState(null); // null | "project"
-  const [dragId, setDragId] = useState(null);
-  const [dragOverId, setDragOverId] = useState(null);
-  const swipeState = useRef({});
-  const [revealedBlockId, setRevealedBlockId] = useState(null); // unused visually but guards close-on-drag
-  const [dwPickerOpen, setDwPickerOpen] = useState(null); // slotId of open picker
-  const [dwPickerStep, setDwPickerStep] = useState({}); // { [slotId]: "project" | "confirm" }
-  const [dwPickerProj, setDwPickerProj] = useState({}); // { [slotId]: projectId }
-  const [dwPickerTime, setDwPickerTime] = useState({}); // { [slotId]: { startHour, startMin, durationMin } }
-  const [workMode, setWorkMode] = useState(false); // false=Plan, true=Work
-  const [earlierOpen, setEarlierOpen] = useState(false); // "Earlier today" disclosure
-  const [planningMode, setPlanningMode] = useState(false); // guided Plan My Day flow
-
-
-  const rescheduleToTomorrow = (blockId) => {
-    setData(d => ({ ...d, blocks: d.blocks.map(b => b.id === blockId ? { ...b, dayOffset: (b.dayOffset || 0) + 1 } : b) }));
-    setRevealedBlockId(null);
-  };
-
-  // ── DW slot mutation helper — all slot saves go through this ──────────────
-  const mutateDWSlot = (dateStr, slotIndex, patch) => {
-    setData(prev => {
-      const existing = [...((prev.deepWorkSlots || {})[dateStr] || [])];
-      while (existing.length <= slotIndex) existing.push({});
-      existing[slotIndex] = patch === null ? {} : { ...existing[slotIndex], ...patch };
-      return { ...prev, deepWorkSlots: { ...(prev.deepWorkSlots || {}), [dateStr]: existing } };
-    });
-  };
-
-  const saveDWSlot = (slotId, slotIndex, projectId, startHour, startMin, durationMin, todayTasks) =>
-    mutateDWSlot(viewDateKeyISO, slotIndex, { projectId, startHour, startMin, durationMin, todayTasks: todayTasks || null });
-
-  const clearDWSlot = (slotIndex) =>
-    mutateDWSlot(viewDateKeyISO, slotIndex, null);
-
-  const handleDragStart = (e, blockId) => {
-    setDragId(blockId);
-    e.dataTransfer.effectAllowed = "move";
-  };
-  const handleDragOver = (e, blockId) => {
-    e.preventDefault();
-    setDragOverId(blockId);
-  };
-  const handleDrop = (e, targetId) => {
-    e.preventDefault();
-    if (!dragId || dragId === targetId) { setDragId(null); setDragOverId(null); return; }
-    setData(d => {
-      const blocks = [...d.blocks];
-      const fromIdx = blocks.findIndex(b => b.id === dragId);
-      const toIdx = blocks.findIndex(b => b.id === targetId);
-      if (fromIdx < 0 || toIdx < 0) return d;
-      const fromBlk = blocks[fromIdx];
-      const toBlk = blocks[toIdx];
-      const newBlocks = blocks.map(b => {
-        if (b.id === dragId) return { ...b, startHour: toBlk.startHour, startMin: toBlk.startMin };
-        if (b.id === targetId) return { ...b, startHour: fromBlk.startHour, startMin: fromBlk.startMin };
-        return b;
-      });
-      return { ...d, blocks: newBlocks };
-    });
-    setDragId(null); setDragOverId(null);
-  };
-
+  const [recentlyChecked, setRecentlyChecked] = useState(new Set());
+  const [blockMenuOpen, setBlockMenuOpen] = useState(null);
+  const [blockMenuMode, setBlockMenuMode] = useState(null);
+  const [dwPickerOpen, setDwPickerOpen] = useState(null);
+  const [dwPickerStep, setDwPickerStep] = useState({});
+  const [dwPickerProj, setDwPickerProj] = useState({});
+  const [dwPickerTime, setDwPickerTime] = useState({});
+  const [viewingTomorrow, setViewingTomorrow] = useState(false);
+  const [lateStarted, setLateStarted] = useState({});
   const [newTaskText, setNewTaskText] = useState({});
   const [tick, setTick] = useState(0);
-  const [viewingTomorrow, setViewingTomorrow] = useState(false);
-  // lateStarted: { [slotId]: { startedAt: ms, accumulatedMs: number, paused: bool, pausedAt: ms|null } }
-  const [lateStarted, setLateStarted] = useState({});
+  const [dwOverflowOpen, setDwOverflowOpen] = useState(null);
+  const [pickerState, setPickerState] = useState(null);
+  const [dwAddingTask, setDwAddingTask] = useState(null);
+  const [dwNewTaskText, setDwNewTaskText] = useState("");
+  const [editingDwTaskId, setEditingDwTaskId] = useState(null);
+  const [editingDwTaskText, setEditingDwTaskText] = useState("");
+  const [editingTaskId, setEditingTaskId] = useState(null);
+  const [editingTime, setEditingTime] = useState(null);
+  const [planningMode, setPlanningMode] = useState(false);
+
+  const scrollRef = useRef(null);
+
+  // manualCompleted derived from persisted data (today's date only)
+  const todayStr = new Date().toDateString();
+  const manualCompleted = new Set(
+    (data.blockCompletions || []).filter(c => c.date === todayStr).map(c => c.blockId)
+  );
+
+  const { domains, projects, blocks, shutdownDone } = data;
 
   // Get elapsed ms for a slot (handles running + paused states)
   const getElapsedMs = (info) => {
@@ -192,7 +147,7 @@ export default function TodayScreen({ data, setData, openShutdown, onSignOut, ju
     });
   };
 
-  // Pause timer — freeze elapsed, keep accumulated
+  // Pause timer
   const pauseTimerSlot = (slotId) => {
     setLateStarted(prev => {
       const info = prev[slotId];
@@ -202,7 +157,7 @@ export default function TodayScreen({ data, setData, openShutdown, onSignOut, ju
     });
   };
 
-  // Done: log elapsed time (even if running — snapshot now), mark complete, clear timer
+  // Done: log elapsed time, mark complete, clear timer
   const doneTimer = (slot, proj) => {
     const info = lateStarted[slot.id];
     const elapsedMs = getElapsedMs(info);
@@ -217,56 +172,45 @@ export default function TodayScreen({ data, setData, openShutdown, onSignOut, ju
     setLateStarted(prev => { const n = { ...prev }; delete n[slotId]; return n; });
   };
 
+  // ── DW slot mutation helper ──
+  const mutateDWSlot = (dateStr, slotIndex, patch) => {
+    setData(prev => {
+      const existing = [...((prev.deepWorkSlots || {})[dateStr] || [])];
+      while (existing.length <= slotIndex) existing.push({});
+      existing[slotIndex] = patch === null ? {} : { ...existing[slotIndex], ...patch };
+      return { ...prev, deepWorkSlots: { ...(prev.deepWorkSlots || {}), [dateStr]: existing } };
+    });
+  };
 
-  const [conflictWarning, setConflictWarning] = useState(null); // blockId with conflict
+  const saveDWSlot = (slotId, slotIndex, projectId, startHour, startMin, durationMin, todayTasks) =>
+    mutateDWSlot(viewDateKeyISO, slotIndex, { projectId, startHour, startMin, durationMin, todayTasks: todayTasks || null });
 
-  // pickerState: { blockId, projectId, selected: Set<taskId>, newText }
-  const [pickerState, setPickerState] = useState(null);
-  const [dwAddingTask, setDwAddingTask] = useState(null); // slotId currently adding task
-  const [dwNewTaskText, setDwNewTaskText] = useState("");
-  const [editingDwTaskId, setEditingDwTaskId] = useState(null); // taskId being edited inline
-  const [editingDwTaskText, setEditingDwTaskText] = useState("");
-  const [dwOverflowOpen, setDwOverflowOpen] = useState(null); // slotId with overflow menu open
-  const [editingTaskId, setEditingTaskId] = useState(null); // { taskId, projectId, text }
-  // manualCompleted derived from persisted data (today's date only)
-  const todayStr = new Date().toDateString();
-  const manualCompleted = new Set(
-    (data.blockCompletions || []).filter(c => c.date === todayStr).map(c => c.blockId)
-  );
-  // editingTime: blockId whose time picker is open
-  const [editingTime, setEditingTime] = useState(null);
-  // looseBlockExp: is the loose tasks block expanded
-  const [looseBlockExp, setLooseBlockExp] = useState(false);
-  // loosePickerOpen: is the task picker open inside loose block
-  const [loosePickerOpen, setLoosePickerOpen] = useState(false);
-  // looseQuickAdd: inline quick-add input state
-  const [looseQuickDraft, setLooseQuickDraft] = useState("");
-  const [looseEditId, setLooseEditId] = useState(null);
-  const [looseEditText, setLooseEditText] = useState("");
-  const { domains, projects, blocks, shutdownDone } = data;
+  const clearDWSlot = (slotIndex) =>
+    mutateDWSlot(viewDateKeyISO, slotIndex, null);
 
+  const saveDWTodayTasks = (slotIndex, taskIds) =>
+    mutateDWSlot(viewDateKeyISO, slotIndex, { todayTasks: taskIds.length > 0 ? taskIds : null });
 
+  const saveDWSessionNote = (slotIndex, note) =>
+    mutateDWSlot(viewDateKeyISO, slotIndex, { sessionNote: note || null });
 
-  // Live tick every second (powers clock + countdowns)
-  useEffect(() => {
-    const id = setInterval(() => setTick(t => t + 1), 1000);
-    return () => clearInterval(id);
-  }, []);
+  const rescheduleDWSlot = (slotIndex, newHour, newMin) => {
+    mutateDWSlot(viewDateKeyISO, slotIndex, { startHour: newHour, startMin: newMin });
+    setEditingTime(null);
+  };
 
-  // Reset shutdownDone each new day
-  useEffect(() => {
-    const todayISO = toISODate();
-    if (data.shutdownDone && data.shutdownDate !== todayISO) {
-      setData(d => ({ ...d, shutdownDone: false, shutdownDate: todayISO }));
-    }
-  }, [data.shutdownDone, data.shutdownDate]);
-
-  const now   = new Date();
-  const today = new Date();
-  const days   = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
-  const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-  const nowMins = now.getHours() * 60 + now.getMinutes();
-  const isAfter4 = now.getHours() >= 16;
+  const logSession = (projectId, durationMin, note) => {
+    setData(d => ({
+      ...d,
+      sessionLog: [...(d.sessionLog || []), {
+        id: uid(),
+        projectId,
+        date: toISODate(),
+        durationMin,
+        note: note || "",
+      }],
+    }));
+  };
 
   const getProject = id => projects.find(p => p.id === id);
   const getDomain  = id => domains.find(d => d.id === id);
@@ -277,7 +221,6 @@ export default function TodayScreen({ data, setData, openShutdown, onSignOut, ju
         p.id === projectId ? { ...p, tasks: p.tasks.map(t => t.id === taskId ? { ...t, done: !t.done, doneAt: !t.done ? new Date().toISOString() : null } : t) } : p
       )
     }));
-    // Trigger bounce + flash on check (not uncheck)
     setRecentlyChecked(prev => {
       const next = new Set(prev);
       next.add(taskId);
@@ -305,8 +248,6 @@ export default function TodayScreen({ data, setData, openShutdown, onSignOut, ju
     setNewTaskText(t => ({ ...t, [projectId]: "" }));
   };
 
-  // Save the chosen todayTask IDs onto a block
-  // If block was completed and new tasks were added, remove the completion
   const saveTodayTasks = (blockId, taskIds) => {
     const todayStr = new Date().toDateString();
     setData(d => {
@@ -314,7 +255,6 @@ export default function TodayScreen({ data, setData, openShutdown, onSignOut, ju
       const blk = d.blocks.find(b => b.id === blockId);
       const prevIds = Array.isArray(blk?.todayTasks) ? blk.todayTasks : [];
       const hasNewTasks = taskIds.some(id => !prevIds.includes(id));
-      // Auto-uncheck if completed and new tasks were added
       const blockCompletions = wasCompleted && hasNewTasks
         ? (d.blockCompletions || []).filter(c => !(c.blockId === blockId && c.date === todayStr))
         : d.blockCompletions;
@@ -326,61 +266,8 @@ export default function TodayScreen({ data, setData, openShutdown, onSignOut, ju
     });
   };
 
-  const unmarkManualDone = (blockId, projectId, todayTaskIds) => {
-    setData(d => {
-      // Uncheck today's tasks on the project
-      let projects = d.projects;
-      if (projectId) {
-        const proj = d.projects.find(p => p.id === projectId);
-        if (proj) {
-          const idsToUncheck = (Array.isArray(todayTaskIds) && todayTaskIds.length > 0)
-            ? todayTaskIds
-            : proj.tasks.map(t => t.id);
-          projects = d.projects.map(p => p.id === projectId
-            ? { ...p, tasks: p.tasks.map(t => idsToUncheck.includes(t.id) ? { ...t, done: false, doneAt: undefined } : t) }
-            : p
-          );
-        }
-      }
-      // Remove from blockCompletions
-      const todayStr = new Date().toDateString();
-      const blockCompletions = (d.blockCompletions || []).filter(c => !(c.blockId === blockId && c.date === todayStr));
-      return { ...d, projects, blockCompletions };
-    });
-  };
-
-  const rescheduleBlock = (blockId, newHour, newMin) => {
-    setData(d => ({ ...d, blocks: d.blocks.map(b => b.id === blockId ? { ...b, startHour: newHour, startMin: newMin } : b) }));
-    setEditingTime(null);
-  };
-
-  const rescheduleDWSlot = (slotIndex, newHour, newMin) => {
-    mutateDWSlot(viewDateKeyISO, slotIndex, { startHour: newHour, startMin: newMin });
-    setEditingTime(null);
-  };
-
-  const saveDWTodayTasks = (slotIndex, taskIds) =>
-    mutateDWSlot(viewDateKeyISO, slotIndex, { todayTasks: taskIds.length > 0 ? taskIds : null });
-
-  const saveDWSessionNote = (slotIndex, note) =>
-    mutateDWSlot(viewDateKeyISO, slotIndex, { sessionNote: note || null });
-
-  const logSession = (projectId, durationMin, note) => {
-    setData(d => ({
-      ...d,
-      sessionLog: [...(d.sessionLog || []), {
-        id: uid(),
-        projectId,
-        date: toISODate(),
-        durationMin,
-        note: note || "",
-      }],
-    }));
-  };
-
   const markManualDone = (blockId, projectId, todayTaskIds) => {
     setData(d => {
-      // Mark today's tasks done on the project
       let projects = d.projects;
       if (projectId) {
         const proj = d.projects.find(p => p.id === projectId);
@@ -394,7 +281,6 @@ export default function TodayScreen({ data, setData, openShutdown, onSignOut, ju
           );
         }
       }
-      // Persist the completion (skip if already logged today)
       const todayStr = new Date().toDateString();
       const existing = d.blockCompletions || [];
       const alreadyLogged = existing.some(c => c.blockId === blockId && c.date === todayStr);
@@ -403,7 +289,6 @@ export default function TodayScreen({ data, setData, openShutdown, onSignOut, ju
       const blockCompletions = alreadyLogged ? existing : [...existing, { blockId, date: todayStr, durationMin }];
       return { ...d, projects, blockCompletions };
     });
-    // Show celebration burst, then collapse
     setCelebratingId(blockId);
     setTimeout(() => {
       setCelebratingId(null);
@@ -411,7 +296,27 @@ export default function TodayScreen({ data, setData, openShutdown, onSignOut, ju
     }, 1600);
   };
 
-  // Add a brand-new task to project AND return its id so caller can also select it
+  const unmarkManualDone = (blockId, projectId, todayTaskIds) => {
+    setData(d => {
+      let projects = d.projects;
+      if (projectId) {
+        const proj = d.projects.find(p => p.id === projectId);
+        if (proj) {
+          const idsToUncheck = (Array.isArray(todayTaskIds) && todayTaskIds.length > 0)
+            ? todayTaskIds
+            : proj.tasks.map(t => t.id);
+          projects = d.projects.map(p => p.id === projectId
+            ? { ...p, tasks: p.tasks.map(t => idsToUncheck.includes(t.id) ? { ...t, done: false, doneAt: undefined } : t) }
+            : p
+          );
+        }
+      }
+      const todayStr = new Date().toDateString();
+      const blockCompletions = (d.blockCompletions || []).filter(c => !(c.blockId === blockId && c.date === todayStr));
+      return { ...d, projects, blockCompletions };
+    });
+  };
+
   const addTaskToProject = (projectId, text) => {
     const newId = uid();
     setData(d => ({ ...d, projects: d.projects.map(p => p.id === projectId ? { ...p, tasks: [...p.tasks, { id: newId, text, done: false }] } : p) }));
@@ -423,130 +328,19 @@ export default function TodayScreen({ data, setData, openShutdown, onSignOut, ju
     setExpandedId(slotId);
   };
 
-  // Today's loose task picks — can be loose tasks OR project tasks
-  const todayDateStr = today.toDateString();
-  const todayLoosePicks = (data.todayLoosePicks || {})[todayDateStr] || [];
-  const looseTasks = data.looseTasks || [];
-
-  // Build a flat lookup of ALL tasks (loose + project) by id
-  const allTasksById = {};
-  (data.looseTasks||[]).forEach(t => { allTasksById[t.id] = { ...t, _type: "loose" }; });
-  (data.projects||[]).forEach(proj => {
-    const domain = (data.domains||[]).find(d => d.id === proj.domainId);
-    proj.tasks.forEach(t => { allTasksById[t.id] = { ...t, domainId: proj.domainId, domainColor: domain?.color, projectName: proj.name, projId: proj.id, _type: "project" }; });
-  });
-
-  const pickedLooseTasks = todayLoosePicks.map(id => allTasksById[id]).filter(Boolean);
-  const loosePickedDone = pickedLooseTasks.filter(t => t.done).length;
-
-  const saveLoosPicks = (ids) => {
-    setData(d => ({
-      ...d,
-      todayLoosePicks: { ...(d.todayLoosePicks||{}), [todayDateStr]: ids }
-    }));
-  };
-
-  const addLooseQuickTask = (text) => {
-    const t = text.trim();
-    if (!t) return;
-    const newTask = { id: uid(), text: t, done: false, domainId: null, doneAt: null, createdAt: Date.now() };
-    setData(d => ({
-      ...d,
-      looseTasks: [...(d.looseTasks||[]), newTask],
-      todayLoosePicks: { ...(d.todayLoosePicks||{}), [todayDateStr]: [...((d.todayLoosePicks||{})[todayDateStr]||[]), newTask.id] },
-    }));
-    setLooseQuickDraft("");
-  };
-
-  const toggleLooseTask = (taskId) => {
-    const task = allTasksById[taskId];
-    if (!task) return;
-    if (task._type === "loose") {
-      setData(d => ({
-        ...d,
-        looseTasks: (d.looseTasks||[]).map(t =>
-          t.id === taskId ? { ...t, done: !t.done, doneAt: !t.done ? new Date().toISOString() : null } : t
-        )
-      }));
-    } else {
-      // project task
-      setData(d => ({
-        ...d,
-        projects: (d.projects||[]).map(p =>
-          p.id === task.projId
-            ? { ...p, tasks: p.tasks.map(t => t.id === taskId ? { ...t, done: !t.done, doneAt: !t.done ? new Date().toISOString() : null } : t) }
-            : p
-        )
-      }));
-    }
-  };
-
-  // Build unified timeline: project blocks + routine blocks for today, sorted by time
-  const todayBlocks = blocks.filter(b => b.dayOffset === 0);
-  const todayBlocksSorted = [...todayBlocks].sort((a,b) => a.startHour*60+a.startMin - (b.startHour*60+b.startMin));
-  const todayRoutines = getRoutinesForDate(data.routineBlocks || [], today);
-  const dateKey = today.toDateString();
-  const dateKeyISO = toISODate(today);
-
-  // Tomorrow date keys
-  const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
-  const tomorrowDateKey = tomorrow.toDateString();
-  const tomorrowDateKeyISO = toISODate(tomorrow);
-
-  // Active view date (today or tomorrow)
-  const viewDate = viewingTomorrow ? tomorrow : today;
-  const viewDateKey = viewingTomorrow ? tomorrowDateKey : dateKey;
-  const viewDateKeyISO = viewingTomorrow ? tomorrowDateKeyISO : dateKeyISO;
-
-  // Build deep work slots for active view (today or tomorrow)
-  const deepDefaults = getDeepSlots(data);
-  const savedDWSlots = (data.deepWorkSlots || {})[viewDateKeyISO] || [];
-  const maxDeepBlocks = data.deepWorkTargets?.maxDeepBlocks ?? 3;
-  const filledSlots = ((data.deepWorkSlots || {})[dateKeyISO] || []).filter(s => s && s.projectId).length;
-  const isPlanned = filledSlots >= maxDeepBlocks;
-  // For tomorrow: show all slots (don't hide past since nowMins doesn't apply)
-  const viewBlocks = viewingTomorrow ? blocks.filter(b => b.dayOffset === 1) : todayBlocks;
-  const viewRoutines = viewingTomorrow ? getRoutinesForDate(data.routineBlocks || [], tomorrow) : todayRoutines;
-
-  // Always show exactly maxDeepBlocks slots — never filter past or empty cards
-  // Rule of 3: always 3 cards visible regardless of time of day or completion status
-  const todayDWSlots = Array.from({ length: maxDeepBlocks }, (_, i) => {
-    const def = deepDefaults[i] || deepDefaults[deepDefaults.length - 1];
-    const saved = savedDWSlots[i] || {};
-    return ({
-    id: `dw-${viewDateKeyISO}-${i}`,
-    slotIndex: i,
-    startHour: saved.startHour ?? def.startHour,
-    startMin:  saved.startMin  ?? def.startMin,
-    durationMin: saved.durationMin ?? def.durationMin,
-    projectId:   saved.projectId || null,
-    todayTasks:  saved.todayTasks || null,
-  });
-  });
-
-  const timeline = [
-    ...viewRoutines.map(r => ({ type: "routine", id: r.id, mins: r.startHour * 60 + r.startMin, data: r })),
-    ...todayDWSlots.map(s => ({ type: "deepwork", id: s.id, mins: s.startHour * 60 + s.startMin, data: s })),
-  ].sort((a, b) => a.mins - b.mins);
-
-  // Find the "current" block — started and not yet ended
-  const currentItem = timeline.find(item => {
-    const endMins = item.mins + (item.data.durationMin || 60);
-    return item.mins <= nowMins && nowMins < endMins;
-  });
-
-  // Auto-expand the current block so the user always sees what to do right now
-  const lastAutoExpanded = useRef(null);
+  // Live tick every second (powers clock + countdowns)
   useEffect(() => {
-    if (currentItem && currentItem.id !== lastAutoExpanded.current) {
-      setExpandedId(currentItem.id);
-      lastAutoExpanded.current = currentItem.id;
-    }
-  }, [currentItem?.id]);
+    const id = setInterval(() => setTick(t => t + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
 
-  // Jump to a specific block when navigating from Projects "Work Now"
-  const scrollRef = useRef(null);
-  const [tomorrowActive, setTomorrowActive] = useState(false);
+  // Reset shutdownDone each new day
+  useEffect(() => {
+    const todayISO = toISODate();
+    if (data.shutdownDone && data.shutdownDate !== todayISO) {
+      setData(d => ({ ...d, shutdownDone: false, shutdownDate: todayISO }));
+    }
+  }, [data.shutdownDone, data.shutdownDate]);
 
   // Scroll DW slot button to near top of screen when picker opens
   useEffect(() => {
@@ -560,40 +354,73 @@ export default function TodayScreen({ data, setData, openShutdown, onSignOut, ju
       }
     }, 30);
   }, [dwPickerOpen]);
-  const tomorrowTimerRef = useRef(null);
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const handleScroll = () => {
-      const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
-      if (nearBottom) {
-        if (!tomorrowTimerRef.current) {
-          tomorrowTimerRef.current = setTimeout(() => setTomorrowActive(true), 600);
-        }
-      } else {
-        clearTimeout(tomorrowTimerRef.current);
-        tomorrowTimerRef.current = null;
-        setTomorrowActive(false);
-      }
-    };
-    el.addEventListener("scroll", handleScroll, { passive: true });
-    return () => { el.removeEventListener("scroll", handleScroll); clearTimeout(tomorrowTimerRef.current); };
-  }, []);
-  useEffect(() => {
-    if (!jumpToBlock) return;
-    setExpandedId(jumpToBlock);
-    // Scroll to the block after a short delay for render
-    setTimeout(() => {
-      const el = document.querySelector(`[data-blockid="${jumpToBlock}"]`);
-      if (el && scrollRef.current) {
-        const top = el.getBoundingClientRect().top - scrollRef.current.getBoundingClientRect().top + scrollRef.current.scrollTop - 20;
-        scrollRef.current.scrollTo({ top, behavior: "smooth" });
-      }
-      onClearJump?.();
-    }, 120);
-  }, [jumpToBlock]);
+
+  const now   = new Date();
+  const today = new Date();
+  const days   = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const nowMins = now.getHours() * 60 + now.getMinutes();
+
+  // Tomorrow date keys
+  const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
+  const dateKey = today.toDateString();
+  const dateKeyISO = toISODate(today);
+  const tomorrowDateKey = tomorrow.toDateString();
+  const tomorrowDateKeyISO = toISODate(tomorrow);
+
+  // Active view date (today or tomorrow)
+  const viewDate = viewingTomorrow ? tomorrow : today;
+  const viewDateKey = viewingTomorrow ? tomorrowDateKey : dateKey;
+  const viewDateKeyISO = viewingTomorrow ? tomorrowDateKeyISO : dateKeyISO;
+
+  // Build deep work slots for active view
+  const deepDefaults = getDeepSlots(data);
+  const savedDWSlots = (data.deepWorkSlots || {})[viewDateKeyISO] || [];
+  const maxDeepBlocks = data.deepWorkTargets?.maxDeepBlocks ?? 3;
+  const filledSlots = ((data.deepWorkSlots || {})[dateKeyISO] || []).filter(s => s && s.projectId).length;
+  const isPlanned = filledSlots >= maxDeepBlocks;
+
+  const todayBlocks = blocks.filter(b => b.dayOffset === 0);
+  const todayRoutines = getRoutinesForDate(data.routineBlocks || [], today);
+  const viewRoutines = viewingTomorrow ? getRoutinesForDate(data.routineBlocks || [], tomorrow) : todayRoutines;
+
+  // Always show exactly maxDeepBlocks slots
+  const todayDWSlots = Array.from({ length: maxDeepBlocks }, (_, i) => {
+    const def = deepDefaults[i] || deepDefaults[deepDefaults.length - 1];
+    const saved = savedDWSlots[i] || {};
+    return ({
+      id: `dw-${viewDateKeyISO}-${i}`,
+      slotIndex: i,
+      startHour: saved.startHour ?? def.startHour,
+      startMin:  saved.startMin  ?? def.startMin,
+      durationMin: saved.durationMin ?? def.durationMin,
+      projectId:   saved.projectId || null,
+      todayTasks:  saved.todayTasks || null,
+    });
+  });
+
+  const timeline = [
+    ...viewRoutines.map(r => ({ type: "routine", id: r.id, mins: r.startHour * 60 + r.startMin, data: r })),
+    ...todayDWSlots.map(s => ({ type: "deepwork", id: s.id, mins: s.startHour * 60 + s.startMin, data: s })),
+  ].sort((a, b) => a.mins - b.mins);
+
+  // Find the "current" block
+  const currentItem = timeline.find(item => {
+    const endMins = item.mins + (item.data.durationMin || 60);
+    return item.mins <= nowMins && nowMins < endMins;
+  });
+
   // Next upcoming
   const nextItem = timeline.find(item => item.mins > nowMins);
+
+  // Auto-expand the current block
+  const lastAutoExpanded = useRef(null);
+  useEffect(() => {
+    if (currentItem && currentItem.id !== lastAutoExpanded.current) {
+      setExpandedId(currentItem.id);
+      lastAutoExpanded.current = currentItem.id;
+    }
+  }, [currentItem?.id]);
 
   // Clock display
   const clockH = now.getHours() > 12 ? now.getHours() - 12 : now.getHours() === 0 ? 12 : now.getHours();
@@ -627,7 +454,6 @@ export default function TodayScreen({ data, setData, openShutdown, onSignOut, ju
               {days[viewDate.getDay()]}, {months[viewDate.getMonth()]} {viewDate.getDate()}
             </div>
           </div>
-          <button className="tab-gear" onClick={() => setShowTodaySettings(true)} onContextMenu={e => { e.preventDefault(); if(onSignOut) onSignOut(); }}><GearIcon size={20} /></button>
         </div>
         <div style={{ fontSize:12, color:"var(--text3)", marginTop:6 }}>
           {viewingTomorrow
@@ -637,11 +463,24 @@ export default function TodayScreen({ data, setData, openShutdown, onSignOut, ju
         </div>
       </div>
 
+      {/* ── BIO-TIME BANNER ── */}
+      {!viewingTomorrow && (() => {
+        const bio = getBioPhase(data.wakeUpTime);
+        return (
+          <div style={{ margin:"0 16px 12px", padding:"10px 14px", borderRadius:12, background:bio.bgColor, borderLeft:`3px solid ${bio.color}`, display:"flex", alignItems:"flex-start", gap:10 }}>
+            <div style={{ flex:1 }}>
+              <div style={{ fontSize:12, fontWeight:700, color:bio.color, marginBottom:2 }}>{bio.label}</div>
+              <div style={{ fontSize:12, color:"var(--text2)", lineHeight:1.4 }}>{bio.advice}</div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ── PLAN MY DAY CTA ── */}
       {!viewingTomorrow && (
         isPlanned ? (
           <div style={{ textAlign:"center", padding:"8px 0", flexShrink:0 }}>
-            <span onClick={() => setTab("plan")} style={{ fontSize:12, color:"var(--text3)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>Edit today's plan</span>
+            <span style={{ fontSize:12, color:"var(--text3)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>Edit today's plan</span>
           </div>
         ) : (
           <div onClick={() => {
@@ -665,9 +504,7 @@ export default function TodayScreen({ data, setData, openShutdown, onSignOut, ju
 
       {/* ── CARD STACK — fills remaining screen height ── */}
       {(() => {
-        const dwItems = timeline.filter(i => i.type === "deepwork");
-        const rtItems = timeline.filter(i => i.type === "routine");
-        const allCards = [...timeline]; // routines + dw slots sorted by time
+        const allCards = [...timeline];
 
         if (allCards.length === 0) {
           return (
@@ -677,10 +514,9 @@ export default function TodayScreen({ data, setData, openShutdown, onSignOut, ju
           );
         }
 
-        // Determine flex values: current gets 2.2, others get 1
         return (
           <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden", minHeight:0 }}>
-            {/* Tomorrow link — top-right of card stack */}
+            {/* Tomorrow link */}
             <div style={{ display:"flex", justifyContent:"flex-end", padding:"0 14px 6px", flexShrink:0 }}>
               {!viewingTomorrow ? (
                 <button onClick={() => setViewingTomorrow(true)}
@@ -694,7 +530,7 @@ export default function TodayScreen({ data, setData, openShutdown, onSignOut, ju
                 </button>
               )}
             </div>
-            <div style={{ flex:1, display:"flex", flexDirection:"column", gap:8, padding:"0 12px 8px", overflow:"hidden", minHeight:0 }}>
+            <div ref={scrollRef} style={{ flex:1, display:"flex", flexDirection:"column", gap:8, padding:"0 12px 8px", overflow:"hidden", minHeight:0 }}>
             {allCards.map((item) => {
               const isPast = !viewingTomorrow && (item.mins + (item.data.durationMin || 60)) <= nowMins;
               const isNow  = !viewingTomorrow && currentItem?.id === item.id;
@@ -818,6 +654,9 @@ export default function TodayScreen({ data, setData, openShutdown, onSignOut, ju
                     return { ...s, [ptKey]: { ...base, _tasks: ex.includes(tid) ? ex.filter(x=>x!==tid) : [...ex, tid] } };
                   });
 
+                  // Bio coach label for empty slot
+                  const slotBio = getSlotBioPhase(slot.startHour, slot.startMin, data.wakeUpTime);
+
                   return (
                     <div key={slot.id} data-blockid={slot.id} style={{ flex: isExp ? 3 : 0.6, minHeight:0, borderRadius:18, background: isExp ? "var(--bg2)" : "var(--bg2)", border: isExp ? "1.5px solid rgba(255,255,255,.18)" : "1.5px dashed rgba(255,255,255,.1)", overflow:"hidden", display:"flex", flexDirection:"column", opacity: 1, transition:"flex .35s cubic-bezier(.4,0,.2,1), border-color .2s", cursor:"pointer" }}
                       onClick={() => setExpandedId(isExp ? null : slot.id)}
@@ -829,6 +668,10 @@ export default function TodayScreen({ data, setData, openShutdown, onSignOut, ju
                         </div>
                       ) : (
                         <div style={{ flex:1, overflowY:"auto", padding:"14px 16px" }} onClick={e => e.stopPropagation()}>
+                          {/* Bio coach label */}
+                          <div style={{ fontSize:11, color:slotBio.color, marginBottom:8, fontWeight:600 }}>
+                            {slotBio.label} — {slotBio.advice}
+                          </div>
                           {!selProjId ? (
                             /* ── STEP 1: 2-col project grid ── */
                             <>
@@ -1248,194 +1091,20 @@ export default function TodayScreen({ data, setData, openShutdown, onSignOut, ju
         );
       })()}
 
-      {/* ── LOOSE TASKS BANNER ── */}
+      {/* ── Inline Shutdown ── */}
       {(() => {
-        const looseCt = (data.looseTasks||[]).filter(t=>!t.done).length;
-        const capCt = (data.captured||[]).length;
-        const totalCt = looseCt + capCt;
-        return (
-          <div onClick={() => setLooseBlockExp(true)}
-            style={{ flexShrink:0, margin:"0 12px 8px", background:"var(--bg2)", borderRadius:14, border:"1px solid var(--border)", padding:"11px 16px", display:"flex", alignItems:"center", gap:12, cursor:"pointer" }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round"/></svg>
-            <span style={{ flex:1, fontSize:13, fontWeight:600, color:"var(--text2)" }}>Loose Tasks</span>
-            <div style={{ display:"flex", alignItems:"center", gap:5 }}>
-              {capCt > 0 && (
-                <span style={{ fontSize:11, fontWeight:700, color:"var(--blue)", background:"rgba(91,138,240,.12)", borderRadius:20, padding:"2px 8px" }}>
-                  {capCt} captured
-                </span>
-              )}
-              {looseCt > 0
-                ? <span style={{ fontSize:12, fontWeight:700, color:"var(--accent)", background:"rgba(232,160,48,.12)", borderRadius:20, padding:"2px 10px" }}>{looseCt} left</span>
-                : totalCt === 0 && <span style={{ fontSize:12, color:"var(--text3)" }}>None</span>
-              }
+        const { shutdownDone } = data;
+        const todayISO = toISODate();
+        if (shutdownDone && data.shutdownDate === todayISO) {
+          return (
+            <div style={{ margin:"16px 16px 24px", padding:"14px 18px", borderRadius:14, border:"1px solid rgba(69,193,122,.2)", background:"rgba(69,193,122,.06)", display:"flex", alignItems:"center", gap:12 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              <span style={{ fontSize:14, fontWeight:700, color:"var(--green)" }}>Shutdown complete</span>
             </div>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style={{ color:"var(--text3)", opacity:.5 }}><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          </div>
-        );
+          );
+        }
+        return null;
       })()}
-
-      {/* ── SHUTDOWN BAR — full width, always visible ── */}
-      {(() => {
-        const isRelevant = !shutdownDone && (data.todayPrefs?.showShutdown !== false);
-        return (
-          <div onClick={isRelevant ? openShutdown : undefined}
-            style={{ flexShrink:0, margin:"0 12px 10px", borderRadius:14, border: shutdownDone ? "1px solid rgba(69,193,122,.2)" : isRelevant ? "1px solid var(--border)" : "1px solid var(--border2)", background: shutdownDone ? "rgba(69,193,122,.06)" : isRelevant ? "var(--bg2)" : "var(--bg2)", padding:"13px 18px", display:"flex", alignItems:"center", gap:12, cursor: isRelevant ? "pointer" : "default", opacity: !isRelevant && !shutdownDone ? 0.4 : 1, transition:"opacity .2s, border-color .2s, background .2s" }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ color: shutdownDone ? "var(--green)" : isRelevant ? "var(--text2)" : "var(--text3)", flexShrink:0 }}>
-              <rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" strokeWidth="2"/>
-              <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
-            <span style={{ flex:1, fontSize:13, fontWeight:700, color: shutdownDone ? "var(--green)" : isRelevant ? "var(--text)" : "var(--text3)", letterSpacing:"-.01em" }}>
-              {shutdownDone ? "Shutdown complete" : "Shutdown Ritual"}
-            </span>
-            {shutdownDone
-              ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              : isRelevant
-                ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style={{ color:"var(--text3)", opacity:.5 }}><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                : null
-            }
-          </div>
-        );
-      })()}
-
-      {/* ── LOOSE TASKS BOTTOM SHEET ── */}
-      {looseBlockExp && (
-        <div style={{ position:"absolute", inset:0, zIndex:120 }} onClick={() => { setLooseBlockExp(false); setLooseEditId(null); }}>
-          <div style={{ position:"absolute", bottom:0, left:0, right:0, background:"var(--bg2)", borderRadius:"20px 20px 0 0", border:"none", borderTop:"3px solid var(--border)", maxHeight:"70vh", display:"flex", flexDirection:"column", animation:"sheet-up .25s cubic-bezier(.4,0,.2,1)", boxShadow:"0 -2px 0 var(--bg4), 0 -20px 60px rgba(0,0,0,.5)" }}
-            onClick={e => e.stopPropagation()}>
-            {/* Drag handle */}
-            <div style={{ flexShrink:0, display:"flex", justifyContent:"center", paddingTop:10 }}>
-              <div style={{ width:36, height:4, borderRadius:2, background:"var(--border)" }} />
-            </div>
-            {/* Header */}
-            <div style={{ flexShrink:0, padding:"10px 20px 12px", display:"flex", alignItems:"center", justifyContent:"space-between", borderBottom:"2px solid var(--border)" }}>
-              <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                <div style={{ fontSize:15, fontWeight:800, color:"var(--text)", letterSpacing:"-.01em" }}>Loose Tasks</div>
-                {(data.captured||[]).length > 0 && (
-                  <div style={{ background:"rgba(91,138,240,.15)", border:"1px solid rgba(91,138,240,.3)", borderRadius:12, padding:"2px 8px", fontSize:11, fontWeight:700, color:"var(--blue)" }}>
-                    {(data.captured||[]).length} captured
-                  </div>
-                )}
-              </div>
-              <button onClick={() => { setLooseBlockExp(false); setLooseEditId(null); }} style={{ background:"none", border:"none", cursor:"pointer", padding:4, color:"var(--text3)" }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></svg>
-              </button>
-            </div>
-            <div style={{ flex:1, overflowY:"auto", padding:"6px 16px 24px" }}>
-              {/* ── Captured section ── */}
-              {(data.captured||[]).length > 0 && (() => {
-                const moveToInbox = (s) => setData(d => ({
-                  ...d,
-                  captured: (d.captured||[]).filter(sc => sc.id !== s.id),
-                  inbox: [...(d.inbox||[]), { id: uid(), text: s.text, createdAt: s.createdAt || Date.now() }]
-                }));
-                const dismiss = (s) => setData(d => ({ ...d, captured: (d.captured||[]).filter(sc => sc.id !== s.id) }));
-                return (
-                  <div style={{ marginBottom:16 }}>
-                    <div style={{ fontSize:10, fontWeight:700, letterSpacing:".08em", textTransform:"uppercase", color:"var(--blue)", marginBottom:6, paddingLeft:2, opacity:.8 }}>Captured</div>
-                    {(data.captured||[]).map(s => (
-                      <div key={s.id} style={{ display:"flex", alignItems:"flex-start", gap:10, padding:"9px 0", borderBottom:"1px solid var(--border2)" }}>
-                        <div style={{ width:5, height:5, borderRadius:"50%", background:"var(--text3)", flexShrink:0, marginTop:7 }} />
-                        <span style={{ flex:1, fontSize:14, color:"var(--text2)", lineHeight:1.4 }}>{s.text}</span>
-                        <div style={{ display:"flex", gap:4, flexShrink:0 }}>
-                          <button onClick={() => moveToInbox(s)}
-                            style={{ background:"rgba(91,138,240,.12)", border:"1px solid rgba(91,138,240,.3)", borderRadius:8, padding:"4px 10px", fontSize:12, fontWeight:700, color:"var(--blue)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", whiteSpace:"nowrap" }}>
-                            → Inbox
-                          </button>
-                          <button onClick={() => dismiss(s)}
-                            style={{ background:"none", border:"1px solid var(--border)", borderRadius:8, padding:"4px 8px", fontSize:12, color:"var(--text3)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
-                            ×
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                    {(data.captured||[]).length > 1 && (
-                      <button onClick={() => setData(d => ({
-                        ...d,
-                        captured: [],
-                        inbox: [...(d.inbox||[]), ...(d.captured||[]).map(s => ({ id: uid(), text: s.text, createdAt: s.createdAt || Date.now() }))]
-                      }))}
-                        style={{ marginTop:10, width:"100%", background:"rgba(91,138,240,.08)", border:"1px solid rgba(91,138,240,.2)", borderRadius:10, padding:"9px 12px", fontSize:13, fontWeight:700, color:"var(--blue)", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
-                        Move all {(data.captured||[]).length} to Inbox
-                      </button>
-                    )}
-                    <div style={{ height:1, background:"var(--border)", margin:"14px 0 6px" }} />
-                  </div>
-                );
-              })()}
-              {(() => {
-                const loose = (data.looseTasks||[]).filter(t=>!t.done);
-                const saveEdit = (id) => {
-                  if (looseEditText.trim()) {
-                    setData(d => ({ ...d, looseTasks: (d.looseTasks||[]).map(lt => lt.id===id ? { ...lt, text: looseEditText.trim() } : lt) }));
-                  }
-                  setLooseEditId(null);
-                  setLooseEditText("");
-                };
-                return loose.length === 0 ? (
-                  <div style={{ textAlign:"center", padding:"24px 0", fontSize:13, color:"var(--text3)" }}>No loose tasks</div>
-                ) : (
-                  loose.map(t => {
-                    const dom = data.domains?.find(d => d.id === t.domainId);
-                    const isEditing = looseEditId === t.id;
-                    const isPickedToday = ((data.todayLoosePicks||{})[toISODate()]||[]).includes(t.id);
-                    const addToToday = () => {
-                      if (isPickedToday) return;
-                      setData(d => {
-                        const cur = (d.todayLoosePicks||{})[toISODate()] || [];
-                        return { ...d, todayLoosePicks: { ...(d.todayLoosePicks||{}), [toISODate()]: [...cur, t.id] } };
-                      });
-                    };
-                    return (
-                      <div key={t.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 0", borderBottom:"1px solid var(--border2)" }}>
-                        {/* Circle — tap to check */}
-                        <div onClick={() => setData(d => ({ ...d, looseTasks: (d.looseTasks||[]).map(lt => lt.id===t.id ? { ...lt, done:true, doneAt:new Date().toISOString() } : lt) }))}
-                          style={{ width:22, height:22, borderRadius:"50%", border:"1.5px solid var(--border)", background:"transparent", flexShrink:0, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", transition:"border-color .15s, background .15s" }} />
-                        {/* Text — tap to edit */}
-                        <div style={{ flex:1, minWidth:0 }}>
-                          {isEditing ? (
-                            <input
-                              autoFocus
-                              style={{ width:"100%", background:"var(--bg3)", border:"1px solid var(--border)", borderRadius:7, padding:"5px 8px", color:"var(--text)", fontSize:14, fontFamily:"'DM Sans',sans-serif", outline:"none", boxSizing:"border-box" }}
-                              value={looseEditText}
-                              onChange={e => setLooseEditText(e.target.value)}
-                              onKeyDown={e => { if (e.key==="Enter") saveEdit(t.id); if (e.key==="Escape") { setLooseEditId(null); setLooseEditText(""); } }}
-                              onBlur={() => saveEdit(t.id)} />
-                          ) : (
-                            <div onClick={() => { setLooseEditId(t.id); setLooseEditText(t.text); }}
-                              style={{ fontSize:14, color:"var(--text)", cursor:"text", padding:"2px 0" }}>{t.text}</div>
-                          )}
-                          {dom && !isEditing && <div style={{ fontSize:11, color:"var(--text3)", marginTop:2 }}>{dom.name}</div>}
-                        </div>
-                        {/* ↓ Do Today button */}
-                        <button onClick={addToToday} title="Do today"
-                          style={{ flexShrink:0, width:28, height:28, borderRadius:8, border: isPickedToday ? "1.5px solid rgba(232,160,48,.4)" : "1px solid var(--border)", background: isPickedToday ? "rgba(232,160,48,.12)" : "none", display:"flex", alignItems:"center", justifyContent:"center", cursor: isPickedToday ? "default" : "pointer", transition:"all .15s" }}>
-                          {isPickedToday
-                            ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                            : <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="var(--text3)" strokeWidth="2" strokeLinecap="round"/><path d="M19 16l-7 7-7-7" stroke="var(--text3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                          }
-                        </button>
-                      </div>
-                    );
-                  })
-                );
-              })()}
-              {/* Quick add */}
-              <div style={{ display:"flex", alignItems:"center", gap:8, background:"var(--bg3)", border:"1px solid var(--border2)", borderRadius:10, padding:"8px 12px", marginTop:12 }}>
-                <span style={{ fontSize:16, color:"var(--text3)", lineHeight:1 }}>+</span>
-                <input style={{ flex:1, background:"none", border:"none", outline:"none", color:"var(--text)", fontSize:13, fontFamily:"'DM Sans',sans-serif", padding:0 }}
-                  placeholder="Add a task…"
-                  value={looseQuickDraft}
-                  onChange={e => setLooseQuickDraft(e.target.value)}
-                  onKeyDown={e => { if (e.key==="Enter") addLooseQuickTask(looseQuickDraft); if (e.key==="Escape") setLooseQuickDraft(""); }} />
-                {looseQuickDraft.trim() && (
-                  <button onClick={() => addLooseQuickTask(looseQuickDraft)}
-                    style={{ background:"var(--accent)", color:"#000", border:"none", borderRadius:6, padding:"4px 10px", fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>Add</button>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Celebration overlay */}
       {celebratingId && (
@@ -1447,7 +1116,8 @@ export default function TodayScreen({ data, setData, openShutdown, onSignOut, ju
         </div>
       )}
 
-      {showTodaySettings && <TodaySettingsSheet data={data} setData={setData} onClose={() => setShowTodaySettings(false)} />}
+      {/* Back button */}
+      <button className="work-back-btn" onClick={onGoToTasks}>← Tasks</button>
     </div>
   );
 }

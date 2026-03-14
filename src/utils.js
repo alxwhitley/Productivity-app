@@ -35,6 +35,33 @@ export function getRoutinesForDate(routineBlocks, date) {
   });
 }
 
+export function getBioPhase(wakeUpTime) {
+  const wake = wakeUpTime || { hour: 7, min: 0 };
+  const now = new Date();
+  const wakeMinutes = wake.hour * 60 + wake.min;
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  let mins = nowMinutes - wakeMinutes;
+  if (mins < 0) mins += 24 * 60;
+  const hrs = mins / 60;
+  if (hrs < 7)  return { phase: "DEEP",     label: "Mental Peak",  color: "var(--blue)",   bgColor: "rgba(91,138,240,.12)", advice: "Your neurons are sharpest now. Best for hard thinking, complex decisions, deep problem-solving." };
+  if (hrs < 10) return { phase: "RECOVER",  label: "Second Wind",  color: "var(--green)",  bgColor: "rgba(69,193,122,.10)", advice: "A genuine second peak. Good for creative synthesis and complex planning." };
+  if (hrs < 13) return { phase: "TROUGH",   label: "Shallow Work", color: "var(--text2)",  bgColor: "rgba(154,149,145,.08)", advice: "Energy is lower. Good for admin, follow-up, and tasks that don't need full focus." };
+  return           { phase: "SHUTDOWN", label: "Wind Down",    color: "var(--accent)", bgColor: "rgba(232,160,48,.10)", advice: "Late in the day. Wrap-up only — avoid starting anything that needs deep concentration." };
+}
+
+export function getSlotBioPhase(startHour, startMin, wakeUpTime) {
+  const wake = wakeUpTime || { hour: 7, min: 0 };
+  const wakeMinutes = wake.hour * 60 + wake.min;
+  const slotMinutes = startHour * 60 + startMin;
+  let mins = slotMinutes - wakeMinutes;
+  if (mins < 0) mins += 24 * 60;
+  const hrs = mins / 60;
+  if (hrs < 7)  return { label: "Mental Peak",  color: "var(--blue)",   bgColor: "rgba(91,138,240,.12)", advice: "Peak neurochemical window — best for hard analysis and deep problem-solving." };
+  if (hrs < 10) return { label: "Second Wind",  color: "var(--green)",  bgColor: "rgba(69,193,122,.10)", advice: "A genuine second peak. Good for creative synthesis and complex planning." };
+  if (hrs < 13) return { label: "Shallow Work", color: "var(--text2)",  bgColor: "rgba(154,149,145,.08)", advice: "Lower energy window. Good for admin and review." };
+  return           { label: "Wind Down",   color: "var(--accent)", bgColor: "rgba(232,160,48,.10)", advice: "Late in the day. Wrap-up tasks only." };
+}
+
 // ── Deep merge: add missing keys from defaults without touching existing ones ─
 export function applyDefaults(saved, defaults) {
   const result = { ...saved };
