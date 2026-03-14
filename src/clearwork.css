@@ -779,14 +779,15 @@
   .tasks-filter-pill.active{background:var(--accent);color:#000;}
 
   /* Task row — plain, no card background */
-  .tasks-row{display:flex;align-items:flex-start;gap:12px;padding:13px 0;min-height:0;}
+  .tasks-row{display:flex;align-items:flex-start;gap:12px;padding:14px 0;min-height:52px;box-sizing:border-box;}
   .tasks-row-divider{border-bottom:1px solid var(--border2);}
   .tasks-row-divider:last-of-type{border-bottom:none;}
 
   /* Circle checkbox */
-  .tasks-circle{width:24px;height:24px;border-radius:50%;border:1.5px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .2s;margin-top:1px;}
+  .tasks-circle{width:26px;height:26px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .25s;margin-top:1px;}
   .tasks-circle.clickable{cursor:pointer;}
   .tasks-circle.done{background:var(--green);border-color:var(--green);animation:tasks-check-fill .25s cubic-bezier(.22,.68,0,1.4);}
+  .tasks-check-icon{font-size:12px;color:#fff;font-weight:700;line-height:1;}
   @keyframes tasks-check-fill{0%{transform:scale(0.7);opacity:.5;}60%{transform:scale(1.2);}100%{transform:scale(1);opacity:1;}}
 
   /* Task text */
@@ -817,3 +818,10 @@
   .tasks-sort-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
   .tasks-sort-name{font-size:13px;color:var(--text);font-weight:500;}
   .tasks-sort-domain{font-size:11px;color:var(--text3);margin-left:6px;}
+
+  /* Tasks — section badges & empty states */
+  .tasks-count-badge{margin-left:6px;font-size:11px;font-weight:700;color:var(--accent);letter-spacing:0;}
+  .tasks-today-progress{margin-left:6px;font-size:11px;font-weight:600;color:var(--text3);letter-spacing:0;text-transform:none;}
+  .tasks-empty-today{text-align:center;padding:24px;font-size:14px;color:var(--text3);}
+  .tasks-swipe-hint{font-size:11px;color:var(--text3);text-align:center;padding:4px 0 8px;animation:tasks-hint-fade 4s ease-out forwards;}
+  @keyframes tasks-hint-fade{0%,70%{opacity:1;}100%{opacity:0;}}

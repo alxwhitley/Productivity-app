@@ -181,8 +181,8 @@ export const MIGRATIONS = [
       const inbox = data.inbox || [];
       const captured = data.captured || [];
       const fabQueue = [
-        ...inbox.map(i => ({ id: i.id, text: i.text, createdAt: i.createdAt || Date.now() })),
-        ...captured.map(c => ({ id: c.id, text: c.text, createdAt: c.createdAt || Date.now() })),
+        ...inbox.map(i => ({ id: i.id, text: i.text, createdAt: i.createdAt || Date.now(), quickWin: false })),
+        ...captured.map(c => ({ id: c.id, text: c.text, createdAt: c.createdAt || Date.now(), quickWin: false })),
       ];
       const next = { ...data, fabQueue, shallowWork: data.shallowWork || {}, deepWorkHours: data.deepWorkHours || {}, schemaVersion: 4 };
       delete next.inbox;
