@@ -15,10 +15,10 @@ const BIO_PHASES = [
 ];
 
 const PHASE_COLORS = {
-  peak: { css: "var(--blue)", glow: "rgba(91,138,240,0.06)" },
-  second: { css: "var(--green)", glow: "rgba(69,193,122,0.06)" },
-  shallow: { css: "var(--teal)", glow: "rgba(75,170,187,0.06)" },
-  wind: { css: "var(--purple)", glow: "rgba(155,114,207,0.06)" },
+  peak: { css: "var(--blue)", glow: "rgba(91,138,240,0.08)" },
+  second: { css: "var(--green)", glow: "rgba(69,193,122,0.08)" },
+  shallow: { css: "var(--teal)", glow: "rgba(75,170,187,0.08)" },
+  wind: { css: "var(--purple)", glow: "rgba(155,114,207,0.08)" },
 };
 const BIO_TOTAL = 840; // 7am–9pm in minutes
 
@@ -635,7 +635,11 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
   // ══════ RENDER ══════
 
   return (
-    <div className="screen active" style={{ display: "flex", flexDirection: "column" }}>
+    <div className="screen active" style={{ display: "flex", flexDirection: "column", position: "relative" }}>
+      {/* Full-screen ambient phase glow */}
+      {!viewingTomorrow && (
+        <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0, background: `radial-gradient(ellipse at center, ${PHASE_COLORS[currentPhase]?.glow || "transparent"} 0%, transparent 70%)` }} />
+      )}
       <StatusBar />
       <div ref={scrollRef} className="scroll" style={{ flex: 1, paddingBottom: showShutdownFooter ? 70 : 100 }}>
 
@@ -724,27 +728,24 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
             <div key={group.id}>
               {/* Phase header */}
               <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "16px 16px 6px" }}>
-                <div style={{ width: 8, height: 8, borderRadius: "50%", background: phaseColor?.css || "var(--text3)", flexShrink: 0 }} />
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: isActivePhase ? (phaseColor?.css || "var(--text3)") : "var(--text3)", flexShrink: 0 }} />
                 <span style={{ fontSize: 11, fontWeight: isActivePhase ? 700 : 500, textTransform: "uppercase", color: isActivePhase ? "var(--text2)" : "var(--text3)", whiteSpace: "nowrap", letterSpacing: ".06em" }}>
                   {group.label}
                 </span>
                 <div style={{ flex: 1, height: 1, background: "var(--border2)" }} />
               </div>
 
-              {/* Block cards with ambient glow */}
-              <div style={{ position: "relative" }}>
-                <div style={{ position: "absolute", inset: 0, pointerEvents: "none", borderRadius: 14, background: `radial-gradient(ellipse at top, ${phaseColor?.glow || "transparent"} 0%, transparent 70%)`, opacity: isActivePhase ? 1 : 0, transition: "opacity 0.8s ease" }} />
-                {group.items.map(item => {
-                  const isNow = !viewingTomorrow && currentItem?.id === item.id;
-                  if (item.type === "routine") return renderRoutineCard(item, isNow);
-                  if (item.type === "deepwork") {
-                    const slot = item.data;
-                    if (!slot.projectId) return renderUnassignedCard(slot);
-                    return renderAssignedCard(slot);
-                  }
-                  return null;
-                })}
-              </div>
+              {/* Block cards */}
+              {group.items.map(item => {
+                const isNow = !viewingTomorrow && currentItem?.id === item.id;
+                if (item.type === "routine") return renderRoutineCard(item, isNow);
+                if (item.type === "deepwork") {
+                  const slot = item.data;
+                  if (!slot.projectId) return renderUnassignedCard(slot);
+                  return renderAssignedCard(slot);
+                }
+                return null;
+              })}
 
               {/* Shallow work banner under shallow phase */}
               {showShallowBanner && (
