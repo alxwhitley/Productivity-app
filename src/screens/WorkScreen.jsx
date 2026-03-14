@@ -82,7 +82,6 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
   const [pickerState, setPickerState] = useState(null);
   const [editingDwTaskId, setEditingDwTaskId] = useState(null);
   const [editingDwTaskText, setEditingDwTaskText] = useState("");
-  const [planningMode, setPlanningMode] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [shutdownOpen, setShutdownOpen] = useState(false);
   const [shallowExpanded, setShallowExpanded] = useState(false);
@@ -256,8 +255,6 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
     };
   });
 
-  const allAssigned = todayDWSlots.every(s => !!s.projectId);
-
   const todayRoutines = getRoutinesForDate(data.routineBlocks || [], today);
   const viewRoutines = viewingTomorrow ? getRoutinesForDate(data.routineBlocks || [], tomorrow) : todayRoutines;
 
@@ -411,12 +408,13 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
     const showBody = isExp && !isCompleted;
     const isPicking = pickerState?.blockId === slot.id;
 
-    // Done card
+    // Done card — expandable review state
     if (isCompleted) {
+      const isExpDone = expandedId === slot.id;
       return (
         <div key={slot.id} className="work-card" style={{
-          background: "var(--bg2)", border: "1px solid var(--border)", opacity: 0.5, position: "relative",
-        }}>
+          background: "var(--bg2)", border: "1px solid var(--border)", opacity: 0.55, position: "relative", cursor: "pointer",
+        }} onClick={() => setExpandedId(isExpDone ? null : slot.id)}>
           <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: "var(--green)", borderRadius: "14px 0 0 14px" }} />
           <div style={{ padding: "14px 16px 14px 20px", display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -425,7 +423,27 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
               <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 3 }}>{data.todayPrefs?.hideTimes ? "" : `${fmtTime(slot.startHour, slot.startMin)} · `}{slot.durationMin} min</div>
             </div>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style={{ color: "var(--text3)", opacity: .4, transform: isExpDone ? "rotate(90deg)" : "none", transition: "transform .2s" }}><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </div>
+          {isExpDone && hasTodayTasks && (
+            <div style={{ padding: "0 16px 14px 20px" }} onClick={e => e.stopPropagation()}>
+              {relevantTasks.map((t, i) => (
+                <div key={t.id} className="tl-task-row" style={{ padding: "8px 0", borderBottom: i < relevantTasks.length - 1 ? "1px solid var(--border2)" : "none" }}>
+                  <div className={`tl-check ${t.done ? "done" : ""}`}
+                    style={{ width: 20, height: 20, flexShrink: 0, cursor: "pointer" }}
+                    onClick={() => {
+                      if (t.done) {
+                        toggleTask(proj.id, t.id);
+                        unmarkManualDone(slot.id, proj.id, [t.id]);
+                      }
+                    }}>
+                    {t.done && <span style={{ fontSize: 10, color: "#fff", fontWeight: 700 }}>✓</span>}
+                  </div>
+                  <span style={{ fontSize: 14, color: t.done ? "var(--text2)" : "var(--text)", textDecoration: t.done ? "line-through" : "none", flex: 1 }}>{t.text}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       );
     }
@@ -541,7 +559,7 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
         {/* ── EXPANDED BODY: tasks + done ── */}
         {showBody && (
           <div style={{ padding: "0 16px 14px 20px" }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: 12, color: "var(--text2)", marginBottom: 10 }}>{domain?.name}{data.todayPrefs?.hideTimes ? "" : ` · ${fmtTime(slot.startHour, slot.startMin)}`} · {slot.durationMin} min</div>
+            <div style={{ fontSize: 12, color: "var(--text2)", marginBottom: 10 }}>{data.todayPrefs?.hideTimes ? "" : `${fmtTime(slot.startHour, slot.startMin)} · `}{slot.durationMin} min</div>
 
             {isPicking ? (() => {
               const ps = pickerState;
@@ -618,12 +636,10 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
                 )}
               </>
             ) : (
-              <div>
-                <div style={{ fontSize: 13, color: "var(--text3)", marginBottom: 10 }}>No tasks picked yet.</div>
-                <button className="tl-start-btn" style={{ width: "100%" }}
-                  onClick={() => setPickerState({ blockId: slot.id, projectId: proj.id, selected: new Set(), newText: "" })}>
-                  Pick tasks
-                </button>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", color: "var(--text3)", fontSize: 13 }}
+                onClick={() => setPickerState({ blockId: slot.id, projectId: proj.id, selected: new Set(), newText: "" })}>
+                <span style={{ fontSize: 16, lineHeight: 1 }}>+</span>
+                <span>Pick tasks for this block</span>
               </div>
             )}
           </div>
@@ -641,7 +657,7 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
         <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0, background: `radial-gradient(ellipse at center, ${PHASE_COLORS[currentPhase]?.glow || "transparent"} 0%, transparent 70%)` }} />
       )}
       <StatusBar />
-      <div ref={scrollRef} className="scroll" style={{ flex: 1, paddingBottom: showShutdownFooter ? 70 : 100 }}>
+      <div ref={scrollRef} className="scroll" style={{ flex: 1, paddingBottom: showShutdownFooter ? 160 : 100 }}>
 
         {/* ── HEADER ── */}
         <div style={{ padding: "14px 24px 10px" }}>
@@ -693,20 +709,6 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
           </div>
         )}
 
-        {/* ── PLAN MY DAY BANNER ── */}
-        {!viewingTomorrow && !allAssigned && (
-          <div style={{ margin: "0 16px", padding: "10px 0", borderTop: "1px solid var(--border2)", borderBottom: "1px solid var(--border2)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 12, color: "var(--text3)" }}>Plan your focus blocks</span>
-            <button onClick={() => {
-              setPlanningMode(true);
-              const firstEmpty = todayDWSlots.find(s => !s.projectId);
-              if (firstEmpty) setExpandedId(firstEmpty.id);
-            }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "var(--accent)", fontFamily: "'DM Sans',sans-serif", padding: 0 }}>
-              Plan My Day →
-            </button>
-          </div>
-        )}
-
         {/* ── BLOCKS BY PHASE ── */}
         {timeline.length === 0 && !hasShallowContent && (
           <div style={{ textAlign: "center", padding: "40px 24px", fontSize: 13, color: "var(--text3)" }}>
@@ -719,7 +721,8 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
           const isShallowPhase = group.id === "shallow";
           const showShallowBanner = isShallowPhase && shallowCount > 0;
 
-          if (!hasItems && !showShallowBanner) return null;
+          const isWindPhase = group.id === "wind";
+          if (!hasItems && !showShallowBanner && !isWindPhase) return null;
 
           const phaseColor = PHASE_COLORS[group.id];
           const isActivePhase = !viewingTomorrow && currentPhase === group.id;
@@ -734,6 +737,13 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
                 </span>
                 <div style={{ flex: 1, height: 1, background: "var(--border2)" }} />
               </div>
+
+              {/* Empty state for Wind Down */}
+              {isWindPhase && !hasItems && (
+                <div style={{ padding: "12px 16px", fontSize: 13, color: "var(--text3)" }}>
+                  No blocks scheduled
+                </div>
+              )}
 
               {/* Block cards */}
               {group.items.map(item => {
@@ -756,7 +766,7 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
                   >
                     <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>Loose Tasks</span>
                     {shallowCount > 0 && (
-                      <span style={{ fontSize: 12, fontWeight: 700, color: "var(--accent)", background: "rgba(232,160,48,.12)", borderRadius: 12, padding: "2px 8px" }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text2)", background: "var(--bg3)", borderRadius: 12, padding: "2px 8px" }}>
                         {shallowUndone > 0 ? shallowUndone : shallowCount}
                       </span>
                     )}
@@ -785,7 +795,7 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
 
         {/* ── TOMORROW PILL ── */}
         {!viewingTomorrow && (
-          <div style={{ textAlign: "center", padding: "24px 0 16px" }}>
+          <div style={{ textAlign: "center", padding: "16px 0 16px" }}>
             <button onClick={() => setViewingTomorrow(true)}
               style={{ background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 22, padding: "8px 20px", fontSize: 13, fontWeight: 600, color: "var(--text2)", cursor: "pointer", fontFamily: "'DM Sans',sans-serif" }}>
               Tomorrow →
@@ -857,14 +867,6 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
                 durationMin: pickerSlot.durationMin,
                 todayTasks: taskIds.length > 0 ? taskIds : null,
               });
-              if (planningMode) {
-                const nextEmpty = todayDWSlots.find(s => !s.projectId && s.id !== pickerSlot.id);
-                if (nextEmpty) {
-                  setDwPickerOpen({ slot: nextEmpty });
-                } else {
-                  setPlanningMode(false);
-                }
-              }
             }}
           />
         );
