@@ -4,6 +4,7 @@ import { getDeepSlots } from "../constants.js";
 import StatusBar from "../components/StatusBar.jsx";
 import TodaySettingsSheet from "../sheets/TodaySettingsSheet.jsx";
 import ShutdownSheet from "../sheets/ShutdownSheet.jsx";
+import DWPickerSheet from "../sheets/DWPickerSheet.jsx";
 
 // Bio-phase definitions (hardcoded wake 7am)
 const BIO_PHASES = [
@@ -67,14 +68,11 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
   const [celebratingId, setCelebratingId] = useState(null);
   const [recentlyChecked, setRecentlyChecked] = useState(new Set());
   const [dwOverflowOpen, setDwOverflowOpen] = useState(null);
-  const [dwPickerProj, setDwPickerProj] = useState({});
-  const [dwPickerTime, setDwPickerTime] = useState({});
+  const [dwPickerOpen, setDwPickerOpen] = useState(null); // { slot, preProjectId?, preTasks? }
   const [viewingTomorrow, setViewingTomorrow] = useState(false);
   const [lateStarted, setLateStarted] = useState({});
   const [tick, setTick] = useState(0);
   const [pickerState, setPickerState] = useState(null);
-  const [dwAddingTask, setDwAddingTask] = useState(null);
-  const [dwNewTaskText, setDwNewTaskText] = useState("");
   const [editingDwTaskId, setEditingDwTaskId] = useState(null);
   const [editingDwTaskText, setEditingDwTaskText] = useState("");
   const [planningMode, setPlanningMode] = useState(false);
@@ -393,123 +391,19 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
   }
 
   function renderUnassignedCard(slot) {
-    const isExp = expandedId === slot.id;
-    const ptKey = slot.id;
-    const selProjId = dwPickerProj[ptKey] || null;
-    const curTime = dwPickerTime[ptKey] || { startHour: slot.startHour, startMin: slot.startMin, durationMin: slot.durationMin };
-    const curSelTasks = curTime._tasks !== undefined ? curTime._tasks : [];
-    const togglePT = (tid) => setDwPickerTime(s => {
-      const base = s[ptKey] || { startHour: slot.startHour, startMin: slot.startMin, durationMin: slot.durationMin };
-      const ex = base._tasks || [];
-      return { ...s, [ptKey]: { ...base, _tasks: ex.includes(tid) ? ex.filter(x => x !== tid) : [...ex, tid] } };
-    });
-
     return (
       <div key={slot.id} className="work-card" style={{
         background: "var(--bg2)",
         border: "1.5px dashed rgba(255,255,255,.1)",
-      }} onClick={() => setExpandedId(isExp ? null : slot.id)}>
-        {!isExp ? (
-          <div style={{ padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="var(--text3)" strokeWidth="2" strokeLinecap="round" opacity=".3"/></svg>
-            <div style={{ flex: 1 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".07em", textTransform: "uppercase", color: "var(--text3)", opacity: .5 }}>Deep Work Block</span>
-            </div>
-            <span style={{ fontSize: 11, color: "var(--text3)", opacity: .4 }}>{data.todayPrefs?.hideTimes ? "" : fmtTime(slot.startHour, slot.startMin) + " · "}{slot.durationMin} min</span>
+        cursor: "pointer",
+      }} onClick={() => setDwPickerOpen({ slot })}>
+        <div style={{ padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity=".3" /></svg>
+          <div style={{ flex: 1, color: "var(--text3)" }}>
+            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".07em", textTransform: "uppercase", opacity: .5 }}>Deep Work Block</span>
           </div>
-        ) : (
-          <div style={{ padding: "14px 16px" }} onClick={e => e.stopPropagation()}>
-            {!selProjId ? (
-              <>
-                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--text3)", marginBottom: 10 }}>Assign project</div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
-                  {data.projects.filter(p => p.status === "active").map(p => {
-                    const d2 = data.domains?.find(d => d.id === p.domainId);
-                    const incomp = (p.tasks || []).filter(t => !t.done);
-                    return (
-                      <div key={p.id}
-                        onClick={() => { setDwPickerProj(s => ({ ...s, [ptKey]: p.id })); setDwPickerTime(s => ({ ...s, [ptKey]: { startHour: slot.startHour, startMin: slot.startMin, durationMin: slot.durationMin, _tasks: [] } })); }}
-                        style={{ borderRadius: 11, background: "var(--bg3)", border: "1.5px solid var(--border2)", padding: "10px 12px", cursor: "pointer", display: "flex", flexDirection: "column", gap: 4 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                          <div style={{ width: 8, height: 8, borderRadius: "50%", background: d2?.color || "var(--text3)", flexShrink: 0 }} />
-                          <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
-                        </div>
-                        <div style={{ fontSize: 11, color: "var(--text3)", paddingLeft: 15 }}>{d2?.name}{incomp.length > 0 ? ` · ${incomp.length}t` : ""}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-            ) : (() => {
-              const sp = data.projects.find(p => p.id === selProjId);
-              const sd = data.domains?.find(d => d.id === sp?.domainId);
-              const incomp = (sp?.tasks || []).filter(t => !t.done);
-              const confirmAssign = () => {
-                const t = dwPickerTime[ptKey] || { startHour: slot.startHour, startMin: slot.startMin, durationMin: slot.durationMin };
-                const tasks = (t._tasks && t._tasks.length > 0) ? t._tasks : null;
-                saveDWSlot(slot.id, slot.slotIndex, selProjId, t.startHour, t.startMin, t.durationMin, tasks);
-                setDwPickerProj(s => { const n = { ...s }; delete n[ptKey]; return n; });
-                setDwPickerTime(s => { const n = { ...s }; delete n[ptKey]; return n; });
-                if (planningMode) {
-                  const nextEmpty = todayDWSlots.find(s => !s.projectId && s.id !== slot.id);
-                  if (nextEmpty) { setExpandedId(nextEmpty.id); } else { setExpandedId(null); setPlanningMode(false); }
-                } else { setExpandedId(null); }
-              };
-              return (
-                <>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                    <button onClick={() => setDwPickerProj(s => { const n = { ...s }; delete n[ptKey]; return n; })}
-                      style={{ background: "none", border: "none", color: "var(--text3)", cursor: "pointer", padding: 0, fontFamily: "'DM Sans',sans-serif", fontSize: 12, display: "flex", alignItems: "center", gap: 4, fontWeight: 600 }}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                      Back
-                    </button>
-                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: sd?.color || "var(--text3)", flexShrink: 0 }} />
-                    <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sp?.name}</span>
-                  </div>
-                  {incomp.length > 0 ? (
-                    <>
-                      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--text3)", marginBottom: 8 }}>Pick focus tasks</div>
-                      {incomp.map(t => {
-                        const tSel = curSelTasks.includes(t.id);
-                        return (
-                          <div key={t.id} onClick={() => togglePT(t.id)}
-                            style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 4px", borderBottom: "1px solid var(--border2)", cursor: "pointer" }}>
-                            <div style={{ width: 18, height: 18, borderRadius: 5, border: tSel ? "none" : "1.5px solid var(--border)", background: tSel ? (sd?.color || "var(--accent)") : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                              {tSel && <span style={{ fontSize: 9, color: "#000", fontWeight: 800 }}>✓</span>}
-                            </div>
-                            <span style={{ fontSize: 13, color: tSel ? "var(--text)" : "var(--text2)" }}>{t.text}</span>
-                          </div>
-                        );
-                      })}
-                    </>
-                  ) : (
-                    <div style={{ fontSize: 13, color: "var(--text3)", padding: "8px 0 12px" }}>No open tasks — assigning project only.</div>
-                  )}
-                  {dwAddingTask === slot.id && (
-                    <div style={{ marginTop: 10, display: "flex", gap: 6 }}>
-                      <input autoFocus
-                        style={{ flex: 1, background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", color: "var(--text)", fontSize: 13, fontFamily: "'DM Sans',sans-serif", outline: "none", boxSizing: "border-box" }}
-                        placeholder="Task name…" value={dwNewTaskText} onChange={e => setDwNewTaskText(e.target.value)}
-                        onKeyDown={e => {
-                          if (e.key === "Enter") { const txt = dwNewTaskText.trim(); if (txt) { const newId = addTaskToProject(selProjId, txt); togglePT(newId); } setDwNewTaskText(""); setDwAddingTask(null); }
-                          if (e.key === "Escape") { setDwAddingTask(null); setDwNewTaskText(""); }
-                        }} />
-                      <button onClick={() => { const txt = dwNewTaskText.trim(); if (txt) { const newId = addTaskToProject(selProjId, txt); togglePT(newId); } setDwNewTaskText(""); setDwAddingTask(null); }}
-                        style={{ background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 12px", color: "var(--text2)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans',sans-serif", flexShrink: 0 }}>Add</button>
-                    </div>
-                  )}
-                  <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
-                    <button style={{ flex: 1, background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 12px", fontSize: 13, fontWeight: 600, color: "var(--text2)", cursor: "pointer", fontFamily: "'DM Sans',sans-serif" }}
-                      onClick={() => { setDwAddingTask(dwAddingTask === slot.id ? null : slot.id); setDwNewTaskText(""); }}>+ Add Task</button>
-                    <button className="dw-confirm-btn" style={{ flex: 1, padding: "10px 12px" }} onClick={confirmAssign}>
-                      ✓ Assign{curSelTasks.length > 0 ? ` · ${curSelTasks.length} task${curSelTasks.length !== 1 ? "s" : ""}` : ""}
-                    </button>
-                  </div>
-                </>
-              );
-            })()}
-          </div>
-        )}
+          <span style={{ fontSize: 11, color: "var(--text3)", opacity: .4 }}>{(data.todayPrefs || {}).hideTimes ? "" : fmtTime(slot.startHour, slot.startMin) + " · "}{slot.durationMin} min</span>
+        </div>
       </div>
     );
   }
@@ -570,6 +464,18 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
                 style={{ padding: "14px 16px", background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 14, fontSize: 14, fontWeight: 600, color: "var(--text2)", cursor: "pointer", fontFamily: "'DM Sans',sans-serif", display: "flex", alignItems: "center", gap: 12 }}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/></svg>
                 Unassign
+              </button>
+              <button onClick={() => {
+                setDwOverflowOpen(null);
+                setDwPickerOpen({
+                  slot,
+                  preProjectId: slot.projectId,
+                  preTasks: Array.isArray(slot.todayTasks) ? slot.todayTasks : [],
+                });
+              }}
+                style={{ padding: "14px 16px", background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 14, fontSize: 14, fontWeight: 600, color: "var(--text2)", cursor: "pointer", fontFamily: "'DM Sans',sans-serif", display: "flex", alignItems: "center", gap: 12 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                Change Project
               </button>
               {!viewingTomorrow && (
                 <button onClick={() => {
@@ -1015,6 +921,39 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
           }}
         />
       )}
+
+      {/* ── DW PICKER SHEET ── */}
+      {dwPickerOpen && (() => {
+        const pickerSlot = dwPickerOpen.slot;
+        return (
+          <DWPickerSheet
+            data={data}
+            slot={pickerSlot}
+            dateStr={viewDateKeyISO}
+            slotIndex={pickerSlot.slotIndex}
+            preSelectedProjectId={dwPickerOpen.preProjectId || null}
+            preSelectedTasks={dwPickerOpen.preTasks || []}
+            onClose={() => setDwPickerOpen(null)}
+            onConfirm={(dateStr, slotIndex, projectId, taskIds) => {
+              mutateDWSlot(dateStr, slotIndex, {
+                projectId,
+                startHour: pickerSlot.startHour,
+                startMin: pickerSlot.startMin,
+                durationMin: pickerSlot.durationMin,
+                todayTasks: taskIds.length > 0 ? taskIds : null,
+              });
+              if (planningMode) {
+                const nextEmpty = todayDWSlots.find(s => !s.projectId && s.id !== pickerSlot.id);
+                if (nextEmpty) {
+                  setDwPickerOpen({ slot: nextEmpty });
+                } else {
+                  setPlanningMode(false);
+                }
+              }
+            }}
+          />
+        );
+      })()}
 
       {/* ── CELEBRATION OVERLAY ── */}
       {celebratingId && (

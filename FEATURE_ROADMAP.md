@@ -8,81 +8,103 @@ Format: mark done items ✅, in-progress 🔄, ideas/backlog 💡
 
 ## Recently Completed ✅
 
-### UI & Interaction
-- ✅ **5-color brand palette** — Huberman-mapped colors (blue/amber/green/purple/teal) applied across domains, onboarding, and project cards
-- ✅ **Gear menu inline expand** — Block gear opens an inline management panel (change project, push to tomorrow, clear slot)
-- ✅ **Deep work block cap** — `maxDeepBlocks` setting in Today gear
-- ✅ **Project picker 2-column grid** — DW slot project picker shows 2-col grid with color dot + stacked name/domain
+### Foundation
+- ✅ **5-color brand palette** — Huberman-mapped colors (blue/amber/green/purple/slate) applied across domains, onboarding, and project cards
+- ✅ **Email/password auth** — Replaced magic link auth with email + password login
+- ✅ **Onboarding coach flow** — 5-card swipeable overlay on first login; sets `onboardingDone` on complete or skip
+
+### Work Tab (formerly Today)
+- ✅ **Tab renamed to Work** — `TodayScreen` → `WorkScreen`, tab label updated throughout
+- ✅ **Bio-phase progress bar** — 4 phases (Mental Peak · Second Wind · Shallow · Wind Down), moving dot, updates every minute
+- ✅ **Phase section headers** — ⚡ Mental Peak · 🔁 Second Wind · 📋 Shallow · 🌙 Wind Down
+- ✅ **Fixed block slots** — 2 under Mental Peak (9am, 11am), 1 under Second Wind (1pm)
+- ✅ **Three block states** — Upcoming · Active (glowing border + large timer) · Done (faded + green checkmark)
 - ✅ **Active block highlight** — Current block gets amber border, scale(1.018), breathing pulse animation; auto-expands on entry
 - ✅ **Completion celebration** — Marking a block done triggers particle burst overlay + "Block complete" label for 1.6s
-- ✅ **Inbox aging badges** — Colored age badges (green = today, amber = 1 day, red = 3+ days); nav dot pulses red when items age past 2 days
-- ✅ **Fast capture rewrite** — QuickReminders is pure capture; items go straight to inbox with `createdAt` timestamp
-- ✅ **Next action highlight** — First unchecked task in active block gets amber left border; auto-advances as tasks complete
-- ✅ **Task checkoff bounce** — Checkbox scale animation + green row flash in Today timeline and Projects tab
-- ✅ **"Work on This Now"** — Creates a 90-min block at current time from Projects tab and jumps to Today
+- ✅ **Next action highlight** — First unchecked task in active block gets amber left border; advances automatically as tasks complete
+- ✅ **Task checkoff bounce** — Checking a task triggers checkbox scale animation + green row flash
+- ✅ **"Work on This Now"** — Expanded project cards show full-width button; creates block at current time (rounded 15 min) and jumps to Work tab
+- ✅ **Shutdown Ritual sticky footer** — Appears above nav bar from 12pm; shows "✓ Day complete" in green after completion
+- ✅ **Shallow Loose Tasks banner** — Thin banner in Shallow phase; tap to expand today's loose tasks
+- ✅ **Plan My Day banner** — Slim one-line banner with subtitle; hides once all blocks assigned
+- ✅ **Deep work block cap** — `maxDeepBlocks` setting in Work gear; cap applies across blocks and DW slots
+- ✅ **Gear menu inline expand** — Block gear opens inline management panel (change project, push to tomorrow, clear slot)
 
-### Data & Auth
-- ✅ **Email/password auth** — Replaced magic link login (hit Supabase rate limits); includes sign in/up tabs, forgot password, inline messaging
-- ✅ **Onboarding coach flow** — Full-screen swipeable 5-card overlay, persisted via `data.onboardingDone`
+### Tasks Tab (new)
+- ✅ **Tasks tab created** — New tab between Work and Projects
+- ✅ **iOS Reminders-inspired rows** — No card backgrounds; tasks on screen background with dividers; large stroke circle checkbox; domain color dot below text
+- ✅ **Swipe LEFT** — Reveals three buttons on RIGHT: Sort · Today · Delete
+- ✅ **Swipe RIGHT** — Instant Quick Win badge toggle on LEFT
+- ✅ **Pill filters** — All · Quick Wins
+- ✅ **Inline task capture** — Tap empty space below list to open new task input inline
+- ✅ **Inline task edit** — Tap existing task text to edit inline
+- ✅ **Sort panel** — Inline below row (flat domain + project list), not a bottom sheet
+- ✅ **FAB hidden on Tasks tab** — FAB only visible on Work and Projects tabs
 
-### Today Screen — Major Refactor
-- ✅ **Biological zoom** — Cards flex based on bio phase; current block expands, future phases compress
-- ✅ **Bio phase arc bar** — Visual day arc showing Mental Peak / Second Wind / Shallow Work / Wind Down with now-dot
-- ✅ **Plan My Day modal** — Multi-step wizard for planning blocks; state lifted to App() so it persists across modal open/close
-- ✅ **Swipe-down to open Plan My Day** — Pull down from top of Today screen triggers PMD modal directly
-- ✅ **Shutdown Ritual wizard** — Multi-step end-of-day flow rendered as overlay inside TodayScreen
-- ✅ **Shallow Work sheet** — Renamed from "Loose Tasks"; daily curated list (`data.shallowWork[dateISO]`); resets each morning
-- ✅ **Shallow Work swipe-to-delete** — Swipe left on task reveals red Delete button on right
-- ✅ **Shallow Work tap behavior** — Tap empty row space toggles checkmark; tap task text opens inline edit
-- ✅ **Shallow Work project picker** — Pick FAB opens sheet showing loose tasks + project tasks grouped by domain/project
-- ✅ **Daily reset** — On new day: wipes shallow work, sends orphan manual tasks to inbox, resets shutdownDone and dayLocked
+### Projects Tab
+- ✅ **All cards expanded by default** — No expand/collapse all chevron
+- ✅ **Loose Tasks card per domain** — Subtle collapsed card above project cards; `var(--bg)` background, border only, no color accent
+- ✅ **Loose Tasks inline add** — Grey `+` top right; tapping expands and opens inline input at top of list
+- ✅ **Keyboard scroll behavior** — `scrollIntoView` + `visualViewport` listener keeps active input above keyboard
+- ✅ **"Add project" moved to gear** — Removed from bottom of screen
+
+### Nav Bar
+- ✅ **Floating pill-shaped nav bar** — Always visible on all tabs
+- ✅ **Active tab style** — Icon in `var(--accent)` + short underline beneath label; no filled background highlight
+- ✅ **4 tabs** — Work · Tasks · Projects · Season
+
+### Auth
+- ✅ **Supabase config** — Site URL must include `https://`; Redirect URLs use `/**` wildcard pattern
 
 ---
 
 ## In Progress 🔄
 
-- 🔄 **Flexible / no-times mode** — Toggle in Today gear to hide the time column (`.tl-left`); cards expand to fill full width; stored in `todayPrefs.hideTimes`
+- 🔄 **Flexible / no-times mode** — Toggle in Work gear (`todayPrefs.hideTimes`) to hide time column; cards fill full width
+- 🔄 **DWPickerSheet** — New bottom sheet for assigning deep work blocks; replaces 2-column grid picker; project cards in selection mode (dashed → solid), task checkboxes, confirm button on card
 
 ---
 
 ## Near-Term Backlog 💡
 
-### Today Screen
-- 💡 **Drag-to-reschedule** — Drag blocks to different time slots (drag-to-reorder exists but no time remapping)
+### Work Tab
+- 💡 **Drag-to-reschedule** — Drag blocks to different time slots (drag-to-reorder exists, no time remapping yet)
 - 💡 **Quick time edit** — Tap time label on a block to edit start time inline
-- 💡 **Block duration scrubber** — Pull bottom edge of a block card to resize duration
+- 💡 **Block duration scrubber** — Pull bottom edge of block card to resize duration visually
+- 💡 **Plan My Day guided flow** — Rebuild the guided planning flow (currently a stub that navigates to Plan tab)
 
-### Projects Screen
-- 💡 **Task priority flags** — Flag a task as most important; surfaces as "next action" in Today blocks
-- 💡 **Project progress nudges** — Prompt if active project has no completed tasks in 7 days
-- 💡 **Bulk task add** — Paste a list and have it parsed into individual task rows
+### Tasks Tab
+- 💡 **"Processed X of Y today"** — Queue section header counter showing daily processing progress
+- 💡 **Empty state animation** — "Queue clear ✓" in green for 2 seconds when queue is empty
+- 💡 **One-time swipe hint** — On first load, brief animation showing swipe directions
 
-### Plan Screen
-- 💡 **Week intention prompt** — If `weekIntention` is empty on Monday morning, prompt before showing week view
-- 💡 **Copy last week's blocks** — One-tap to replicate last week's block pattern
+### Projects Tab
+- 💡 **Task priority flags** — Flag a task as most important in the project; surfaces as "next action" in Work blocks
+- 💡 **Project progress nudges** — If active project has no completed tasks in 7 days, surface a subtle prompt
+- 💡 **Bulk task add** — Paste a list of tasks and have them parsed into individual rows
 
-### Season Screen
+### Season Tab
 - 💡 **Season review prompt** — Structured review flow at end of quarter before starting new season
-- 💡 **Domain balance ring** — Visual ring chart showing block time distributed across domains
+- 💡 **Domain balance ring** — Visual ring chart showing block time distributed across domains this season
 
 ### Cross-cutting
-- 💡 **Focus mode** — Hide everything except active block and its tasks; all other UI fades out
+- 💡 **Focus mode** — Hide everything except the active block and its tasks; all other UI fades out
 - 💡 **Recurring blocks** — Mark a block as recurring (daily / weekdays / weekly)
 - 💡 **Notifications** — Optional reminder at block start time (requires PWA or native wrapper)
 - 💡 **Export** — Export completed work log as text summary or CSV
-- 💡 **Domain picker toolbar** — Inline domain dot picker on task add inputs (Projects, Shallow Work, PMD loose tasks); deferred — do not add until requested
 
 ---
 
-## Deferred / Reconsidered
+## Deferred / Reconsidered ❌
 
-- ❌ **Today / Later pills on capture** — Removed. Routing during capture adds friction.
+- ❌ **Today / Later pills on capture** — Removed. Routing during capture adds friction. Inbox processing is the right moment.
 - ❌ **Complex onboarding wizard** — Replaced with 5-card swipeable coach sequence.
-- ❌ **"Do Today" from inbox** — Replaced by Shallow Work model.
+- ❌ **Domain picker toolbar** — Explicitly deferred. Do not add yet.
+- ❌ **DW slot 2-column grid picker** — Replaced by `DWPickerSheet` (bottom sheet with full project cards in selection mode).
 
 ---
 
-## Notes for Prioritization
+## Prioritization Principles
 
 When evaluating new features, ask:
 1. Does this reduce friction between intention and action?
