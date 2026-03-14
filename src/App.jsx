@@ -113,29 +113,37 @@ export default function App() {
             </svg>
           </button>
 
-          {/* Back button — Work tab only */}
-          {tab === "work" && (
-            <button className="work-back-btn" onClick={() => setTab("tasks")}>← Tasks</button>
-          )}
-
-          {/* Floating pill nav — hidden when Work tab is active */}
-          {tab !== "work" && (
-            <div className="pill-nav">
-              {[
-                { id: "work", lbl: "Work" },
-                { id: "tasks", lbl: "Tasks" },
-                { id: "projects", lbl: "Projects" },
-              ].map(n => (
-                <button
-                  key={n.id}
-                  className={`pill-nav-btn ${tab === n.id ? "active" : ""}`}
-                  onClick={() => setTab(n.id)}
-                >
-                  {n.lbl}
-                </button>
-              ))}
-            </div>
-          )}
+          {/* Floating pill nav — always visible */}
+          <div className="pill-nav">
+            {[
+              { id: "work", lbl: "Work", icon: (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+                  <polyline points="12 6 12 12 16 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )},
+              { id: "tasks", lbl: "Tasks", icon: (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path d="M9 11l3 3L22 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )},
+              { id: "projects", lbl: "Projects", icon: (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )},
+            ].map(n => (
+              <button
+                key={n.id}
+                className={`pill-nav-btn ${tab === n.id ? "active" : ""}`}
+                onClick={() => setTab(n.id)}
+              >
+                <span className="pill-nav-icon">{n.icon}</span>
+                <span className="pill-nav-label">{n.lbl}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </>
