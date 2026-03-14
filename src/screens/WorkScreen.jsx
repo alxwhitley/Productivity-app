@@ -8,11 +8,18 @@ import DWPickerSheet from "../sheets/DWPickerSheet.jsx";
 
 // Bio-phase definitions (hardcoded wake 7am)
 const BIO_PHASES = [
-  { id: "peak", label: "Mental Peak", icon: "\u26A1", startMin: 420, endMin: 720 },
-  { id: "second", label: "Second Wind", icon: "\uD83D\uDD01", startMin: 720, endMin: 900 },
-  { id: "shallow", label: "Shallow", icon: "\uD83D\uDCCB", startMin: 900, endMin: 1020 },
-  { id: "wind", label: "Wind Down", icon: "\uD83C\uDF19", startMin: 1020, endMin: 1260 },
+  { id: "peak", label: "Mental Peak", startMin: 420, endMin: 720 },
+  { id: "second", label: "Second Wind", startMin: 720, endMin: 900 },
+  { id: "shallow", label: "Shallow", startMin: 900, endMin: 1020 },
+  { id: "wind", label: "Wind Down", startMin: 1020, endMin: 1260 },
 ];
+
+const PHASE_COLORS = {
+  peak: { css: "var(--blue)", glow: "rgba(91,138,240,0.06)" },
+  second: { css: "var(--green)", glow: "rgba(69,193,122,0.06)" },
+  shallow: { css: "var(--teal)", glow: "rgba(75,170,187,0.06)" },
+  wind: { css: "var(--purple)", glow: "rgba(155,114,207,0.06)" },
+};
 const BIO_TOTAL = 840; // 7am–9pm in minutes
 
 // Fixed deep work slots: 2 under Mental Peak, 1 under Second Wind
@@ -77,7 +84,6 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
   const [editingDwTaskText, setEditingDwTaskText] = useState("");
   const [planningMode, setPlanningMode] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [dayPlanOpen, setDayPlanOpen] = useState(false);
   const [shutdownOpen, setShutdownOpen] = useState(false);
   const [shallowExpanded, setShallowExpanded] = useState(false);
 
@@ -236,6 +242,7 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
   const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
   const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
   const nowMins = now.getHours() * 60 + now.getMinutes();
+  const currentPhase = getPhaseForMins(nowMins);
 
   const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
   const dateKey = today.toDateString();
@@ -394,15 +401,15 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
     return (
       <div key={slot.id} className="work-card" style={{
         background: "var(--bg2)",
-        border: "1.5px dashed rgba(255,255,255,.1)",
+        border: "1.5px dashed var(--border)",
         cursor: "pointer",
       }} onClick={() => setDwPickerOpen({ slot })}>
         <div style={{ padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 }}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity=".3" /></svg>
-          <div style={{ flex: 1, color: "var(--text3)" }}>
-            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".07em", textTransform: "uppercase", opacity: .5 }}>Deep Work Block</span>
+          <div style={{ flex: 1, color: "var(--text2)" }}>
+            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".07em", textTransform: "uppercase" }}>Deep Work Block</span>
           </div>
-          <span style={{ fontSize: 11, color: "var(--text3)", opacity: .4 }}>{(data.todayPrefs || {}).hideTimes ? "" : fmtTime(slot.startHour, slot.startMin) + " · "}{slot.durationMin} min</span>
+          <span style={{ fontSize: 11, color: "var(--text2)" }}>{(data.todayPrefs || {}).hideTimes ? "" : fmtTime(slot.startHour, slot.startMin) + " · "}{slot.durationMin} min</span>
         </div>
       </div>
     );
@@ -427,7 +434,7 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
         <div key={slot.id} className="work-card" style={{
           background: "var(--bg2)", border: "1px solid var(--border)", opacity: 0.5, position: "relative",
         }}>
-          {domainColor && <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: "var(--border)", borderRadius: "18px 0 0 18px" }} />}
+          <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: "var(--green)", borderRadius: "14px 0 0 14px" }} />
           <div style={{ padding: "14px 16px 14px 20px", display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--text3)", marginBottom: 2 }}>{domain?.name || "Deep Work"}</div>
@@ -447,11 +454,11 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
         boxShadow: isActive && domainColor ? `0 0 18px ${domainColor}33` : "none",
         position: "relative",
       }} onClick={() => { if (!isActive) setExpandedId(isExp ? null : slot.id); }}>
-        {domainColor && <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: domainColor, borderRadius: "18px 0 0 18px" }} />}
+        <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: domainColor || "var(--text3)", borderRadius: "14px 0 0 14px" }} />
 
         {/* Overflow menu overlay */}
         {dwOverflowOpen === slot.id && (
-          <div style={{ position: "absolute", inset: 0, background: "var(--bg2)", borderRadius: 18, zIndex: 10, display: "flex", flexDirection: "column", padding: "16px 16px 14px" }} onClick={e => e.stopPropagation()}>
+          <div style={{ position: "absolute", inset: 0, background: "var(--bg2)", borderRadius: 14, zIndex: 10, display: "flex", flexDirection: "column", padding: "16px 16px 14px" }} onClick={e => e.stopPropagation()}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text2)" }}>{proj?.name}</span>
               <button onClick={() => setDwOverflowOpen(null)}
@@ -750,7 +757,7 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
             </div>
             <div style={{ position: "relative", height: 4, background: "var(--bg4)", borderRadius: 2 }}>
               <div style={{ position: "absolute", left: 0, top: 0, height: "100%", background: "var(--accent)", borderRadius: 2, width: `${barPct}%` }} />
-              <div className="work-bio-dot" style={{ left: `${barPct}%` }} />
+              <div className="work-bio-dot" style={{ left: `${barPct}%`, background: PHASE_COLORS[currentPhase]?.css || "var(--accent)" }} />
             </div>
           </div>
         )}
@@ -769,33 +776,6 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
           </div>
         )}
 
-        {/* ── DAY PLAN COLLAPSIBLE ── */}
-        {!viewingTomorrow && timeline.length > 0 && (
-          <div style={{ padding: "0 16px 12px" }}>
-            <button onClick={() => setDayPlanOpen(!dayPlanOpen)}
-              style={{ width: "100%", textAlign: "center", background: "none", border: "none", cursor: "pointer", padding: "8px 0", fontSize: 13, color: "var(--text3)", fontFamily: "'DM Sans',sans-serif", fontWeight: 500 }}>
-              {dayPlanOpen ? "\u25B4" : "\u25BE"} Day plan
-            </button>
-            {dayPlanOpen && (
-              <div style={{ padding: "4px 8px" }}>
-                {timeline.map(item => {
-                  const startH = Math.floor(item.mins / 60);
-                  const startM = item.mins % 60;
-                  const label = item.type === "routine"
-                    ? item.data.title
-                    : (item.data.projectId ? getProject(item.data.projectId)?.name || "Assigned" : "Unassigned");
-                  return (
-                    <div key={item.id} style={{ padding: "5px 0", fontSize: 13, color: "var(--text2)", display: "flex", justifyContent: "space-between" }}>
-                      <span>{label}</span>
-                      <span style={{ color: "var(--text3)", fontSize: 12 }}>{fmtTime(startH, startM)}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
         {/* ── BLOCKS BY PHASE ── */}
         {timeline.length === 0 && !hasShallowContent && (
           <div style={{ textAlign: "center", padding: "40px 24px", fontSize: 13, color: "var(--text3)" }}>
@@ -810,27 +790,34 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
 
           if (!hasItems && !showShallowBanner) return null;
 
+          const phaseColor = PHASE_COLORS[group.id];
+          const isActivePhase = !viewingTomorrow && currentPhase === group.id;
+
           return (
             <div key={group.id}>
               {/* Phase header */}
               <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "16px 16px 6px" }}>
-                <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "var(--text3)", whiteSpace: "nowrap", letterSpacing: ".06em" }}>
-                  {group.icon} {group.label}
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: phaseColor?.css || "var(--text3)", flexShrink: 0 }} />
+                <span style={{ fontSize: 11, fontWeight: isActivePhase ? 700 : 500, textTransform: "uppercase", color: isActivePhase ? "var(--text2)" : "var(--text3)", whiteSpace: "nowrap", letterSpacing: ".06em" }}>
+                  {group.label}
                 </span>
                 <div style={{ flex: 1, height: 1, background: "var(--border2)" }} />
               </div>
 
-              {/* Block cards */}
-              {group.items.map(item => {
-                const isNow = !viewingTomorrow && currentItem?.id === item.id;
-                if (item.type === "routine") return renderRoutineCard(item, isNow);
-                if (item.type === "deepwork") {
-                  const slot = item.data;
-                  if (!slot.projectId) return renderUnassignedCard(slot);
-                  return renderAssignedCard(slot);
-                }
-                return null;
-              })}
+              {/* Block cards with ambient glow */}
+              <div style={{ position: "relative" }}>
+                <div style={{ position: "absolute", inset: 0, pointerEvents: "none", borderRadius: 14, background: `radial-gradient(ellipse at top, ${phaseColor?.glow || "transparent"} 0%, transparent 70%)`, opacity: isActivePhase ? 1 : 0, transition: "opacity 0.8s ease" }} />
+                {group.items.map(item => {
+                  const isNow = !viewingTomorrow && currentItem?.id === item.id;
+                  if (item.type === "routine") return renderRoutineCard(item, isNow);
+                  if (item.type === "deepwork") {
+                    const slot = item.data;
+                    if (!slot.projectId) return renderUnassignedCard(slot);
+                    return renderAssignedCard(slot);
+                  }
+                  return null;
+                })}
+              </div>
 
               {/* Shallow work banner under shallow phase */}
               {showShallowBanner && (
