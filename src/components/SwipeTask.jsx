@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 
-function SwipeTask({ task, onToggle, onDelete, onSave }) {
+function SwipeTask({ task, onToggle, onDelete, onSave, scrollIntoView }) {
   const [offset, setOffset]   = useState(0);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft]     = useState(task.text);
@@ -62,6 +62,7 @@ function SwipeTask({ task, onToggle, onDelete, onSave }) {
             value={draft}
             autoFocus
             onChange={e => setDraft(e.target.value)}
+            onFocus={e => { if (scrollIntoView) scrollIntoView(e.target); }}
             onBlur={commitEdit}
             onKeyDown={e => { if (e.key === "Enter") commitEdit(); if (e.key === "Escape") { setDraft(task.text); setEditing(false); } }}
             onClick={e => e.stopPropagation()}

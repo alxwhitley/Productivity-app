@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { uid } from "../utils.js";
 import GearIcon from "../components/GearIcon.jsx";
 import StatusBar from "../components/StatusBar.jsx";
@@ -14,27 +14,42 @@ export default function ProjectsScreen({ data, setData }) {
   const [newProjId, setNewProjId] = useState(null);
   const [pendingModeProj, setPendingModeProj] = useState(null);
 
-  // Loose task inline editing
+  // Loose task state
+  const [looseExpanded, setLooseExpanded] = useState(false);
   const [editingLooseId, setEditingLooseId] = useState(null);
   const [editingLooseText, setEditingLooseText] = useState("");
-  // Adding loose task
-  const [addingLoose, setAddingLoose] = useState(false);
-  const [newLooseText, setNewLooseText] = useState("");
-  const looseInputRef = useRef(null);
+  const [addingLooseBottom, setAddingLooseBottom] = useState(false);
+  const [newLooseBottomText, setNewLooseBottomText] = useState("");
+  const looseBottomRef = useRef(null);
+  const [addingLooseTop, setAddingLooseTop] = useState(false);
+  const [newLooseTopText, setNewLooseTopText] = useState("");
+  const looseTopRef = useRef(null);
+  const [removingLooseId, setRemovingLooseId] = useState(null);
+
+  const scrollRef = useRef(null);
+
+  // Keyboard scroll behavior — adjust padding when virtual keyboard opens
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const handler = () => {
+      const kbHeight = window.innerHeight - vv.height;
+      if (scrollRef.current) {
+        scrollRef.current.style.paddingBottom = kbHeight > 50 ? `${kbHeight + 20}px` : "";
+      }
+    };
+    vv.addEventListener("resize", handler);
+    return () => vv.removeEventListener("resize", handler);
+  }, []);
+
+  const scrollIntoView = useCallback((el) => {
+    if (el) setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "nearest" }), 50);
+  }, []);
 
   const domainProjects = projects.filter(p => p.domainId === activeDomain);
   const domain = domains.find(d => d.id === activeDomain);
   const activeCount = projects.filter(p => p.status === "active").length;
   const domainLoose = (data.looseTasks || []).filter(t => t.domainId === activeDomain && !t.done);
-
-  const allCollapsed = domainProjects.length > 0 && domainProjects.every(p => collapsedProjs.has(p.id));
-  const toggleAllCollapsed = () => {
-    if (allCollapsed) {
-      setCollapsedProjs(s => { const n = new Set(s); domainProjects.forEach(p => n.delete(p.id)); return n; });
-    } else {
-      setCollapsedProjs(s => { const n = new Set(s); domainProjects.forEach(p => n.add(p.id)); return n; });
-    }
-  };
 
   const toggleTask = (projectId, taskId) => setData(d => ({
     ...d, projects: d.projects.map(p =>
@@ -95,12 +110,16 @@ export default function ProjectsScreen({ data, setData }) {
 
   // ── Loose task helpers ──
   const toggleLoose = (id) => {
-    setData(d => ({
-      ...d,
-      looseTasks: (d.looseTasks || []).map(t =>
-        t.id === id ? { ...t, done: true, doneAt: new Date().toISOString() } : t
-      ),
-    }));
+    setRemovingLooseId(id);
+    setTimeout(() => {
+      setData(d => ({
+        ...d,
+        looseTasks: (d.looseTasks || []).map(t =>
+          t.id === id ? { ...t, done: true, doneAt: new Date().toISOString() } : t
+        ),
+      }));
+      setRemovingLooseId(null);
+    }, 300);
   };
 
   const saveLooseEdit = (id, text) => {
@@ -114,14 +133,31 @@ export default function ProjectsScreen({ data, setData }) {
     setEditingLooseText("");
   };
 
-  const addLooseTask = () => {
-    const trimmed = newLooseText.trim();
+  const addLooseTaskBottom = () => {
+    const trimmed = newLooseBottomText.trim();
     if (!trimmed) return;
     setData(d => ({
       ...d,
       looseTasks: [...(d.looseTasks || []), { id: uid(), domainId: activeDomain, text: trimmed, done: false, doneAt: null }],
     }));
-    setNewLooseText("");
+    setNewLooseBottomText("");
+  };
+
+  const addLooseTaskTop = () => {
+    const trimmed = newLooseTopText.trim();
+    if (!trimmed) return;
+    setData(d => ({
+      ...d,
+      looseTasks: [{ id: uid(), domainId: activeDomain, text: trimmed, done: false, doneAt: null }, ...(d.looseTasks || [])],
+    }));
+    setNewLooseTopText("");
+  };
+
+  const handlePlusTap = (e) => {
+    e.stopPropagation();
+    setLooseExpanded(true);
+    setAddingLooseTop(true);
+    setTimeout(() => { looseTopRef.current?.focus(); scrollIntoView(looseTopRef.current); }, 50);
   };
 
   return (
@@ -144,31 +180,14 @@ export default function ProjectsScreen({ data, setData }) {
           <button key={d.id}
             className={`domain-tab ${activeDomain === d.id ? "active" : ""}`}
             style={activeDomain === d.id ? { color: d.color, borderBottomColor: d.color } : {}}
-            onClick={() => { setActiveDomain(d.id); setCollapsedProjs(new Set()); setAddingLoose(false); setEditingLooseId(null); }}>
+            onClick={() => { setActiveDomain(d.id); setCollapsedProjs(new Set()); setLooseExpanded(false); setEditingLooseId(null); setAddingLooseTop(false); setAddingLooseBottom(false); }}>
             <div className="domain-tab-dot" style={{ background: activeDomain === d.id ? d.color : "var(--border)" }} />
             {d.name}
           </button>
         ))}
-        {domainProjects.length > 0 && (
-          <button
-            onClick={toggleAllCollapsed}
-            title={allCollapsed ? "Expand all" : "Collapse all"}
-            style={{ marginLeft:"auto", background:"none", border:"none", cursor:"pointer", padding:"0 14px", color:"var(--text3)", opacity:.7, flexShrink:0, display:"flex", alignItems:"center" }}
-          >
-            {allCollapsed ? (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            ) : (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <path d="M18 15l-6-6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            )}
-          </button>
-        )}
       </div>
 
-      <div className="scroll" style={{ paddingTop: 16 }}>
+      <div ref={scrollRef} className="scroll" style={{ paddingTop: 16 }}>
 
         {/* Mode picker for new project */}
         {pendingModeProj && (
@@ -204,7 +223,105 @@ export default function ProjectsScreen({ data, setData }) {
           </div>
         )}
 
-        {/* Project cards */}
+        {/* ── LOOSE TASKS CARD ── */}
+        <div className="loose-card">
+          <div className="loose-card-header" onClick={() => setLooseExpanded(!looseExpanded)}>
+            <span className="loose-card-label">Loose Tasks{domainLoose.length > 0 ? ` · ${domainLoose.length}` : ""}</span>
+            <div className="loose-card-plus" onClick={handlePlusTap}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></svg>
+            </div>
+          </div>
+          {looseExpanded && (
+            <div className="loose-card-body">
+              {/* Top add row (from + button) */}
+              {addingLooseTop && (
+                <div className="loose-domain-row">
+                  <div className="dotted-add-circle" />
+                  <input
+                    ref={looseTopRef}
+                    className="loose-domain-edit"
+                    placeholder="New task…"
+                    value={newLooseTopText}
+                    autoFocus
+                    onChange={e => setNewLooseTopText(e.target.value)}
+                    onFocus={e => scrollIntoView(e.target)}
+                    onKeyDown={e => {
+                      if (e.key === "Enter") {
+                        addLooseTaskTop();
+                        setTimeout(() => { looseTopRef.current?.focus(); }, 30);
+                      }
+                      if (e.key === "Escape") { setAddingLooseTop(false); setNewLooseTopText(""); }
+                    }}
+                    onBlur={() => { if (newLooseTopText.trim()) addLooseTaskTop(); setAddingLooseTop(false); setNewLooseTopText(""); }}
+                  />
+                </div>
+              )}
+
+              {/* Existing loose tasks */}
+              {domainLoose.map(t => (
+                <div key={t.id} className={`loose-domain-row${removingLooseId === t.id ? " loose-removing" : ""}`}>
+                  <div
+                    className={`loose-domain-check${removingLooseId === t.id ? " done" : ""}`}
+                    onClick={() => toggleLoose(t.id)}
+                  >
+                    {removingLooseId === t.id && <span style={{ fontSize: 10, color: "#fff", fontWeight: 700 }}>✓</span>}
+                  </div>
+                  {editingLooseId === t.id ? (
+                    <input
+                      className="loose-domain-edit"
+                      value={editingLooseText}
+                      autoFocus
+                      onFocus={e => scrollIntoView(e.target)}
+                      onChange={e => setEditingLooseText(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === "Enter") saveLooseEdit(t.id, editingLooseText);
+                        if (e.key === "Escape") { setEditingLooseId(null); setEditingLooseText(""); }
+                      }}
+                      onBlur={() => saveLooseEdit(t.id, editingLooseText)}
+                    />
+                  ) : (
+                    <span
+                      className={`loose-domain-text${removingLooseId === t.id ? " done" : ""}`}
+                      onClick={() => { if (removingLooseId) return; setEditingLooseId(t.id); setEditingLooseText(t.text); }}
+                      style={{ cursor: "text" }}
+                    >{t.text}</span>
+                  )}
+                </div>
+              ))}
+
+              {/* Bottom dotted circle add row */}
+              {addingLooseBottom ? (
+                <div className="dotted-add-row">
+                  <div className="dotted-add-circle" />
+                  <input
+                    ref={looseBottomRef}
+                    className="dotted-add-input"
+                    placeholder="New loose task…"
+                    value={newLooseBottomText}
+                    autoFocus
+                    onFocus={e => scrollIntoView(e.target)}
+                    onChange={e => setNewLooseBottomText(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === "Enter") {
+                        addLooseTaskBottom();
+                        setTimeout(() => looseBottomRef.current?.focus(), 30);
+                      }
+                      if (e.key === "Escape") { setAddingLooseBottom(false); setNewLooseBottomText(""); }
+                    }}
+                    onBlur={() => { if (newLooseBottomText.trim()) addLooseTaskBottom(); setAddingLooseBottom(false); setNewLooseBottomText(""); }}
+                  />
+                </div>
+              ) : (
+                <div className="dotted-add-row" onClick={() => { setAddingLooseBottom(true); setTimeout(() => looseBottomRef.current?.focus(), 30); }}>
+                  <div className="dotted-add-circle" />
+                  <span className="dotted-add-placeholder">Add task…</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ── PROJECT CARDS ── */}
         {domainProjects.map(proj => (
           <ProjectCard
             key={proj.id}
@@ -213,6 +330,7 @@ export default function ProjectsScreen({ data, setData }) {
             isExp={!collapsedProjs.has(proj.id)}
             newTaskText={newTaskText[proj.id] || ""}
             sessionLog={data.sessionLog || []}
+            scrollIntoView={scrollIntoView}
             onModeToggle={() => setData(d => ({ ...d, projects: d.projects.map(p => p.id === proj.id ? { ...p, mode: p.mode === "sessions" ? "tasks" : "sessions" } : p) }))}
             onToggleExpand={() => setCollapsedProjs(s => { const n = new Set(s); n.has(proj.id) ? n.delete(proj.id) : n.add(proj.id); return n; })}
             onToggleStatus={e => toggleStatus(proj.id, e)}
@@ -227,73 +345,10 @@ export default function ProjectsScreen({ data, setData }) {
           />
         ))}
 
-        {/* Loose Tasks for this domain — rendered after project cards */}
-        {(domainLoose.length > 0 || addingLoose) && (
-          <div className="loose-domain-label">Loose Tasks</div>
-        )}
-        {domainLoose.map(t => (
-          <div key={t.id} className="loose-domain-row" style={{ margin: "0 16px" }}>
-            <div className="loose-domain-check" onClick={() => toggleLoose(t.id)} />
-            {editingLooseId === t.id ? (
-              <input
-                className="loose-domain-edit"
-                value={editingLooseText}
-                autoFocus
-                onChange={e => setEditingLooseText(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === "Enter") saveLooseEdit(t.id, editingLooseText);
-                  if (e.key === "Escape") { setEditingLooseId(null); setEditingLooseText(""); }
-                }}
-                onBlur={() => saveLooseEdit(t.id, editingLooseText)}
-              />
-            ) : (
-              <span
-                className="loose-domain-text"
-                onClick={() => { setEditingLooseId(t.id); setEditingLooseText(t.text); }}
-                style={{ cursor: "text" }}
-              >{t.text}</span>
-            )}
-          </div>
-        ))}
-
-        {/* Dotted circle add row for loose tasks */}
-        {addingLoose ? (
-          <div className="dotted-add-row" style={{ margin: "0 16px" }}>
-            <div className="dotted-add-circle" />
-            <input
-              ref={looseInputRef}
-              className="dotted-add-input"
-              placeholder="New loose task…"
-              value={newLooseText}
-              autoFocus
-              onChange={e => setNewLooseText(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === "Enter") {
-                  addLooseTask();
-                  setTimeout(() => looseInputRef.current?.focus(), 30);
-                }
-                if (e.key === "Escape") { setAddingLoose(false); setNewLooseText(""); }
-              }}
-              onBlur={() => { if (newLooseText.trim()) addLooseTask(); setAddingLoose(false); setNewLooseText(""); }}
-            />
-          </div>
-        ) : (
-          <div className="dotted-add-row" style={{ margin: "0 16px" }} onClick={() => { setAddingLoose(true); setTimeout(() => looseInputRef.current?.focus(), 30); }}>
-            <div className="dotted-add-circle" />
-            <span className="dotted-add-placeholder">Add loose task…</span>
-          </div>
-        )}
-
-        {/* Add project button */}
-        <div className="add-proj-row" onClick={addProject}>
-          <span className="add-proj-ico">+</span>
-          <span className="add-proj-txt">Add project</span>
-        </div>
-
         <div className="spacer" />
       </div>
 
-      {showManage && <ProjectsManageSheet data={data} setData={setData} onClose={() => setShowManage(false)} />}
+      {showManage && <ProjectsManageSheet data={data} setData={setData} onClose={() => setShowManage(false)} onAddProject={addProject} />}
     </div>
   );
 }

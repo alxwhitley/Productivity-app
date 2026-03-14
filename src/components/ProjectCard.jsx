@@ -9,7 +9,7 @@ const PROJ_COLORS = DOMAIN_COLORS;
 function ProjectCard({ proj, domain, isExp, newTaskText,
   onToggleExpand, onToggleStatus, onDelete, onEditSave,
   onToggleTask, onDeleteTask, onSaveTask, onNewTaskChange, onAddTask, autoFocus,
-  sessionLog, onModeToggle }) {
+  sessionLog, onModeToggle, scrollIntoView }) {
   const isSessionMode = proj.mode === "sessions";
   const [addingTask, setAddingTask] = useState(false);
   const [newText, setNewText] = useState("");
@@ -22,7 +22,6 @@ function ProjectCard({ proj, domain, isExp, newTaskText,
   const [draftName, setDraftName] = useState(proj.name);
   const [draftColor, setDraftColor] = useState(domain?.color || PROJ_COLORS[0]);
   const startX = useRef(null);
-  // Two-button reveal: Session toggle(blue) 80px + Delete(red) 80px = 160px
   const MAX = 160; const SNAP = 60;
 
   const onTouchStart = e => { startX.current = e.touches[0].clientX; };
@@ -37,8 +36,6 @@ function ProjectCard({ proj, domain, isExp, newTaskText,
     startX.current = null;
   };
 
-
-
   useEffect(() => {
     if (autoFocus) {
       setTimeout(() => { nameInputRef.current?.focus(); nameInputRef.current?.select(); }, 80);
@@ -50,6 +47,10 @@ function ProjectCard({ proj, domain, isExp, newTaskText,
       onEditSave({ name: draftName.trim() || proj.name });
       setShowEdit(false);
     }
+  };
+
+  const doScrollIntoView = (el) => {
+    if (scrollIntoView && el) scrollIntoView(el);
   };
 
   return (
@@ -94,6 +95,7 @@ function ProjectCard({ proj, domain, isExp, newTaskText,
                 onChange={e => setDraftName(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter") handleSaveEdit(); if (e.key === "Escape") setShowEdit(false); }}
                 onBlur={handleSaveEdit}
+                onFocus={e => doScrollIntoView(e.target)}
                 onClick={e => e.stopPropagation()}
               />
             ) : (
@@ -116,7 +118,7 @@ function ProjectCard({ proj, domain, isExp, newTaskText,
             const weekSessions = projSessions.filter(s => new Date(s.date) >= weekStart);
             const weekMins = weekSessions.reduce((a,s) => a + (s.durationMin||0), 0);
             const weekHrs = (weekMins/60).toFixed(1);
-            const weekTarget = 10; // soft weekly hours target for session projects
+            const weekTarget = 10;
             const barPct = Math.min((weekMins/60) / weekTarget * 100, 100);
             return (
               <>
@@ -142,8 +144,6 @@ function ProjectCard({ proj, domain, isExp, newTaskText,
           )}
         </div>
       </div>
-
-
 
       {/* Tasks / Session Log */}
       {isExp && (
@@ -181,6 +181,7 @@ function ProjectCard({ proj, domain, isExp, newTaskText,
               onToggle={() => onToggleTask(t.id)}
               onDelete={() => onDeleteTask(t.id)}
               onSave={text => onSaveTask(t.id, text)}
+              scrollIntoView={doScrollIntoView}
             />
           ))}
           {addingTask ? (
@@ -192,6 +193,7 @@ function ProjectCard({ proj, domain, isExp, newTaskText,
                 placeholder="New task…"
                 value={newText}
                 autoFocus
+                onFocus={e => doScrollIntoView(e.target)}
                 onChange={e => setNewText(e.target.value)}
                 onKeyDown={e => {
                   if (e.key === "Enter") {
@@ -209,9 +211,6 @@ function ProjectCard({ proj, domain, isExp, newTaskText,
               <span className="dotted-add-placeholder">Add task…</span>
             </div>
           )}
-
-          {/* Work Now button removed — blocks are deep work slots only */}
-
         </>
         )}
         </div>

@@ -3,7 +3,7 @@ import { DOMAIN_COLORS } from "../constants.js";
 import { uid } from "../utils.js";
 import useSwipeDown from "../useSwipeDown.js";
 
-function ProjectsManageSheet({ data, setData, onClose }) {
+function ProjectsManageSheet({ data, setData, onClose, onAddProject }) {
   const swipe = useSwipeDown(onClose);
   const { domains, projects } = data;
   const COLORS = DOMAIN_COLORS;
@@ -12,11 +12,6 @@ function ProjectsManageSheet({ data, setData, onClose }) {
   const [catEdits, setCatEdits] = useState(domains.map(d => ({ ...d })));
   const [newCatName, setNewCatName] = useState("");
   const [newCatColor, setNewCatColor] = useState(COLORS[0]);
-
-  // ── New project state ──
-  const [newProjName, setNewProjName] = useState("");
-  const [newProjDomain, setNewProjDomain] = useState(domains[0]?.id || "");
-  const [newProjColor, setNewProjColor] = useState("");
 
   // ── Project edits ──
   const [projEdits, setProjEdits] = useState(projects.map(p => ({ id: p.id, name: p.name, domainId: p.domainId })));
@@ -32,14 +27,6 @@ function ProjectsManageSheet({ data, setData, onClose }) {
   };
 
   const removeCat = (id) => setCatEdits(cs => cs.filter(c => c.id !== id));
-
-  const addProject = () => {
-    const name = newProjName.trim();
-    if (!name || !newProjDomain) return;
-    const newP = { id: uid(), domainId: newProjDomain, name, status: "active", tasks: [] };
-    setData(d => ({ ...d, projects: [...d.projects, newP] }));
-    setNewProjName("");
-  };
 
   const updateProjEdit = (id, field, val) => setProjEdits(ps => ps.map(p => p.id === id ? { ...p, [field]: val } : p));
 
@@ -95,14 +82,12 @@ function ProjectsManageSheet({ data, setData, onClose }) {
           )}
 
           {/* ── ADD PROJECT ── */}
-          <div className="set-section" style={{ marginTop:20 }}>Add New Project</div>
-          <div style={{ background:"var(--bg3)", borderRadius:10, padding:"10px 12px" }}>
-            <input className="set-input" placeholder="Project name…" value={newProjName} onChange={e => setNewProjName(e.target.value)} style={{ marginBottom:8 }} />
-            <select className="form-select" value={newProjDomain} onChange={e => setNewProjDomain(e.target.value)} style={{ marginBottom:8 }}>
-              {catEdits.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-            <button className="form-btn" style={{ marginTop:0 }} disabled={!newProjName.trim()} onClick={addProject}>Add Project</button>
-          </div>
+          {onAddProject && (
+            <>
+              <div className="set-section" style={{ marginTop:20 }}>New Project</div>
+              <button className="form-btn" style={{ marginTop:0 }} onClick={() => { onClose(); setTimeout(() => onAddProject(), 100); }}>+ Add Project</button>
+            </>
+          )}
 
           {/* ── EDIT EXISTING PROJECTS ── */}
           <div className="set-section" style={{ marginTop:20 }}>Edit Projects</div>

@@ -3,6 +3,7 @@ import { fmtTime, toISODate, uid, getRoutinesForDate } from "../utils.js";
 import { getDeepSlots } from "../constants.js";
 import StatusBar from "../components/StatusBar.jsx";
 import TodaySettingsSheet from "../sheets/TodaySettingsSheet.jsx";
+import ShutdownSheet from "../sheets/ShutdownSheet.jsx";
 
 // Bio-phase definitions (hardcoded wake 7am)
 const BIO_PHASES = [
@@ -12,6 +13,13 @@ const BIO_PHASES = [
   { id: "wind", label: "Wind Down", icon: "\uD83C\uDF19", startMin: 1020, endMin: 1260 },
 ];
 const BIO_TOTAL = 840; // 7am–9pm in minutes
+
+// Fixed deep work slots: 2 under Mental Peak, 1 under Second Wind
+const FIXED_DW_SLOTS = [
+  { slotIndex: 0, startHour: 9, startMin: 0, durationMin: 90, phase: "peak" },
+  { slotIndex: 1, startHour: 11, startMin: 0, durationMin: 90, phase: "peak" },
+  { slotIndex: 2, startHour: 13, startMin: 0, durationMin: 90, phase: "second" },
+];
 
 function getPhaseForMins(mins) {
   for (const p of BIO_PHASES) {
@@ -72,6 +80,8 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
   const [planningMode, setPlanningMode] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [dayPlanOpen, setDayPlanOpen] = useState(false);
+  const [shutdownOpen, setShutdownOpen] = useState(false);
+  const [shallowExpanded, setShallowExpanded] = useState(false);
 
   const scrollRef = useRef(null);
 
@@ -240,17 +250,10 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
   const viewDateKeyISO = viewingTomorrow ? tomorrowDateKeyISO : dateKeyISO;
   viewDateKeyISO_ref.current = viewDateKeyISO;
 
-  const deepDefaults = getDeepSlots(data);
   const savedDWSlots = (data.deepWorkSlots || {})[viewDateKeyISO] || [];
-  const maxDeepBlocks = data.deepWorkTargets?.maxDeepBlocks ?? 3;
-  const filledSlots = ((data.deepWorkSlots || {})[dateKeyISO] || []).filter(s => s && s.projectId).length;
-  const isPlanned = filledSlots >= maxDeepBlocks;
 
-  const todayRoutines = getRoutinesForDate(data.routineBlocks || [], today);
-  const viewRoutines = viewingTomorrow ? getRoutinesForDate(data.routineBlocks || [], tomorrow) : todayRoutines;
-
-  const todayDWSlots = Array.from({ length: maxDeepBlocks }, (_, i) => {
-    const def = deepDefaults[i] || deepDefaults[deepDefaults.length - 1];
+  // Build the 3 fixed deep work slots
+  const todayDWSlots = FIXED_DW_SLOTS.map((def, i) => {
     const saved = savedDWSlots[i] || {};
     return {
       id: `dw-${viewDateKeyISO}-${i}`,
@@ -260,8 +263,14 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
       durationMin: saved.durationMin ?? def.durationMin,
       projectId: saved.projectId || null,
       todayTasks: saved.todayTasks || null,
+      phase: def.phase,
     };
   });
+
+  const allAssigned = todayDWSlots.every(s => !!s.projectId);
+
+  const todayRoutines = getRoutinesForDate(data.routineBlocks || [], today);
+  const viewRoutines = viewingTomorrow ? getRoutinesForDate(data.routineBlocks || [], tomorrow) : todayRoutines;
 
   const timeline = [
     ...viewRoutines.map(r => ({ type: "routine", id: r.id, mins: r.startHour * 60 + r.startMin, data: r })),
@@ -285,28 +294,52 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
   const greeting = now.getHours() < 12 ? "Good morning" : now.getHours() < 17 ? "Good afternoon" : "Good evening";
   const name = data.todayPrefs?.name;
 
-  // ── Deep work progress ──
-  const dwMinutesCompleted = (data.blockCompletions || [])
-    .filter(c => c.date === todayStr)
-    .reduce((sum, c) => sum + (c.durationMin || 0), 0);
-  const dwGoalHrs = data.deepWorkTargets?.dailyHours || 4;
-  const dwGoalMin = dwGoalHrs * 60;
-  const dwPct = Math.min(100, Math.round(dwMinutesCompleted / dwGoalMin * 100));
-  const dwHrs = Math.floor(dwMinutesCompleted / 60);
-  const dwRemMin = dwMinutesCompleted % 60;
-  const dwLabel = [dwHrs > 0 ? `${dwHrs} hr` : null, dwRemMin > 0 ? `${dwRemMin} min` : null].filter(Boolean).join(" ") || "0 min";
-
   // ── Bio bar position ──
   const barPct = Math.max(0, Math.min(100, (nowMins - 420) / BIO_TOTAL * 100));
 
-  // ── Group timeline by phase ──
-  const groupedBlocks = BIO_PHASES.map(phase => ({
-    ...phase,
-    items: timeline.filter(item => {
-      const m = item.mins;
-      return m >= phase.startMin && m < phase.endMin;
-    }),
-  })).filter(g => g.items.length > 0);
+  // ── Shallow work tasks ──
+  const todayISO = toISODate();
+  const shallowTasks = (data.shallowWork || {})[todayISO] || [];
+  const shallowUndone = shallowTasks.filter(t => !t.done).length;
+  const shallowCount = shallowTasks.length;
+
+  const toggleShallowTask = (taskId) => {
+    setData(d => {
+      const sw = { ...(d.shallowWork || {}) };
+      const tasks = (sw[todayISO] || []).map(t =>
+        t.id === taskId ? { ...t, done: !t.done, doneAt: !t.done ? new Date().toISOString() : null } : t
+      );
+      return { ...d, shallowWork: { ...sw, [todayISO]: tasks } };
+    });
+  };
+
+  // ── Shutdown visibility: show at 12pm+ ──
+  const showShutdownFooter = !viewingTomorrow && nowMins >= 720;
+  const shutdownDoneToday = data.shutdownDone && data.shutdownDate === todayISO;
+
+  // ── Group blocks by phase ──
+  // For deep work we use fixed phase assignments; for routines we compute from time
+  const groupedBlocks = BIO_PHASES.map(phase => {
+    const items = [];
+    // Add routines in this phase
+    viewRoutines.forEach(r => {
+      const m = r.startHour * 60 + r.startMin;
+      if (m >= phase.startMin && m < phase.endMin) {
+        items.push({ type: "routine", id: r.id, mins: m, data: r });
+      }
+    });
+    // Add deep work slots assigned to this phase
+    todayDWSlots.forEach(s => {
+      if (s.phase === phase.id) {
+        items.push({ type: "deepwork", id: s.id, mins: s.startHour * 60 + s.startMin, data: s });
+      }
+    });
+    items.sort((a, b) => a.mins - b.mins);
+    return { ...phase, items };
+  });
+
+  // Determine which phases have content (blocks or shallow banner)
+  const hasShallowContent = shallowCount > 0;
 
   // ── Render helpers ──
 
@@ -374,12 +407,14 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
     return (
       <div key={slot.id} className="work-card" style={{
         background: "var(--bg2)",
-        border: "1.5px dashed var(--border)",
+        border: "1.5px dashed rgba(255,255,255,.1)",
       }} onClick={() => setExpandedId(isExp ? null : slot.id)}>
         {!isExp ? (
-          <div style={{ padding: "18px 16px", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 6 }}>
+          <div style={{ padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="var(--text3)" strokeWidth="2" strokeLinecap="round" opacity=".3"/></svg>
-            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".07em", textTransform: "uppercase", color: "var(--text3)", opacity: .5 }}>Deep Work Block</span>
+            <div style={{ flex: 1 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".07em", textTransform: "uppercase", color: "var(--text3)", opacity: .5 }}>Deep Work Block</span>
+            </div>
             <span style={{ fontSize: 11, color: "var(--text3)", opacity: .4 }}>{data.todayPrefs?.hideTimes ? "" : fmtTime(slot.startHour, slot.startMin) + " · "}{slot.durationMin} min</span>
           </div>
         ) : (
@@ -760,9 +795,9 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
   // ══════ RENDER ══════
 
   return (
-    <div className="screen active">
+    <div className="screen active" style={{ display: "flex", flexDirection: "column" }}>
       <StatusBar />
-      <div ref={scrollRef} className="scroll" style={{ paddingBottom: 100 }}>
+      <div ref={scrollRef} className="scroll" style={{ flex: 1, paddingBottom: showShutdownFooter ? 70 : 100 }}>
 
         {/* ── HEADER ── */}
         <div style={{ padding: "14px 24px 10px" }}>
@@ -787,7 +822,6 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
                 }
               </div>
             </div>
-            {/* Gear icon */}
             <button onClick={() => setSettingsOpen(true)}
               style={{ background: "none", border: "none", cursor: "pointer", padding: 4, color: "var(--text3)", marginTop: 2 }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -797,18 +831,6 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
             </button>
           </div>
         </div>
-
-        {/* ── DEEP WORK PROGRESS ── */}
-        {!viewingTomorrow && (
-          <div style={{ padding: "0 24px 12px", textAlign: "center" }}>
-            <div style={{ fontSize: 12, color: "var(--text3)" }}>
-              {dwLabel} deep work · {dwGoalHrs} hr goal
-            </div>
-            <div style={{ height: 4, background: "var(--bg4)", borderRadius: 2, marginTop: 6, overflow: "hidden" }}>
-              <div style={{ height: "100%", background: "var(--blue)", borderRadius: 2, width: `${dwPct}%`, transition: "width .5s" }} />
-            </div>
-          </div>
-        )}
 
         {/* ── BIO-PHASE BAR ── */}
         {!viewingTomorrow && (
@@ -824,6 +846,20 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
               <div style={{ position: "absolute", left: 0, top: 0, height: "100%", background: "var(--accent)", borderRadius: 2, width: `${barPct}%` }} />
               <div className="work-bio-dot" style={{ left: `${barPct}%` }} />
             </div>
+          </div>
+        )}
+
+        {/* ── PLAN MY DAY BANNER ── */}
+        {!viewingTomorrow && !allAssigned && (
+          <div style={{ margin: "0 16px", padding: "10px 0", borderTop: "1px solid var(--border2)", borderBottom: "1px solid var(--border2)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={{ fontSize: 12, color: "var(--text3)" }}>Plan your focus blocks</span>
+            <button onClick={() => {
+              setPlanningMode(true);
+              const firstEmpty = todayDWSlots.find(s => !s.projectId);
+              if (firstEmpty) setExpandedId(firstEmpty.id);
+            }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "var(--accent)", fontFamily: "'DM Sans',sans-serif", padding: 0 }}>
+              Plan My Day →
+            </button>
           </div>
         )}
 
@@ -854,57 +890,77 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
           </div>
         )}
 
-        {/* ── PLAN MY DAY CTA ── */}
-        {!viewingTomorrow && !isPlanned && (
-          <div onClick={() => {
-            setPlanningMode(true);
-            const firstEmpty = todayDWSlots.find(s => !s.projectId);
-            if (firstEmpty) setExpandedId(firstEmpty.id);
-          }} style={{ margin: "0 16px 12px", background: "var(--bg2)", borderRadius: 14, borderLeft: "4px solid var(--accent)", padding: "14px 16px", cursor: "pointer" }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", lineHeight: 1.3 }}>Plan your deep work</div>
-            <div style={{ fontSize: 12, color: "var(--text2)", marginTop: 4 }}>Assign your focus blocks for today</div>
-            <button onClick={e => {
-              e.stopPropagation();
-              setPlanningMode(true);
-              const firstEmpty = todayDWSlots.find(s => !s.projectId);
-              if (firstEmpty) setExpandedId(firstEmpty.id);
-            }} style={{ display: "block", width: "100%", marginTop: 12, padding: "12px 0", background: "var(--accent)", color: "#000", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 700, fontFamily: "'DM Sans',sans-serif", cursor: "pointer" }}>
-              Plan My Day →
-            </button>
-          </div>
-        )}
-
         {/* ── BLOCKS BY PHASE ── */}
-        {timeline.length === 0 && (
+        {timeline.length === 0 && !hasShallowContent && (
           <div style={{ textAlign: "center", padding: "40px 24px", fontSize: 13, color: "var(--text3)" }}>
             No blocks today.
           </div>
         )}
 
-        {groupedBlocks.map(group => (
-          <div key={group.id}>
-            {/* Phase header */}
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "16px 16px 6px" }}>
-              <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "var(--text3)", whiteSpace: "nowrap", letterSpacing: ".06em" }}>
-                {group.icon} {group.label}
-              </span>
-              <div style={{ flex: 1, height: 1, background: "var(--border2)" }} />
+        {groupedBlocks.map(group => {
+          const hasItems = group.items.length > 0;
+          const isShallowPhase = group.id === "shallow";
+          const showShallowBanner = isShallowPhase && shallowCount > 0;
+
+          if (!hasItems && !showShallowBanner) return null;
+
+          return (
+            <div key={group.id}>
+              {/* Phase header */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "16px 16px 6px" }}>
+                <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "var(--text3)", whiteSpace: "nowrap", letterSpacing: ".06em" }}>
+                  {group.icon} {group.label}
+                </span>
+                <div style={{ flex: 1, height: 1, background: "var(--border2)" }} />
+              </div>
+
+              {/* Block cards */}
+              {group.items.map(item => {
+                const isNow = !viewingTomorrow && currentItem?.id === item.id;
+                if (item.type === "routine") return renderRoutineCard(item, isNow);
+                if (item.type === "deepwork") {
+                  const slot = item.data;
+                  if (!slot.projectId) return renderUnassignedCard(slot);
+                  return renderAssignedCard(slot);
+                }
+                return null;
+              })}
+
+              {/* Shallow work banner under shallow phase */}
+              {showShallowBanner && (
+                <div style={{ margin: "0 12px 8px" }}>
+                  <div
+                    onClick={() => setShallowExpanded(!shallowExpanded)}
+                    style={{ background: "var(--bg2)", borderRadius: 10, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}
+                  >
+                    <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>Loose Tasks</span>
+                    {shallowCount > 0 && (
+                      <span style={{ fontSize: 12, fontWeight: 700, color: "var(--accent)", background: "rgba(232,160,48,.12)", borderRadius: 12, padding: "2px 8px" }}>
+                        {shallowUndone > 0 ? shallowUndone : shallowCount}
+                      </span>
+                    )}
+                  </div>
+                  {shallowExpanded && (
+                    <div style={{ background: "var(--bg2)", borderRadius: "0 0 10px 10px", marginTop: -2, padding: "0 16px 8px" }}>
+                      {shallowTasks.map((t, i) => (
+                        <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderTop: "1px solid var(--border2)", cursor: "pointer" }}
+                          onClick={() => toggleShallowTask(t.id)}>
+                          <div className={`tl-check ${t.done ? "done" : ""}`} style={{ width: 20, height: 20, flexShrink: 0 }}>
+                            {t.done && <span style={{ fontSize: 10, color: "#fff", fontWeight: 700 }}>✓</span>}
+                          </div>
+                          <span style={{ fontSize: 14, color: t.done ? "var(--text3)" : "var(--text)", textDecoration: t.done ? "line-through" : "none", flex: 1 }}>{t.text}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
+          );
+        })}
 
-            {/* Cards */}
-            {group.items.map(item => {
-              const isNow = !viewingTomorrow && currentItem?.id === item.id;
-
-              if (item.type === "routine") return renderRoutineCard(item, isNow);
-              if (item.type === "deepwork") {
-                const slot = item.data;
-                if (!slot.projectId) return renderUnassignedCard(slot);
-                return renderAssignedCard(slot);
-              }
-              return null;
-            })}
-          </div>
-        ))}
+        {/* Render shallow phase header + banner if no blocks exist in shallow but there are shallow tasks */}
+        {shallowCount > 0 && !groupedBlocks.some(g => g.id === "shallow" && (g.items.length > 0 || true)) ? null : null}
 
         {/* ── TOMORROW PILL ── */}
         {!viewingTomorrow && (
@@ -916,26 +972,48 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
           </div>
         )}
 
-        {/* ── SHUTDOWN STATUS ── */}
-        {(() => {
-          const todayISO = toISODate();
-          if (data.shutdownDone && data.shutdownDate === todayISO) {
-            return (
-              <div style={{ margin: "0 16px 24px", padding: "14px 18px", borderRadius: 14, border: "1px solid rgba(69,193,122,.2)", background: "rgba(69,193,122,.06)", display: "flex", alignItems: "center", gap: 12 }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                <span style={{ fontSize: 14, fontWeight: 700, color: "var(--green)" }}>Shutdown complete</span>
-              </div>
-            );
-          }
-          return null;
-        })()}
-
         <div className="spacer" />
       </div>
+
+      {/* ── SHUTDOWN RITUAL FOOTER ── */}
+      {showShutdownFooter && (
+        <div style={{ background: "var(--bg2)", borderTop: "1px solid var(--border)", padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: shutdownDoneToday ? "center" : "space-between" }}>
+          {shutdownDoneToday ? (
+            <span style={{ fontSize: 13, color: "var(--green)", fontWeight: 600 }}>✓ Day complete</span>
+          ) : (
+            <>
+              <span style={{ fontSize: 14, color: "var(--text)" }}>🌙 Shutdown Ritual</span>
+              <button onClick={() => setShutdownOpen(true)}
+                style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "var(--accent)", fontFamily: "'DM Sans',sans-serif", padding: 0 }}>
+                Begin →
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       {/* ── SETTINGS SHEET ── */}
       {settingsOpen && (
         <TodaySettingsSheet data={data} setData={setData} onClose={() => setSettingsOpen(false)} />
+      )}
+
+      {/* ── SHUTDOWN SHEET ── */}
+      {shutdownOpen && (
+        <ShutdownSheet
+          data={data}
+          alreadyDone={shutdownDoneToday}
+          onClose={() => setShutdownOpen(false)}
+          onComplete={() => {
+            setData(d => ({ ...d, shutdownDone: true, shutdownDate: todayISO }));
+            setShutdownOpen(false);
+          }}
+          onCategorizeLoose={(taskId, domainId) => {
+            setData(d => ({
+              ...d,
+              looseTasks: (d.looseTasks || []).map(t => t.id === taskId ? { ...t, domainId } : t),
+            }));
+          }}
+        />
       )}
 
       {/* ── CELEBRATION OVERLAY ── */}
