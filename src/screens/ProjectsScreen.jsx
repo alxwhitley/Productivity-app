@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { uid } from "../utils.js";
 import GearIcon from "../components/GearIcon.jsx";
 import StatusBar from "../components/StatusBar.jsx";
@@ -12,19 +12,26 @@ export default function ProjectsScreen({ data, setData }) {
   const [newTaskText, setNewTaskText] = useState({});
   const [showManage, setShowManage] = useState(false);
   const [newProjId, setNewProjId] = useState(null);
-  const [pendingModeProj, setPendingModeProj] = useState(null); // { id, name, domainId } — awaiting mode pick
+  const [pendingModeProj, setPendingModeProj] = useState(null);
+
+  // Loose task inline editing
+  const [editingLooseId, setEditingLooseId] = useState(null);
+  const [editingLooseText, setEditingLooseText] = useState("");
+  // Adding loose task
+  const [addingLoose, setAddingLoose] = useState(false);
+  const [newLooseText, setNewLooseText] = useState("");
+  const looseInputRef = useRef(null);
 
   const domainProjects = projects.filter(p => p.domainId === activeDomain);
   const domain = domains.find(d => d.id === activeDomain);
   const activeCount = projects.filter(p => p.status === "active").length;
+  const domainLoose = (data.looseTasks || []).filter(t => t.domainId === activeDomain && !t.done);
 
   const allCollapsed = domainProjects.length > 0 && domainProjects.every(p => collapsedProjs.has(p.id));
   const toggleAllCollapsed = () => {
     if (allCollapsed) {
-      // expand all — remove all domain projects from collapsed set
       setCollapsedProjs(s => { const n = new Set(s); domainProjects.forEach(p => n.delete(p.id)); return n; });
     } else {
-      // collapse all — add all domain projects to collapsed set
       setCollapsedProjs(s => { const n = new Set(s); domainProjects.forEach(p => n.add(p.id)); return n; });
     }
   };
@@ -73,7 +80,6 @@ export default function ProjectsScreen({ data, setData }) {
   };
 
   const addProject = () => {
-    // Stage project — wait for mode picker before creating
     setPendingModeProj({ id: uid(), domainId: activeDomain, name: "", status: "backlog", tasks: [] });
   };
 
@@ -86,6 +92,37 @@ export default function ProjectsScreen({ data, setData }) {
   };
 
   const cancelNewProject = () => setPendingModeProj(null);
+
+  // ── Loose task helpers ──
+  const toggleLoose = (id) => {
+    setData(d => ({
+      ...d,
+      looseTasks: (d.looseTasks || []).map(t =>
+        t.id === id ? { ...t, done: true, doneAt: new Date().toISOString() } : t
+      ),
+    }));
+  };
+
+  const saveLooseEdit = (id, text) => {
+    const trimmed = text.trim();
+    if (!trimmed) {
+      setData(d => ({ ...d, looseTasks: (d.looseTasks || []).filter(t => t.id !== id) }));
+    } else {
+      setData(d => ({ ...d, looseTasks: (d.looseTasks || []).map(t => t.id === id ? { ...t, text: trimmed } : t) }));
+    }
+    setEditingLooseId(null);
+    setEditingLooseText("");
+  };
+
+  const addLooseTask = () => {
+    const trimmed = newLooseText.trim();
+    if (!trimmed) return;
+    setData(d => ({
+      ...d,
+      looseTasks: [...(d.looseTasks || []), { id: uid(), domainId: activeDomain, text: trimmed, done: false, doneAt: null }],
+    }));
+    setNewLooseText("");
+  };
 
   return (
     <div className="screen active">
@@ -101,13 +138,13 @@ export default function ProjectsScreen({ data, setData }) {
         <div className="ph-sub">{activeCount} active · {projects.length - activeCount} in backlog</div>
       </div>
 
-      {/* DOMAIN TABS — edge-to-edge nav */}
+      {/* DOMAIN TABS */}
       <div className="domain-tabs" style={{ position:"relative" }}>
         {domains.map(d => (
           <button key={d.id}
             className={`domain-tab ${activeDomain === d.id ? "active" : ""}`}
             style={activeDomain === d.id ? { color: d.color, borderBottomColor: d.color } : {}}
-            onClick={() => { setActiveDomain(d.id); setCollapsedProjs(new Set()); }}>
+            onClick={() => { setActiveDomain(d.id); setCollapsedProjs(new Set()); setAddingLoose(false); setEditingLooseId(null); }}>
             <div className="domain-tab-dot" style={{ background: activeDomain === d.id ? d.color : "var(--border)" }} />
             {d.name}
           </button>
@@ -131,17 +168,13 @@ export default function ProjectsScreen({ data, setData }) {
         )}
       </div>
 
-      <div className="scroll" style={{ paddingTop: 16 }} onClick={() => {}}>
+      <div className="scroll" style={{ paddingTop: 16 }}>
 
-
-
-
-        {/* Mode picker — appears inline when adding a new project */}
+        {/* Mode picker for new project */}
         {pendingModeProj && (
           <div style={{ margin:"0 16px 8px", borderRadius:14, background:"var(--bg2)", border:"1px solid var(--border)", padding:"16px" }}>
             <div style={{ fontSize:12, fontWeight:700, color:"var(--text3)", letterSpacing:".06em", textTransform:"uppercase", marginBottom:12, textAlign:"center" }}>How will you work on this?</div>
             <div style={{ display:"flex", gap:10 }}>
-              {/* Tasks option */}
               <button
                 onClick={() => confirmNewProject("tasks")}
                 style={{ flex:1, background:"var(--bg3)", border:"1px solid var(--border)", borderRadius:12, padding:"14px 10px", cursor:"pointer", textAlign:"left", fontFamily:"'DM Sans',sans-serif" }}
@@ -154,7 +187,6 @@ export default function ProjectsScreen({ data, setData }) {
                 </div>
                 <div style={{ fontSize:11, color:"var(--text3)", lineHeight:1.4 }}>Discrete work with a clear finish line. Build a list, check things off, measure progress.</div>
               </button>
-              {/* Sessions option */}
               <button
                 onClick={() => confirmNewProject("sessions")}
                 style={{ flex:1, background:"var(--bg3)", border:"1px solid var(--border)", borderRadius:12, padding:"14px 10px", cursor:"pointer", textAlign:"left", fontFamily:"'DM Sans',sans-serif" }}
@@ -172,6 +204,7 @@ export default function ProjectsScreen({ data, setData }) {
           </div>
         )}
 
+        {/* Project cards */}
         {domainProjects.map(proj => (
           <ProjectCard
             key={proj.id}
@@ -194,26 +227,62 @@ export default function ProjectsScreen({ data, setData }) {
           />
         ))}
 
-        {/* Loose Tasks for this domain */}
-        {(() => {
-          const domainLoose = (data.looseTasks || []).filter(t => t.domainId === activeDomain && !t.done);
-          if (domainLoose.length === 0) return null;
-          return (
-            <div className="loose-section">
-              <div className="loose-header">
-                <span className="loose-title">Loose Tasks</span>
-                <span className="loose-count">{domainLoose.length}</span>
-              </div>
-              {domainLoose.map(t => (
-                <div key={t.id} className="loose-task-row"
-                  onClick={() => setData(d => ({ ...d, looseTasks: (d.looseTasks||[]).map(lt => lt.id === t.id ? { ...lt, done: true, doneAt: new Date().toISOString() } : lt) }))}>
-                  <div className="loose-check" />
-                  <span className="loose-task-text">{t.text}</span>
-                </div>
-              ))}
-            </div>
-          );
-        })()}
+        {/* Loose Tasks for this domain — rendered after project cards */}
+        {(domainLoose.length > 0 || addingLoose) && (
+          <div className="loose-domain-label">Loose Tasks</div>
+        )}
+        {domainLoose.map(t => (
+          <div key={t.id} className="loose-domain-row" style={{ margin: "0 16px" }}>
+            <div className="loose-domain-check" onClick={() => toggleLoose(t.id)} />
+            {editingLooseId === t.id ? (
+              <input
+                className="loose-domain-edit"
+                value={editingLooseText}
+                autoFocus
+                onChange={e => setEditingLooseText(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === "Enter") saveLooseEdit(t.id, editingLooseText);
+                  if (e.key === "Escape") { setEditingLooseId(null); setEditingLooseText(""); }
+                }}
+                onBlur={() => saveLooseEdit(t.id, editingLooseText)}
+              />
+            ) : (
+              <span
+                className="loose-domain-text"
+                onClick={() => { setEditingLooseId(t.id); setEditingLooseText(t.text); }}
+                style={{ cursor: "text" }}
+              >{t.text}</span>
+            )}
+          </div>
+        ))}
+
+        {/* Dotted circle add row for loose tasks */}
+        {addingLoose ? (
+          <div className="dotted-add-row" style={{ margin: "0 16px" }}>
+            <div className="dotted-add-circle" />
+            <input
+              ref={looseInputRef}
+              className="dotted-add-input"
+              placeholder="New loose task…"
+              value={newLooseText}
+              autoFocus
+              onChange={e => setNewLooseText(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === "Enter") {
+                  addLooseTask();
+                  setTimeout(() => looseInputRef.current?.focus(), 30);
+                }
+                if (e.key === "Escape") { setAddingLoose(false); setNewLooseText(""); }
+              }}
+              onBlur={() => { if (newLooseText.trim()) addLooseTask(); setAddingLoose(false); setNewLooseText(""); }}
+            />
+          </div>
+        ) : (
+          <div className="dotted-add-row" style={{ margin: "0 16px" }} onClick={() => { setAddingLoose(true); setTimeout(() => looseInputRef.current?.focus(), 30); }}>
+            <div className="dotted-add-circle" />
+            <span className="dotted-add-placeholder">Add loose task…</span>
+          </div>
+        )}
 
         {/* Add project button */}
         <div className="add-proj-row" onClick={addProject}>

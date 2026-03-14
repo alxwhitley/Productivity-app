@@ -12,6 +12,7 @@ function ProjectCard({ proj, domain, isExp, newTaskText,
   sessionLog, onModeToggle }) {
   const isSessionMode = proj.mode === "sessions";
   const [addingTask, setAddingTask] = useState(false);
+  const [newText, setNewText] = useState("");
   const taskInputRef = useRef(null);
   const nameInputRef = useRef(null);
 
@@ -183,34 +184,30 @@ function ProjectCard({ proj, domain, isExp, newTaskText,
             />
           ))}
           {addingTask ? (
-            <div className="add-task-inline">
+            <div className="dotted-add-row">
+              <div className="dotted-add-circle" />
               <input
                 ref={taskInputRef}
-                className="add-task-inline-input"
+                className="dotted-add-input"
                 placeholder="New task…"
-                value={newTaskText}
+                value={newText}
                 autoFocus
-                onChange={e => onNewTaskChange(e.target.value)}
+                onChange={e => setNewText(e.target.value)}
                 onKeyDown={e => {
-                  if (e.key === "Enter") { onAddTask(); setTimeout(() => taskInputRef.current?.focus(), 30); }
-                  if (e.key === "Escape") { setAddingTask(false); onNewTaskChange(""); }
+                  if (e.key === "Enter") {
+                    const t = newText.trim();
+                    if (t) { onNewTaskChange(t); onAddTask(); setNewText(""); setTimeout(() => taskInputRef.current?.focus(), 30); }
+                  }
+                  if (e.key === "Escape") { setAddingTask(false); setNewText(""); }
                 }}
+                onBlur={() => { const t = newText.trim(); if (t) { onNewTaskChange(t); onAddTask(); } setAddingTask(false); setNewText(""); }}
               />
-              <button
-                onMouseDown={e => { e.preventDefault(); if (newTaskText.trim()) { onAddTask(); setTimeout(() => taskInputRef.current?.focus(), 30); } else { setAddingTask(false); } }}
-                style={{ background: "none", border: "none", padding: "0 4px 0 8px", cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
-              >
-                <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
-                  <circle cx="13" cy="13" r="12" fill="rgba(232,160,48,0.15)" stroke="rgba(232,160,48,0.5)" strokeWidth="1.5"/>
-                  <path d="M13 8v10M8 13h10" stroke="#E8A030" strokeWidth="2" strokeLinecap="round"/>
-                </svg>
-              </button>
             </div>
           ) : (
-            <div
-              className="add-task-tap"
-              onClick={() => { setAddingTask(true); setTimeout(() => taskInputRef.current?.focus(), 30); }}
-            />
+            <div className="dotted-add-row" onClick={() => { setAddingTask(true); setTimeout(() => taskInputRef.current?.focus(), 30); }}>
+              <div className="dotted-add-circle" />
+              <span className="dotted-add-placeholder">Add task…</span>
+            </div>
           )}
 
           {/* Work Now button removed — blocks are deep work slots only */}
