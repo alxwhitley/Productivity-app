@@ -137,6 +137,21 @@ export default function ProfileScreen({ data, setData, onClose }) {
             </select>
           </div>
 
+          {/* Shutdown begins */}
+          <div className="set-row" style={{ marginTop:12 }}>
+            <div>
+              <div className="set-row-label">Shutdown begins</div>
+              <div className="set-row-sub">When the shutdown banner appears</div>
+            </div>
+            <select className="form-select" style={{ width:"auto", minWidth:100 }}
+              value={data.shutdownTriggerHour ?? 16}
+              onChange={e => setData(d => ({ ...d, shutdownTriggerHour: parseInt(e.target.value) }))}>
+              {[12,13,14,15,16,17,18,19,20].map(h => (
+                <option key={h} value={h}>{h > 12 ? h-12 : h}:00 {h >= 12 ? "PM" : "AM"}</option>
+              ))}
+            </select>
+          </div>
+
           {/* Deep Work Targets */}
           <div style={{ marginTop:16 }}>
             <div className="set-section">Deep Work Targets</div>

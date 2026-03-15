@@ -601,6 +601,7 @@
   @keyframes dot-pulse{0%,100%{box-shadow:0 0 8px rgba(224,85,85,.7);}50%{box-shadow:0 0 14px rgba(224,85,85,.9);}}
   @keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.65)}}
   @keyframes dw-running-pulse{0%,100%{box-shadow:0 0 0 2px rgba(155,114,207,.15),0 0 24px rgba(155,114,207,.12);}50%{box-shadow:0 0 0 3px rgba(155,114,207,.3),0 0 36px rgba(155,114,207,.22);}}
+  @keyframes sd-slide-down{from{transform:translateY(-100%);opacity:0}to{transform:translateY(0);opacity:1}}
   .nav-btn{position:relative;}
 
   /* ── SHEETS ── */

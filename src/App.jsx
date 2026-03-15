@@ -13,6 +13,7 @@ import WorkScreen from "./screens/WorkScreen.jsx";
 import TasksScreen from "./screens/TasksScreen.jsx";
 import ProjectsScreen from "./screens/ProjectsScreen.jsx";
 import ProfileScreen from "./screens/ProfileScreen.jsx";
+import ShutdownRitualScreen from "./screens/ShutdownRitualScreen.jsx";
 
 export default function App() {
   const [session, setSession] = useState(undefined); // undefined = loading
@@ -26,6 +27,7 @@ export default function App() {
   const [data, setData] = useData(userId);
   const [tab, setTab] = useState("tasks"); // default tab
   const [profileOpen, setProfileOpen] = useState(false);
+  const [shutdownRitualOpen, setShutdownRitualOpen] = useState(false);
 
   const [lightMode, setLightMode] = useState(() => {
     try { return localStorage.getItem(THEME_KEY) === "light"; } catch { return false; }
@@ -67,7 +69,29 @@ export default function App() {
     emptyBlocks: data.emptyBlocks || [],
     workWeek: data.workWeek || [2,3,4,5,6],
     reviewData: data.reviewData || { domainBlocks: {}, projectProgress: {}, daysWorked: [] },
+    shutdownTriggerHour: data.shutdownTriggerHour ?? 16,
+    leadDomino: data.leadDomino || "",
   };
+
+  // ── Shutdown banner logic ──
+  const now = new Date();
+  const todayISO = toISODate(now);
+  const currentHour = now.getHours();
+  const shutdownDoneToday = safeData.shutdownDone && safeData.shutdownDate === todayISO;
+
+  // Check if all DW blocks are complete
+  const allDWComplete = (() => {
+    const completions = safeData.blockCompletions.filter(c => c.date === todayISO);
+    const completedIds = new Set(completions.map(c => c.blockId));
+    const maxBlocks = safeData.deepWorkTargets?.maxDeepBlocks ?? 3;
+    let allDone = true;
+    for (let i = 0; i < maxBlocks; i++) {
+      if (!completedIds.has(`dw-${todayISO}-${i}`)) { allDone = false; break; }
+    }
+    return allDone && maxBlocks > 0;
+  })();
+
+  const showBanner = currentHour >= safeData.shutdownTriggerHour || allDWComplete;
 
   return (
     <>
@@ -75,6 +99,22 @@ export default function App() {
         <div className={`phone ${lightMode ? "light" : ""}`}>
           {!safeData.onboardingDone && (
             <OnboardingFlow onDone={() => setData(d => ({ ...d, onboardingDone: true }))} />
+          )}
+
+          {/* Shutdown banner — all tabs */}
+          {showBanner && (
+            <div
+              onClick={() => !shutdownDoneToday && setShutdownRitualOpen(true)}
+              style={{
+                width: "100%", height: 52, display: "flex", alignItems: "center", justifyContent: "center",
+                background: shutdownDoneToday ? "var(--bg3)" : "var(--purple)",
+                color: shutdownDoneToday ? "var(--text3)" : "#fff",
+                fontSize: 14, fontWeight: 600, cursor: shutdownDoneToday ? "default" : "pointer",
+                fontFamily: "'DM Sans',sans-serif", flexShrink: 0,
+              }}
+            >
+              {shutdownDoneToday ? "You're ready for tomorrow" : "Begin shutdown ritual →"}
+            </div>
           )}
 
           {tab === "work" && (
@@ -102,6 +142,14 @@ export default function App() {
               data={safeData}
               setData={setData}
               onClose={() => setProfileOpen(false)}
+            />
+          )}
+
+          {shutdownRitualOpen && (
+            <ShutdownRitualScreen
+              data={safeData}
+              setData={setData}
+              onClose={() => setShutdownRitualOpen(false)}
             />
           )}
 

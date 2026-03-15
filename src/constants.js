@@ -113,6 +113,8 @@ export const FIELD_DEFAULTS = {
   todayLoosePicks: {}, // { [dateStr]: [looseTaskId, ...] } — tasks picked for today's loose block
   onboardingDone: false,
   sessionLog: [], // [{ id, projectId, date, durationMin, note }]
+  shutdownTriggerHour: 16, // 4 PM default
+  leadDomino: "", // "most important thing tomorrow" from shutdown ritual
 };
 
 // ── Deep work slot defaults ──────────────────────────────────────────────────
