@@ -1,12 +1,12 @@
-// 5 colors mapped to Huberman's psychology of motivation:
-// Blue=deep focus, Amber=drive/dopamine, Green=completion/recovery, Purple=identity/seasons, Slate=neutral/admin
-export const DOMAIN_COLORS = ["#5B8AF0","#E8A030","#45C17A","#9B72CF","#8A9BB0"];
+// Neutral domain palette — does not conflict with app-level semantic colors
+// Slate, Rose, Sand, Sage, Dusk, Stone
+export const DOMAIN_COLORS = ["#6B7A8D","#C47A7A","#B89B6A","#7A9E7E","#8A7AAE","#8A9099"];
 
 export const INITIAL_DATA = {
   domains: [
-    { id: "church", name: "Church", color: "#5B8AF0" },
-    { id: "work",   name: "Work",   color: "#9B72CF" },
-    { id: "life",   name: "Life",   color: "#45C17A" },
+    { id: "church", name: "Church", color: "#6B7A8D" },
+    { id: "work",   name: "Work",   color: "#8A7AAE" },
+    { id: "life",   name: "Life",   color: "#7A9E7E" },
   ],
   projects: [
     { id: "podcast",     domainId: "church", name: "Podcast",        status: "active",  tasks: [
@@ -75,7 +75,7 @@ export const INITIAL_DATA = {
 //   3. The rest of the app is unchanged
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 export const STORAGE_KEY    = "nave_data_v1";       // new key — clean break from momentum_v2
 export const THEME_KEY      = "nave_theme";
 
@@ -198,5 +198,29 @@ export const MIGRATIONS = [
       projects: (data.projects || []).map(p => ({ ...p, type: p.mode || p.type || "tasks" })),
       schemaVersion: 5,
     })
+  },
+  // v6: migrate domain colors from brand palette to neutral palette
+  {
+    version: 6,
+    up: (data) => {
+      const colorMap = {
+        "#5B8AF0": "#6B7A8D", // Blue → Slate
+        "#5b8af0": "#6B7A8D",
+        "#E8A030": "#B89B6A", // Amber → Sand
+        "#e8a030": "#B89B6A",
+        "#45C17A": "#7A9E7E", // Green → Sage
+        "#45c17a": "#7A9E7E",
+        "#9B72CF": "#8A7AAE", // Purple → Dusk
+        "#9b72cf": "#8A7AAE",
+        "#8A9BB0": "#8A9099", // old Slate → Stone
+        "#8a9bb0": "#8A9099",
+      };
+      const migrate = (color) => colorMap[color] || colorMap[color?.toLowerCase()] || "#8A9099";
+      return {
+        ...data,
+        domains: (data.domains || []).map(d => ({ ...d, color: migrate(d.color) })),
+        schemaVersion: 6,
+      };
+    }
   },
 ];

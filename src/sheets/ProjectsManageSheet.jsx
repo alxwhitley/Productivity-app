@@ -11,7 +11,7 @@ function ProjectsManageSheet({ data, setData, onClose, onAddProject }) {
   // ── Categories state ──
   const [catEdits, setCatEdits] = useState(domains.map(d => ({ ...d })));
   const [newCatName, setNewCatName] = useState("");
-  const [newCatColor, setNewCatColor] = useState(COLORS[0]);
+  const [newCatColor, setNewCatColor] = useState(COLORS[0] || "#6B7A8D");
 
   // ── Project edits ──
   const [projEdits, setProjEdits] = useState(projects.map(p => ({ id: p.id, name: p.name, domainId: p.domainId })));
