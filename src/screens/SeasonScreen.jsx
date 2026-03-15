@@ -13,8 +13,8 @@ const QUARTER_META = [
 const MAX_GOALS = 4;
 
 const TYPE_PILLS = {
-  essential: { bg: "rgba(232,160,48,0.15)", color: "#E8A030" },
-  maintain:  { bg: "rgba(138,144,153,0.15)", color: "#8A9099" },
+  essential: { bg: "rgba(232,160,48,0.15)", color: "var(--accent)" },
+  maintain:  { bg: "rgba(255,255,255,0.07)", color: "var(--text3)" },
   bonus:     { bg: "rgba(155,114,207,0.15)", color: "var(--purple)" },
 };
 
@@ -139,7 +139,7 @@ function GoalRow({ goal, idx, total, readOnly, getDomain, onToggle, onDelete }) 
   const resetSwipe = () => { setSwipeX(0); setShowDelete(false); };
 
   return (
-    <div ref={rowRef} style={{ position: "relative", overflow: "hidden", borderBottom: idx < total - 1 ? "1px solid var(--border2)" : "none" }}>
+    <div ref={rowRef} style={{ position: "relative", overflow: "hidden", borderBottom: "1px solid var(--border2)" }}>
       {/* Delete reveal */}
       {!readOnly && (
         <div style={{
@@ -158,23 +158,19 @@ function GoalRow({ goal, idx, total, readOnly, getDomain, onToggle, onDelete }) 
         onTouchEnd={handleTouchEnd}
         onClick={() => { if (showDelete) resetSwipe(); }}
         style={{
-          display: "flex", alignItems: "center", gap: 10, padding: "12px 0",
-          minHeight: 48, opacity: goal.done ? 0.5 : 1, transition: "transform .2s, opacity .15s",
+          display: "flex", alignItems: "center", gap: 8, padding: "13px 0",
+          opacity: goal.done ? 0.5 : 1, transition: "transform .2s, opacity .15s",
           transform: `translateX(${swipeX}px)`, background: "var(--bg)",
           position: "relative", zIndex: 1,
         }}
       >
         <div style={{ width: 8, height: 8, borderRadius: "50%", background: dom?.color || "var(--text3)", flexShrink: 0 }} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ marginBottom: 2 }}>
-            <span style={{
-              fontSize: 10, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase",
-              padding: "2px 6px", borderRadius: 4, background: pill.bg, color: pill.color,
-            }}>{goal.type}</span>
-          </div>
-          <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text)", textDecoration: goal.done ? "line-through" : "none" }}>
-            {goal.text}
-          </div>
+        <span style={{
+          fontSize: 10, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase",
+          padding: "2px 6px", borderRadius: 4, lineHeight: 1, background: pill.bg, color: pill.color, flexShrink: 0,
+        }}>{goal.type}</span>
+        <div style={{ flex: 1, minWidth: 0, fontSize: 15, color: "var(--text)", textDecoration: goal.done ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {goal.text}
         </div>
         {!readOnly && (
           <div onClick={(e) => { e.stopPropagation(); onToggle(goal.id); }} style={{
@@ -434,10 +430,23 @@ export default function SeasonScreen({ data, setData }) {
                 const isAdding = addingSlot === slotIdx;
 
                 return (
-                  <div key={`empty-${i}`} ref={isAdding ? addFormRef : null}
-                    style={{ padding: "12px 0", borderBottom: slotIdx < MAX_GOALS - 1 ? "1px solid var(--border2)" : "none" }}>
-                    {isAdding ? (
-                      <div>
+                  <div key={`empty-${i}`} ref={isAdding ? addFormRef : null}>
+                    {/* "+ Add goal" row */}
+                    <div
+                      onClick={() => { if (!isAdding) openAddSlot(slotIdx); }}
+                      style={{
+                        display: "flex", alignItems: "center", padding: "13px 0",
+                        borderBottom: "1px solid var(--border2)",
+                        cursor: isAdding ? "default" : "pointer",
+                      }}
+                    >
+                      <span style={{ fontSize: 14, color: "var(--accent)", fontWeight: 700, marginRight: 6 }}>+</span>
+                      <span style={{ fontSize: 14, color: "var(--text3)" }}>Add goal</span>
+                    </div>
+
+                    {/* Inline add form — expands below the row */}
+                    {isAdding && (
+                      <div style={{ padding: "12px 0 8px" }}>
                         <input ref={inputRef}
                           className="set-input"
                           placeholder="What's the goal?"
@@ -500,14 +509,6 @@ export default function SeasonScreen({ data, setData }) {
                           <span onClick={() => setAddingSlot(null)}
                             style={{ fontSize: 13, color: "var(--text3)", fontWeight: 500, cursor: "pointer" }}>Cancel</span>
                         </div>
-                      </div>
-                    ) : (
-                      <div onClick={() => openAddSlot(slotIdx)}
-                        style={{
-                          border: "1.5px dashed var(--border)", borderRadius: 10, padding: "12px 16px",
-                          cursor: "pointer", textAlign: "center",
-                        }}>
-                        <span style={{ fontSize: 13, color: "var(--text3)", fontWeight: 500 }}>+ Add goal</span>
                       </div>
                     )}
                   </div>
