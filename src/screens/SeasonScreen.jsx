@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { DOMAIN_COLORS } from "../constants.js";
 import { uid, toISODate } from "../utils.js";
 import StatusBar from "../components/StatusBar.jsx";
@@ -13,7 +13,7 @@ const QUARTER_META = [
 const MAX_GOALS = 4;
 
 const TYPE_PILLS = {
-  essential: { bg: "rgba(184,155,106,0.15)", color: "#B89B6A" },
+  essential: { bg: "rgba(232,160,48,0.15)", color: "#E8A030" },
   maintain:  { bg: "rgba(138,144,153,0.15)", color: "#8A9099" },
   bonus:     { bg: "rgba(155,114,207,0.15)", color: "var(--purple)" },
 };
@@ -24,6 +24,8 @@ const TYPE_DESC = {
   bonus:     "A stretch goal. Only chase this once your Essential goals are on track.",
 };
 
+const PALETTE = ["#6B7A8D","#C47A7A","#B89B6A","#7A9E7E","#8A7AAE","#8A9099"];
+
 function getQuarter(d) { return Math.floor(d.getMonth() / 3) + 1; }
 
 function quarterStartEnd(q, year) {
@@ -32,17 +34,174 @@ function quarterStartEnd(q, year) {
   return { start: s, end: e };
 }
 
+// ── Radar chart helper ──
+function RadarChart({ domainData, size }) {
+  const cx = size / 2, cy = size / 2;
+  const radius = size / 2 - 30;
+  const n = domainData.length;
+  if (n === 0) return null;
+
+  const maxVal = Math.max(...domainData.map(d => d.value), 1);
+  const angleStep = (2 * Math.PI) / n;
+  const startAngle = -Math.PI / 2;
+
+  const pointAt = (i, r) => {
+    const a = startAngle + i * angleStep;
+    return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+  };
+
+  // Reference rings
+  const rings = [0.33, 0.66, 1].map(pct => {
+    const r = radius * pct;
+    const pts = Array.from({ length: n }, (_, i) => pointAt(i, r));
+    return pts.map(p => `${p.x},${p.y}`).join(" ");
+  });
+
+  // Data polygon
+  const dataPoints = domainData.map((d, i) => {
+    const r = (d.value / maxVal) * radius;
+    return pointAt(i, Math.max(r, 2));
+  });
+  const polyStr = dataPoints.map(p => `${p.x},${p.y}`).join(" ");
+
+  // Axis tip labels
+  const tipPoints = domainData.map((d, i) => {
+    const p = pointAt(i, radius + 16);
+    return { ...p, name: d.name, color: d.color };
+  });
+
+  return (
+    <svg width={size} height={size} style={{ display: "block", margin: "0 auto" }}>
+      {/* Reference rings */}
+      {rings.map((pts, i) => (
+        <polygon key={i} points={pts} fill="none" stroke="var(--border)" strokeWidth="0.5" opacity="0.5" />
+      ))}
+      {/* Axis lines */}
+      {domainData.map((_, i) => {
+        const tip = pointAt(i, radius);
+        return <line key={i} x1={cx} y1={cy} x2={tip.x} y2={tip.y} stroke="var(--border)" strokeWidth="0.5" opacity="0.4" />;
+      })}
+      {/* Data fill */}
+      <polygon points={polyStr} fill="rgba(155,114,207,0.15)" stroke="rgba(155,114,207,0.6)" strokeWidth="2" />
+      {/* Data dots */}
+      {dataPoints.map((p, i) => (
+        <circle key={i} cx={p.x} cy={p.y} r="4" fill={domainData[i].color} />
+      ))}
+      {/* Labels */}
+      {tipPoints.map((t, i) => (
+        <text key={i} x={t.x} y={t.y} textAnchor="middle" dominantBaseline="central"
+          fill={t.color} fontSize="11" fontWeight="600" fontFamily="'DM Sans',sans-serif">
+          {t.name}
+        </text>
+      ))}
+    </svg>
+  );
+}
+
+// ── Swipeable goal row ──
+function GoalRow({ goal, idx, total, readOnly, getDomain, onToggle, onDelete }) {
+  const dom = getDomain(goal.domainId);
+  const pill = TYPE_PILLS[goal.type] || TYPE_PILLS.essential;
+  const rowRef = useRef(null);
+  const touchStart = useRef(null);
+  const [swipeX, setSwipeX] = useState(0);
+  const [showDelete, setShowDelete] = useState(false);
+
+  const handleTouchStart = useCallback((e) => {
+    if (readOnly) return;
+    touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    setShowDelete(false);
+  }, [readOnly]);
+
+  const handleTouchMove = useCallback((e) => {
+    if (!touchStart.current || readOnly) return;
+    const dx = e.touches[0].clientX - touchStart.current.x;
+    const dy = e.touches[0].clientY - touchStart.current.y;
+    if (Math.abs(dy) > Math.abs(dx)) return;
+    if (dx < 0) {
+      e.preventDefault();
+      setSwipeX(Math.max(dx, -80));
+    }
+  }, [readOnly]);
+
+  const handleTouchEnd = useCallback(() => {
+    if (readOnly) return;
+    if (swipeX < -40) {
+      setSwipeX(-72);
+      setShowDelete(true);
+    } else {
+      setSwipeX(0);
+      setShowDelete(false);
+    }
+    touchStart.current = null;
+  }, [swipeX, readOnly]);
+
+  const resetSwipe = () => { setSwipeX(0); setShowDelete(false); };
+
+  return (
+    <div ref={rowRef} style={{ position: "relative", overflow: "hidden", borderBottom: idx < total - 1 ? "1px solid var(--border2)" : "none" }}>
+      {/* Delete reveal */}
+      {!readOnly && (
+        <div style={{
+          position: "absolute", right: 0, top: 0, bottom: 0, width: 72,
+          background: "var(--red)", display: "flex", alignItems: "center", justifyContent: "center",
+          color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
+        }} onClick={() => { onDelete(goal.id); resetSwipe(); }}>
+          Delete
+        </div>
+      )}
+
+      {/* Row content */}
+      <div
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onClick={() => { if (showDelete) resetSwipe(); }}
+        style={{
+          display: "flex", alignItems: "center", gap: 10, padding: "12px 0",
+          minHeight: 48, opacity: goal.done ? 0.5 : 1, transition: "transform .2s, opacity .15s",
+          transform: `translateX(${swipeX}px)`, background: "var(--bg)",
+          position: "relative", zIndex: 1,
+        }}
+      >
+        <div style={{ width: 8, height: 8, borderRadius: "50%", background: dom?.color || "var(--text3)", flexShrink: 0 }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ marginBottom: 2 }}>
+            <span style={{
+              fontSize: 10, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase",
+              padding: "2px 6px", borderRadius: 4, background: pill.bg, color: pill.color,
+            }}>{goal.type}</span>
+          </div>
+          <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text)", textDecoration: goal.done ? "line-through" : "none" }}>
+            {goal.text}
+          </div>
+        </div>
+        {!readOnly && (
+          <div onClick={(e) => { e.stopPropagation(); onToggle(goal.id); }} style={{
+            width: 22, height: 22, borderRadius: "50%", flexShrink: 0, cursor: "pointer",
+            background: goal.done ? "var(--green)" : "transparent",
+            border: goal.done ? "none" : "1.5px solid var(--border)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            {goal.done && <span style={{ fontSize: 11, color: "#fff", fontWeight: 700 }}>✓</span>}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function SeasonScreen({ data, setData }) {
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentQ = getQuarter(now);
 
-  const [selectedQ, setSelectedQ] = useState(currentQ);
+  const [viewingQuarter, setViewingQuarter] = useState(null);
   const [addingSlot, setAddingSlot] = useState(null);
   const [addText, setAddText] = useState("");
   const [addType, setAddType] = useState("essential");
   const [addDomainId, setAddDomainId] = useState(null);
-  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [balanceMode, setBalanceMode] = useState("hours");
 
   const addFormRef = useRef(null);
   const inputRef = useRef(null);
@@ -50,12 +209,14 @@ export default function SeasonScreen({ data, setData }) {
   const { domains, projects, seasonGoals, blockCompletions, deepWorkSlots } = data;
   const goals = seasonGoals || [];
 
-  const isCurrentQ = selectedQ === currentQ;
-  const isPastQ = selectedQ < currentQ;
+  const selectedQ = viewingQuarter ? viewingQuarter.q : currentQ;
+  const selectedYear = viewingQuarter ? viewingQuarter.year : currentYear;
+  const isCurrentQ = !viewingQuarter;
+  const isPastQ = !!viewingQuarter;
 
   const getDomain = (id) => domains.find(d => d.id === id);
 
-  const { start: qStart, end: qEnd } = quarterStartEnd(selectedQ, currentYear);
+  const { start: qStart, end: qEnd } = quarterStartEnd(selectedQ, selectedYear);
   const seasonCap = now < qEnd ? now : qEnd;
 
   const essentialCount = goals.filter(g => g.type === "essential").length;
@@ -84,7 +245,6 @@ export default function SeasonScreen({ data, setData }) {
 
   const deleteGoal = (goalId) => {
     setData(d => ({ ...d, seasonGoals: (d.seasonGoals || []).filter(g => g.id !== goalId) }));
-    setDeleteConfirm(null);
   };
 
   const openAddSlot = (idx) => {
@@ -104,9 +264,8 @@ export default function SeasonScreen({ data, setData }) {
     return d >= qStart && d <= seasonCap;
   });
 
-  // ── Domain balance ──
+  // ── Domain hours (from blockCompletions → deepWorkSlots → project → domain) ──
   const domainMins = {};
-  let totalMins = 0;
   seasonCompletions.forEach(c => {
     const dateISO = c.date;
     const slots = (deepWorkSlots || {})[dateISO] || [];
@@ -117,8 +276,35 @@ export default function SeasonScreen({ data, setData }) {
         domainMins[proj.domainId] = (domainMins[proj.domainId] || 0) + (c.durationMin || 0);
       }
     }
-    totalMins += (c.durationMin || 0);
   });
+
+  // ── Domain tasks (from project tasks done this season) ──
+  const domainTasks = {};
+  projects.forEach(proj => {
+    (proj.tasks || []).forEach(t => {
+      if (t.done && t.doneAt) {
+        const d = new Date(t.doneAt);
+        if (d >= qStart && d <= seasonCap) {
+          domainTasks[proj.domainId] = (domainTasks[proj.domainId] || 0) + 1;
+        }
+      }
+    });
+  });
+
+  // ── Radar chart data ──
+  const activeDomains = domains.filter(d =>
+    projects.some(p => p.domainId === d.id && (p.status === "active" || p.status === "done"))
+  );
+  const domainActivity = activeDomains.map(d => ({
+    id: d.id, name: d.name, color: d.color,
+    hours: (domainMins[d.id] || 0) / 60,
+    tasks: domainTasks[d.id] || 0,
+  }));
+  // Sort by activity descending, cap at 6
+  const sortKey = balanceMode === "hours" ? "hours" : "tasks";
+  const radarDomains = [...domainActivity].sort((a, b) => b[sortKey] - a[sortKey]).slice(0, 6);
+  const radarData = radarDomains.map(d => ({ name: d.name, color: d.color, value: d[sortKey] }));
+  const hasRadarData = radarData.some(d => d.value > 0);
 
   // ── Deep work stats ──
   const dwCompletions = seasonCompletions.filter(c => c.blockId && c.blockId.startsWith("dw-"));
@@ -154,57 +340,13 @@ export default function SeasonScreen({ data, setData }) {
     weekDots.push({ filled: hasActivity, past });
     if (hasActivity) shutdownWeeks++;
   }
+  const pastWeeks = weekDots.filter(w => w.past).length;
 
-  // ── Render helpers ──
+  // ── Render ──
   const filledSlots = goals.slice(0, MAX_GOALS);
   const emptyCount = MAX_GOALS - filledSlots.length;
 
-  const renderGoalRow = (goal, idx, total, readOnly) => {
-    const dom = getDomain(goal.domainId);
-    const pill = TYPE_PILLS[goal.type] || TYPE_PILLS.essential;
-    const isDeleting = deleteConfirm === goal.id;
-
-    return (
-      <div key={goal.id} style={{
-        display: "flex", alignItems: "center", gap: 10, padding: "12px 0",
-        borderBottom: idx < total - 1 ? "1px solid var(--border)" : "none",
-        opacity: goal.done ? 0.5 : 1, transition: "opacity .15s",
-      }}>
-        <div style={{ width: 8, height: 8, borderRadius: "50%", background: dom?.color || "var(--text3)", flexShrink: 0 }} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ marginBottom: 2 }}>
-            <span style={{
-              fontSize: 9, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase",
-              padding: "2px 6px", borderRadius: 4, background: pill.bg, color: pill.color,
-            }}>{goal.type}</span>
-          </div>
-          <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text)", textDecoration: goal.done ? "line-through" : "none" }}>
-            {goal.text}
-          </div>
-        </div>
-        {!readOnly && (
-          <>
-            {isDeleting ? (
-              <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                <button onClick={() => deleteGoal(goal.id)} style={{ background: "none", border: "none", color: "var(--red)", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans',sans-serif" }}>Delete</button>
-                <button onClick={() => setDeleteConfirm(null)} style={{ background: "none", border: "none", color: "var(--text3)", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans',sans-serif" }}>Cancel</button>
-              </div>
-            ) : (
-              <button onClick={() => setDeleteConfirm(goal.id)} style={{ background: "none", border: "none", color: "var(--text3)", fontSize: 12, cursor: "pointer", padding: "4px", flexShrink: 0 }}>✕</button>
-            )}
-            <div onClick={() => toggleDone(goal.id)} style={{
-              width: 22, height: 22, borderRadius: "50%", flexShrink: 0, cursor: "pointer",
-              background: goal.done ? "var(--green)" : "transparent",
-              border: goal.done ? "none" : "1.5px solid var(--border)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-              {goal.done && <span style={{ fontSize: 11, color: "#fff", fontWeight: 700 }}>✓</span>}
-            </div>
-          </>
-        )}
-      </div>
-    );
-  };
+  const fmtHrs = (h) => h > 0 ? (h % 1 === 0 ? String(h) : h.toFixed(1)) : "0";
 
   return (
     <div className="screen active">
@@ -226,7 +368,7 @@ export default function SeasonScreen({ data, setData }) {
         </div>
       </div>
 
-      <div className="scroll" style={{ padding: "0 0 40px" }}>
+      <div className="scroll" style={{ padding: "0 0 120px" }}>
 
         {/* ── Quarter row ── */}
         <div style={{ display: "flex", gap: 6, padding: "4px 16px 20px" }}>
@@ -234,21 +376,25 @@ export default function SeasonScreen({ data, setData }) {
             const isCurr = q === currentQ;
             const past = q < currentQ;
             const future = q > currentQ;
-            const sel = q === selectedQ;
+            const sel = (isCurrentQ && isCurr) || (isPastQ && q === selectedQ);
 
             return (
               <div key={q}
-                onClick={() => { if (!future) setSelectedQ(q); }}
+                onClick={() => {
+                  if (future) return;
+                  if (isCurr) { setViewingQuarter(null); }
+                  else if (past) { setViewingQuarter({ q, year: currentYear }); }
+                }}
                 style={{
-                  flex: 1, textAlign: "center", padding: "10px 4px", borderRadius: 10,
+                  flex: 1, textAlign: "center", padding: "10px 0", borderRadius: 10,
                   background: sel && isCurr ? "rgba(155,114,207,0.15)" : "var(--bg3)",
-                  border: sel && isCurr ? "1.5px solid var(--purple)" : sel && past ? "1.5px solid var(--border)" : "1.5px solid transparent",
+                  border: sel && isCurr ? "1px solid rgba(155,114,207,0.4)" : sel && past ? "1px solid var(--border)" : "1px solid transparent",
                   opacity: isCurr ? 1 : past ? 0.45 : 0.35,
                   cursor: future ? "default" : "pointer",
                   transition: "all .15s",
                 }}
               >
-                <div style={{ fontSize: isCurr ? 15 : 13, fontWeight: 700, color: sel && isCurr ? "var(--text)" : "var(--text2)" }}>{label}</div>
+                <div style={{ fontSize: isCurr ? 15 : 13, fontWeight: 700, color: sel && isCurr ? "var(--purple)" : "var(--text2)" }}>{label}</div>
                 <div style={{ fontSize: 10, color: "var(--text3)", marginTop: 2 }}>{sub}</div>
               </div>
             );
@@ -258,8 +404,7 @@ export default function SeasonScreen({ data, setData }) {
         {/* Past quarter banner */}
         {isPastQ && (
           <div style={{ margin: "0 16px 16px", padding: "12px 16px", background: "var(--bg3)", borderRadius: 10, textAlign: "center" }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text2)" }}>Q{selectedQ} · {currentYear} — Season complete</div>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--text3)", marginTop: 4 }}>READ ONLY</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text2)" }}>Q{selectedQ} {selectedYear} · Season complete</div>
           </div>
         )}
 
@@ -270,133 +415,133 @@ export default function SeasonScreen({ data, setData }) {
         </div>
 
         <div style={{ padding: "0 16px" }}>
-          {/* Filled slots */}
-          {filledSlots.map((g, i) => renderGoalRow(g, i, MAX_GOALS, isPastQ))}
-
-          {/* Empty slots — current quarter only */}
-          {isCurrentQ && Array.from({ length: emptyCount }, (_, i) => {
-            const slotIdx = filledSlots.length + i;
-            const isAdding = addingSlot === slotIdx;
-
-            return (
-              <div key={`empty-${i}`} ref={isAdding ? addFormRef : null}
-                style={{ padding: "12px 0", borderBottom: slotIdx < MAX_GOALS - 1 ? "1px solid var(--border)" : "none" }}>
-                {isAdding ? (
-                  <div>
-                    <input ref={inputRef}
-                      className="set-input"
-                      placeholder="What's the goal?"
-                      value={addText}
-                      onChange={e => setAddText(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === "Enter") addGoal();
-                        if (e.key === "Escape") setAddingSlot(null);
-                      }}
-                      style={{ marginBottom: 10 }}
-                    />
-
-                    {/* Type selector */}
-                    <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
-                      {["essential", "maintain", "bonus"].map(t => {
-                        const sel = addType === t;
-                        const pill = TYPE_PILLS[t];
-                        const disabled = t === "essential" && essentialCount >= 2 && addType !== "essential";
-                        return (
-                          <button key={t}
-                            onClick={() => { if (!disabled) setAddType(t); }}
-                            style={{
-                              flex: 1, padding: "7px 0", borderRadius: 8, fontSize: 11, fontWeight: 700,
-                              textTransform: "uppercase", letterSpacing: ".04em",
-                              cursor: disabled ? "default" : "pointer",
-                              border: sel ? `1.5px solid ${pill.color}` : "1.5px solid var(--border)",
-                              background: sel ? pill.bg : "var(--bg3)",
-                              color: disabled ? "var(--text3)" : pill.color,
-                              opacity: disabled ? 0.4 : 1,
-                              fontFamily: "'DM Sans',sans-serif", transition: "all .12s",
-                            }}
-                          >{t}</button>
-                        );
-                      })}
-                    </div>
-                    {essentialCount >= 2 && addType !== "essential" && (
-                      <div style={{ fontSize: 10, color: "var(--text3)", marginBottom: 6 }}>2 of 2 Essential goals set</div>
-                    )}
-                    <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 10, lineHeight: 1.4 }}>
-                      {TYPE_DESC[addType]}
-                    </div>
-
-                    {/* Domain color dots */}
-                    <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-                      {domains.map(d => (
-                        <div key={d.id}
-                          onClick={() => setAddDomainId(d.id)}
-                          style={{
-                            width: 22, height: 22, borderRadius: "50%", background: d.color, cursor: "pointer",
-                            boxShadow: (addDomainId || domains[0]?.id) === d.id ? `0 0 0 2px var(--bg2), 0 0 0 3.5px ${d.color}` : "none",
-                            transition: "box-shadow .1s",
-                          }}
-                        />
-                      ))}
-                    </div>
-
-                    <span onClick={addGoal}
-                      style={{ fontSize: 13, color: "var(--accent)", fontWeight: 600, cursor: "pointer" }}>Add</span>
-                  </div>
-                ) : (
-                  <div onClick={() => openAddSlot(slotIdx)}
-                    style={{
-                      border: "1.5px dashed var(--border)", borderRadius: 10, padding: "14px 16px",
-                      cursor: "pointer", textAlign: "center",
-                    }}>
-                    <span style={{ fontSize: 13, color: "var(--text3)", fontWeight: 500 }}>+ Add goal</span>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-
-          {/* Past quarter empty */}
-          {isPastQ && goals.length === 0 && (
+          {isPastQ ? (
+            /* Past quarter: read-only, currently no historical storage */
             <div style={{ textAlign: "center", color: "var(--text3)", fontSize: 13, padding: "20px 0" }}>
-              No goals recorded for this quarter
+              No goals recorded for this season.
             </div>
+          ) : (
+            <>
+              {/* Filled slots */}
+              {filledSlots.map((g, i) => (
+                <GoalRow key={g.id} goal={g} idx={i} total={MAX_GOALS} readOnly={false}
+                  getDomain={getDomain} onToggle={toggleDone} onDelete={deleteGoal} />
+              ))}
+
+              {/* Empty slots */}
+              {Array.from({ length: emptyCount }, (_, i) => {
+                const slotIdx = filledSlots.length + i;
+                const isAdding = addingSlot === slotIdx;
+
+                return (
+                  <div key={`empty-${i}`} ref={isAdding ? addFormRef : null}
+                    style={{ padding: "12px 0", borderBottom: slotIdx < MAX_GOALS - 1 ? "1px solid var(--border2)" : "none" }}>
+                    {isAdding ? (
+                      <div>
+                        <input ref={inputRef}
+                          className="set-input"
+                          placeholder="What's the goal?"
+                          value={addText}
+                          onChange={e => setAddText(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === "Enter") addGoal();
+                            if (e.key === "Escape") setAddingSlot(null);
+                          }}
+                          style={{ marginBottom: 10 }}
+                        />
+
+                        {/* Type selector */}
+                        <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
+                          {["essential", "maintain", "bonus"].map(t => {
+                            const sel = addType === t;
+                            const pill = TYPE_PILLS[t];
+                            const disabled = t === "essential" && essentialCount >= 2 && addType !== "essential";
+                            return (
+                              <button key={t}
+                                onClick={() => { if (!disabled) setAddType(t); }}
+                                style={{
+                                  flex: 1, padding: "7px 0", borderRadius: 8, fontSize: 11, fontWeight: 700,
+                                  textTransform: "uppercase", letterSpacing: ".04em",
+                                  cursor: disabled ? "default" : "pointer",
+                                  border: sel ? `1.5px solid ${pill.color}` : "1.5px solid var(--border)",
+                                  background: sel ? pill.bg : "var(--bg3)",
+                                  color: disabled ? "var(--text3)" : pill.color,
+                                  opacity: disabled ? 0.4 : 1,
+                                  fontFamily: "'DM Sans',sans-serif", transition: "all .12s",
+                                }}
+                              >{t}</button>
+                            );
+                          })}
+                        </div>
+                        {essentialCount >= 2 && addType !== "essential" && (
+                          <div style={{ fontSize: 10, color: "var(--text3)", marginBottom: 6 }}>2 of 2 Essential goals set</div>
+                        )}
+                        <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 10, lineHeight: 1.4 }}>
+                          {TYPE_DESC[addType]}
+                        </div>
+
+                        {/* Domain color picker — locked palette */}
+                        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                          {domains.map(d => (
+                            <div key={d.id}
+                              onClick={() => setAddDomainId(d.id)}
+                              style={{
+                                width: 22, height: 22, borderRadius: "50%", background: d.color, cursor: "pointer",
+                                boxShadow: (addDomainId || domains[0]?.id) === d.id ? `0 0 0 2px var(--bg2), 0 0 0 3.5px ${d.color}` : "none",
+                                transition: "box-shadow .1s",
+                              }}
+                            />
+                          ))}
+                        </div>
+
+                        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                          <span onClick={addGoal}
+                            style={{ fontSize: 13, color: "#E8A030", fontWeight: 600, cursor: "pointer" }}>Add</span>
+                          <span onClick={() => setAddingSlot(null)}
+                            style={{ fontSize: 13, color: "var(--text3)", fontWeight: 500, cursor: "pointer" }}>Cancel</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div onClick={() => openAddSlot(slotIdx)}
+                        style={{
+                          border: "1.5px dashed var(--border)", borderRadius: 10, padding: "12px 16px",
+                          cursor: "pointer", textAlign: "center",
+                        }}>
+                        <span style={{ fontSize: 13, color: "var(--text3)", fontWeight: 500 }}>+ Add goal</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </>
           )}
         </div>
 
-        {/* ── DOMAIN BALANCE ── */}
+        {/* ── DOMAIN BALANCE — RADAR CHART ── */}
         <div className="sh" style={{ paddingTop: 20 }}>
           <span className="sh-label">DOMAIN BALANCE</span>
+          <div style={{ display: "flex", gap: 2 }}>
+            {["hours", "tasks"].map(m => (
+              <button key={m} onClick={() => setBalanceMode(m)}
+                style={{
+                  background: "none", border: "none", cursor: "pointer", padding: "2px 8px",
+                  fontSize: 12, fontWeight: balanceMode === m ? 700 : 500,
+                  color: balanceMode === m ? "#E8A030" : "var(--text3)",
+                  fontFamily: "'DM Sans',sans-serif", transition: "color .15s",
+                }}>
+                {m === "hours" ? "Hours" : "Tasks"}
+              </button>
+            ))}
+          </div>
         </div>
-        <div style={{ padding: "0 16px" }}>
-          {(() => {
-            const activeDomains = domains.filter(d => projects.some(p => p.domainId === d.id && p.status === "active"));
-            if (totalMins === 0) {
-              return (
-                <div style={{ textAlign: "center", color: "var(--text3)", fontSize: 13, padding: "16px 0" }}>
-                  Block time will appear here as you complete work sessions.
-                </div>
-              );
-            }
-            return activeDomains.map(d => {
-              const mins = domainMins[d.id] || 0;
-              const pct = totalMins > 0 ? (mins / totalMins) * 100 : 0;
-              const hrs = (mins / 60).toFixed(1);
-              return (
-                <div key={d.id} style={{ padding: "10px 0", borderBottom: "1px solid var(--border)" }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <div style={{ width: 8, height: 8, borderRadius: "50%", background: d.color }} />
-                      <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text)" }}>{d.name}</span>
-                    </div>
-                    <span style={{ fontSize: 12, color: "var(--text3)" }}>{hrs} hrs</span>
-                  </div>
-                  <div style={{ height: 4, borderRadius: 2, background: "var(--bg4)", overflow: "hidden" }}>
-                    <div style={{ width: `${pct}%`, height: "100%", borderRadius: 2, background: d.color, transition: "width .3s" }} />
-                  </div>
-                </div>
-              );
-            });
-          })()}
+        <div style={{ padding: "16px 0" }}>
+          {radarDomains.length === 0 || !hasRadarData ? (
+            <div style={{ textAlign: "center", color: "var(--text3)", fontSize: 13, padding: "32px 16px" }}>
+              Block time will appear here as you log work sessions.
+            </div>
+          ) : (
+            <RadarChart domainData={radarData} size={260} />
+          )}
         </div>
 
         {/* ── DEEP WORK ── */}
@@ -404,23 +549,21 @@ export default function SeasonScreen({ data, setData }) {
           <span className="sh-label">DEEP WORK</span>
         </div>
         <div style={{ display: "flex", gap: 12, padding: "0 16px" }}>
-          <div style={{ flex: 1, background: "var(--bg3)", borderRadius: 12, padding: "16px", textAlign: "center" }}>
-            <div style={{ fontSize: 24, fontWeight: 800, color: "var(--text)" }}>
-              {totalDWHrs > 0 ? (totalDWHrs % 1 === 0 ? totalDWHrs : totalDWHrs.toFixed(1)) : "0"}
-            </div>
-            <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 2 }}>hrs this season</div>
+          <div style={{ flex: 1, background: "var(--bg2)", borderRadius: 12, padding: 16, textAlign: "center" }}>
+            <div style={{ fontSize: 28, fontWeight: 700, color: "var(--text)" }}>{fmtHrs(totalDWHrs)}</div>
+            <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>hrs</div>
+            <div style={{ fontSize: 12, color: "var(--text3)" }}>This Season</div>
           </div>
-          <div style={{ flex: 1, background: "var(--bg3)", borderRadius: 12, padding: "16px", textAlign: "center" }}>
-            <div style={{ fontSize: 24, fontWeight: 800, color: "var(--text)" }}>
-              {avgDWPerWeek > 0 ? avgDWPerWeek.toFixed(1) : "0"}
-            </div>
-            <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 2 }}>hrs / week avg</div>
+          <div style={{ flex: 1, background: "var(--bg2)", borderRadius: 12, padding: 16, textAlign: "center" }}>
+            <div style={{ fontSize: 28, fontWeight: 700, color: "var(--text)" }}>{fmtHrs(avgDWPerWeek)}</div>
+            <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>hrs/wk</div>
+            <div style={{ fontSize: 12, color: "var(--text3)" }}>Weekly Avg</div>
           </div>
         </div>
 
-        {/* ── PROJECTS ── */}
+        {/* ── COMPLETED PROJECTS ── */}
         <div className="sh" style={{ paddingTop: 20 }}>
-          <span className="sh-label">PROJECTS</span>
+          <span className="sh-label">COMPLETED PROJECTS</span>
         </div>
         <div style={{ padding: "0 16px" }}>
           {completedProjects.length === 0 ? (
@@ -434,7 +577,7 @@ export default function SeasonScreen({ data, setData }) {
                 <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: "1px solid var(--border)" }}>
                   <div style={{ width: 8, height: 8, borderRadius: "50%", background: dom?.color || "var(--text3)" }} />
                   <span style={{ flex: 1, fontSize: 14, fontWeight: 500, color: "var(--text)" }}>{p.name}</span>
-                  <span style={{ fontSize: 11, color: "var(--text3)", fontWeight: 500 }}>✓ Complete</span>
+                  <span style={{ fontSize: 11, color: "var(--green)", fontWeight: 500 }}>✓ Complete</span>
                 </div>
               );
             })
@@ -446,26 +589,19 @@ export default function SeasonScreen({ data, setData }) {
           <span className="sh-label">WEEKLY REVIEWS</span>
         </div>
         <div style={{ padding: "0 16px" }}>
-          {seasonCompletions.length === 0 ? (
-            <div style={{ textAlign: "center", color: "var(--text3)", fontSize: 13, padding: "16px 0" }}>
-              Weekly review data will appear as the season progresses.
-            </div>
-          ) : (
-            <>
-              <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 10 }}>
-                {weekDots.map((w, i) => (
-                  <div key={i} style={{
-                    width: 14, height: 14, borderRadius: "50%",
-                    background: w.filled ? "#B89B6A" : "var(--bg4)",
-                    opacity: w.past || w.filled ? 1 : 0.4,
-                  }} />
-                ))}
-              </div>
-              <div style={{ fontSize: 12, color: "var(--text3)" }}>
-                {shutdownWeeks} of {weekDots.filter(w => w.past).length} weeks with a shutdown ritual completed
-              </div>
-            </>
-          )}
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 10 }}>
+            {weekDots.map((w, i) => (
+              <div key={i} style={{
+                width: 14, height: 14, borderRadius: "50%",
+                background: w.filled ? "#B89B6A" : "transparent",
+                border: w.filled ? "none" : "1.5px solid var(--border)",
+                opacity: w.past || w.filled ? 1 : 0.4,
+              }} />
+            ))}
+          </div>
+          <div style={{ fontSize: 12, color: "var(--text3)" }}>
+            {shutdownWeeks} of {pastWeeks} weeks with a shutdown completed
+          </div>
         </div>
 
         <div className="spacer" />
