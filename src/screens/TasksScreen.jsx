@@ -316,7 +316,15 @@ export default function TasksScreen({ data, setData }) {
                     onTouchMove={e => handleTouchMove(item.id, e)}
                     onTouchEnd={e => handleTouchEnd(item.id, e)}
                   >
-                    <div className="tasks-circle" />
+                    <div className="tasks-circle" onClick={(e) => {
+                      e.stopPropagation();
+                      animateOut(item.id, () => {
+                        setData(d => ({
+                          ...d,
+                          fabQueue: (d.fabQueue || []).filter(i => i.id !== item.id),
+                        }));
+                      });
+                    }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       {isEditing ? (
                         <input
@@ -351,7 +359,7 @@ export default function TasksScreen({ data, setData }) {
                         return dom ? <div className="tasks-domain-dot" style={{ background: dom.color }} /> : null;
                       })()}
                     </div>
-                    {!isEditing && isQuickWin && (
+                    {!isEditing && item.quickWin === true && (
                       <span style={{ fontSize: 16, flexShrink: 0, alignSelf: "center" }}>⚡</span>
                     )}
                   </div>
