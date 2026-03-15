@@ -75,7 +75,7 @@ export const INITIAL_DATA = {
 //   3. The rest of the app is unchanged
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 export const STORAGE_KEY    = "nave_data_v1";       // new key — clean break from momentum_v2
 export const THEME_KEY      = "nave_theme";
 
@@ -96,7 +96,7 @@ export const FIELD_DEFAULTS = {
   deepWorkHours:  {}, // { [dateISO]: number } — minutes of deep work logged per day
   weekIntention:  "",
   shutdownDone:   false,
-  seasonGoals:    INITIAL_DATA.seasonGoals,
+  seasonGoals:    [], // [{ id, text, type, domainId, done }] — type: "essential"|"maintain"|"bonus"
   workWeek:       [2,3,4,5,6],
   deepBlockDefaults: [
     { startHour:9,  startMin:0, durationMin:90 },
@@ -224,5 +224,14 @@ export const MIGRATIONS = [
         schemaVersion: 6,
       };
     }
+  },
+  // v7: add type field to seasonGoals (default "essential" for existing goals)
+  {
+    version: 7,
+    up: (data) => ({
+      ...data,
+      seasonGoals: (data.seasonGoals || []).map(g => ({ type: "essential", ...g })),
+      schemaVersion: 7,
+    })
   },
 ];
