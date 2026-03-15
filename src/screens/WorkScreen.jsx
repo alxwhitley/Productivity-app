@@ -705,8 +705,8 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
           const hasItems = group.items.length > 0;
           const isShallowPhase = group.id === "shallow";
 
-          const isWindPhase = group.id === "wind";
-          if (!hasItems && !isShallowPhase && !isWindPhase) return null;
+          if (group.id === "wind") return null;
+          if (!hasItems && !isShallowPhase) return null;
 
           const phaseColor = PHASE_COLORS[group.id];
           const isActivePhase = currentPhase === group.id;
@@ -771,15 +771,6 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
                 )
               )}
 
-              {/* Wind Down empty state */}
-              {isWindPhase && !hasItems && !shutdownDoneToday && (
-                <div
-                  style={{ padding: "8px 16px 4px", cursor: "pointer", color: "var(--text3)", fontSize: 13, fontWeight: 500 }}
-                  onClick={() => setShutdownOpen(true)}
-                >
-                  Begin shutdown ritual →
-                </div>
-              )}
             </div>
           );
         })}
@@ -787,23 +778,6 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
 
 
       </div>
-
-      {/* ── SHUTDOWN RITUAL FOOTER ── */}
-      {showShutdownFooter && (
-        <div style={{ background: "var(--bg2)", borderTop: "1px solid var(--border)", padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: shutdownDoneToday ? "center" : "space-between" }}>
-          {shutdownDoneToday ? (
-            <span style={{ fontSize: 13, color: "var(--green)", fontWeight: 600 }}>✓ Day complete</span>
-          ) : (
-            <>
-              <span style={{ fontSize: 14, color: "var(--text)" }}>🌙 Shutdown Ritual</span>
-              <button onClick={() => setShutdownOpen(true)}
-                style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "var(--accent)", fontFamily: "'DM Sans',sans-serif", padding: 0 }}>
-                Begin →
-              </button>
-            </>
-          )}
-        </div>
-      )}
 
 
       {/* ── SHUTDOWN SHEET ── */}
