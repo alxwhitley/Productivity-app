@@ -92,7 +92,6 @@ export default function ProjectsScreen({ data, setData }) {
     setData(d => ({
       ...d,
       projects: d.projects.map(p => p.id === projectId ? { ...p, name } : p),
-      domains: d.domains
     }));
   };
 

@@ -1,14 +1,13 @@
 import { useState, useRef, useEffect } from "react";
 import { getPct } from "../utils.js";
-import { DOMAIN_COLORS } from "../constants.js";
 import SwipeTask from "./SwipeTask.jsx";
 
-const PROJ_COLORS = DOMAIN_COLORS;
-
-function ProjectCard({ proj, domain, isExp, newTaskText,
+function ProjectCard({ proj, domain: domainProp, isExp, newTaskText,
   onToggleExpand, onToggleStatus, onDelete, onEditSave,
   onToggleTask, onDeleteTask, onSaveTask, onTodayTask, onNewTaskChange, onAddTask, autoFocus,
   data, onTypeChange, scrollIntoView }) {
+  // Always read domain from live data to avoid stale color references
+  const domain = (data?.domains || []).find(d => d.id === proj.domainId) || domainProp;
   const isSessionMode = (proj.type || proj.mode) === "sessions";
   const [addingTask, setAddingTask] = useState(false);
   const [newText, setNewText] = useState("");

@@ -102,6 +102,34 @@ export default function App() {
             <OnboardingFlow onDone={() => setData(d => ({ ...d, onboardingDone: true }))} />
           )}
 
+          {/* Shutdown pill — top of screen, in flow */}
+          {showBanner && (
+            <div
+              onClick={() => !shutdownDoneToday && setShutdownRitualOpen(true)}
+              style={{
+                width: "52%", margin: "10px auto", height: 36,
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                borderRadius: 20,
+                background: shutdownDoneToday
+                  ? "linear-gradient(135deg, #2A2A2A 0%, #1E1E1E 100%)"
+                  : "linear-gradient(135deg, #2D1B4E 0%, #1E1235 100%)",
+                border: shutdownDoneToday
+                  ? "1px solid rgba(138,144,153,0.4)"
+                  : "1px solid rgba(155,114,207,0.4)",
+                boxShadow: shutdownDoneToday
+                  ? "none"
+                  : "0 0 32px 8px rgba(155,114,207,0.35), 0 0 64px 16px rgba(155,114,207,0.15)",
+                color: shutdownDoneToday ? "var(--text3)" : "#fff",
+                fontSize: 13, fontWeight: 600,
+                cursor: shutdownDoneToday ? "default" : "pointer",
+                fontFamily: "'DM Sans',sans-serif",
+              }}
+            >
+              <span style={{ display: "flex", alignItems: "center" }}>{shutdownDoneToday ? "✓" : <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}</span>
+              <span>{shutdownDoneToday ? "Shutdown complete" : "Shutdown ritual →"}</span>
+            </div>
+          )}
+
           {tab === "work" && (
             <WorkScreen
               data={safeData}
@@ -151,35 +179,6 @@ export default function App() {
               <circle cx="12" cy="7" r="4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
-
-          {/* Shutdown pill — floats above nav */}
-          {showBanner && (
-            <div
-              onClick={() => !shutdownDoneToday && setShutdownRitualOpen(true)}
-              style={{
-                position: "fixed", bottom: "calc(72px + 12px)", left: 16, right: 16,
-                height: 52, zIndex: 100,
-                display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                borderRadius: 28,
-                background: shutdownDoneToday
-                  ? "linear-gradient(135deg, #2A2A2A 0%, #1E1E1E 100%)"
-                  : "linear-gradient(135deg, #2D1B4E 0%, #1E1235 100%)",
-                border: shutdownDoneToday
-                  ? "1px solid rgba(138,144,153,0.4)"
-                  : "1px solid rgba(155,114,207,0.4)",
-                boxShadow: shutdownDoneToday
-                  ? "none"
-                  : "0 0 32px 8px rgba(155,114,207,0.35), 0 0 64px 16px rgba(155,114,207,0.15)",
-                color: shutdownDoneToday ? "var(--text3)" : "#fff",
-                fontSize: 14, fontWeight: 600,
-                cursor: shutdownDoneToday ? "default" : "pointer",
-                fontFamily: "'DM Sans',sans-serif",
-              }}
-            >
-              <span>{shutdownDoneToday ? "✓" : "🌙"}</span>
-              <span>{shutdownDoneToday ? "Shutdown complete · Rest well" : "Begin shutdown ritual →"}</span>
-            </div>
-          )}
 
           {/* Floating pill nav — always visible */}
           <div className="pill-nav">
