@@ -152,25 +152,28 @@ export default function App() {
             </svg>
           </button>
 
-          {/* Shutdown pill — floats above nav */}
+          {/* Shutdown pill — notification bar at top */}
           {showBanner && (
             <div
               onClick={() => !shutdownDoneToday && setShutdownRitualOpen(true)}
               style={{
-                position: "fixed", bottom: 90, left: 16, right: 16, height: 52, zIndex: 49,
+                position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)",
+                width: "fit-content", height: 44, zIndex: 49,
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                borderRadius: 28,
+                padding: "0 24px",
+                borderRadius: "0 0 22px 22px",
                 background: shutdownDoneToday
                   ? "linear-gradient(135deg, #2A2A2A 0%, #1E1E1E 100%)"
                   : "linear-gradient(135deg, #2D1B4E 0%, #1E1235 100%)",
                 border: shutdownDoneToday
                   ? "1px solid rgba(138,144,153,0.4)"
                   : "1px solid rgba(155,114,207,0.4)",
+                borderTop: "none",
                 boxShadow: shutdownDoneToday
                   ? "none"
-                  : "0 0 32px 8px rgba(155,114,207,0.35), 0 0 64px 16px rgba(155,114,207,0.15)",
+                  : "0 8px 32px rgba(155,114,207,0.35), 0 4px 64px rgba(155,114,207,0.15)",
                 color: shutdownDoneToday ? "var(--text3)" : "#fff",
-                fontSize: 14, fontWeight: 600,
+                fontSize: 13, fontWeight: 600,
                 cursor: shutdownDoneToday ? "default" : "pointer",
                 fontFamily: "'DM Sans',sans-serif",
               }}
