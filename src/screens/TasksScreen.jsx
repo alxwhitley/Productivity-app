@@ -258,10 +258,16 @@ export default function TasksScreen({ data, setData }) {
       <StatusBar />
       <div className="scroll" style={{ flex: 1, display: "flex", flexDirection: "column", paddingBottom: 100 }}>
 
+        {/* ── HEADER ── */}
+        <div className="ph">
+          <div className="ph-eye">Tasks</div>
+          <div className="ph-title">Tasks</div>
+        </div>
+
         {/* ── PILL FILTERS ── */}
         <div className="tasks-filter-row">
           <button className={`tasks-filter-pill ${filter === "all" ? "active" : ""}`} onClick={() => setFilter("all")}>All</button>
-          <button className={`tasks-filter-pill ${filter === "quickwins" ? "active" : ""}`} onClick={() => setFilter("quickwins")}>Quick Wins</button>
+          <button className={`tasks-filter-pill ${filter === "quickwins" ? "active" : ""}`} onClick={() => setFilter("quickwins")}>⚡ Quick Wins</button>
         </div>
 
         {/* ── SECTION: QUEUE ── */}
@@ -345,9 +351,13 @@ export default function TasksScreen({ data, setData }) {
                           {item.text}
                         </div>
                       )}
+                      {(() => {
+                        const dom = item.domainId ? domains.find(d => d.id === item.domainId) : null;
+                        return dom ? <div className="tasks-domain-dot" style={{ background: dom.color }} /> : null;
+                      })()}
                     </div>
                     {!isEditing && isQuickWin && (
-                      <span className="tasks-qw-badge">Quick Win</span>
+                      <span style={{ fontSize: 16, flexShrink: 0, alignSelf: "center" }}>⚡</span>
                     )}
                   </div>
                 </div>

@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from "react";
 import { fmtTime, toISODate, uid, getRoutinesForDate } from "../utils.js";
 import { getDeepSlots } from "../constants.js";
 import StatusBar from "../components/StatusBar.jsx";
-import TodaySettingsSheet from "../sheets/TodaySettingsSheet.jsx";
 import ShutdownSheet from "../sheets/ShutdownSheet.jsx";
 import DWPickerSheet from "../sheets/DWPickerSheet.jsx";
 
@@ -76,13 +75,11 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
   const [recentlyChecked, setRecentlyChecked] = useState(new Set());
   const [dwOverflowOpen, setDwOverflowOpen] = useState(null);
   const [dwPickerOpen, setDwPickerOpen] = useState(null); // { slot, preProjectId?, preTasks? }
-  const [viewingTomorrow, setViewingTomorrow] = useState(false);
   const [lateStarted, setLateStarted] = useState({});
   const [tick, setTick] = useState(0);
   const [pickerState, setPickerState] = useState(null);
   const [editingDwTaskId, setEditingDwTaskId] = useState(null);
   const [editingDwTaskText, setEditingDwTaskText] = useState("");
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [shutdownOpen, setShutdownOpen] = useState(false);
   const [shallowExpanded, setShallowExpanded] = useState(false);
 
@@ -227,15 +224,11 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
   const nowMins = now.getHours() * 60 + now.getMinutes();
   const currentPhase = getPhaseForMins(nowMins);
 
-  const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
   const dateKey = today.toDateString();
   const dateKeyISO = toISODate(today);
-  const tomorrowDateKey = tomorrow.toDateString();
-  const tomorrowDateKeyISO = toISODate(tomorrow);
 
-  const viewDate = viewingTomorrow ? tomorrow : today;
-  const viewDateKey = viewingTomorrow ? tomorrowDateKey : dateKey;
-  const viewDateKeyISO = viewingTomorrow ? tomorrowDateKeyISO : dateKeyISO;
+  const viewDate = today;
+  const viewDateKeyISO = dateKeyISO;
   viewDateKeyISO_ref.current = viewDateKeyISO;
 
   const savedDWSlots = (data.deepWorkSlots || {})[viewDateKeyISO] || [];
@@ -256,7 +249,7 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
   });
 
   const todayRoutines = getRoutinesForDate(data.routineBlocks || [], today);
-  const viewRoutines = viewingTomorrow ? getRoutinesForDate(data.routineBlocks || [], tomorrow) : todayRoutines;
+  const viewRoutines = todayRoutines;
 
   const timeline = [
     ...viewRoutines.map(r => ({ type: "routine", id: r.id, mins: r.startHour * 60 + r.startMin, data: r })),
@@ -289,6 +282,34 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
   const shallowUndone = shallowTasks.filter(t => !t.done).length;
   const shallowCount = shallowTasks.length;
 
+  // ── Today picks (project + loose tasks picked via "Today" swipe) ──
+  const todayPickIds = (data.todayLoosePicks || {})[todayISO] || [];
+  const todayPickTasks = todayPickIds.map(id => {
+    // Check project tasks first
+    for (const p of projects) {
+      const t = p.tasks.find(t => t.id === id);
+      if (t) return { ...t, _projectId: p.id, _source: "project" };
+    }
+    // Check loose tasks
+    const lt = (data.looseTasks || []).find(t => t.id === id);
+    if (lt) return { ...lt, _source: "loose" };
+    return null;
+  }).filter(Boolean);
+  const hasShallowOrPicks = shallowCount > 0 || todayPickTasks.length > 0;
+
+  const toggleTodayPickTask = (task) => {
+    if (task._source === "project") {
+      toggleTask(task._projectId, task.id);
+    } else {
+      setData(d => ({
+        ...d,
+        looseTasks: (d.looseTasks || []).map(t =>
+          t.id === task.id ? { ...t, done: !t.done, doneAt: !t.done ? new Date().toISOString() : null } : t
+        ),
+      }));
+    }
+  };
+
   const toggleShallowTask = (taskId) => {
     setData(d => {
       const sw = { ...(d.shallowWork || {}) };
@@ -300,7 +321,7 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
   };
 
   // ── Shutdown visibility: show at 12pm+ ──
-  const showShutdownFooter = !viewingTomorrow && nowMins >= 720;
+  const showShutdownFooter = nowMins >= 720;
   const shutdownDoneToday = data.shutdownDone && data.shutdownDate === todayISO;
 
   // ── Group blocks by phase ──
@@ -325,7 +346,7 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
   });
 
   // Determine which phases have content (blocks or shallow banner)
-  const hasShallowContent = shallowCount > 0;
+  const hasShallowContent = true; // Always show shallow phase
 
   // ── Render helpers ──
 
@@ -415,10 +436,9 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
         <div key={slot.id} className="work-card" style={{
           background: "var(--bg2)", border: "1px solid var(--border)", opacity: 0.55, position: "relative", cursor: "pointer",
         }} onClick={() => setExpandedId(isExpDone ? null : slot.id)}>
-          <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: "var(--green)", borderRadius: "14px 0 0 14px" }} />
+          <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: "var(--border)", borderRadius: "14px 0 0 14px" }} />
           <div style={{ padding: "14px 16px 14px 20px", display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--text3)", marginBottom: 2 }}>{domain?.name || "Deep Work"}</div>
               <div style={{ fontSize: 18, fontWeight: 800, color: "var(--text3)", letterSpacing: "-.02em" }}>{proj?.name}</div>
               <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 3 }}>{data.todayPrefs?.hideTimes ? "" : `${fmtTime(slot.startHour, slot.startMin)} · `}{slot.durationMin} min</div>
             </div>
@@ -493,8 +513,7 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                 Change Project
               </button>
-              {!viewingTomorrow && (
-                <button onClick={() => {
+              <button onClick={() => {
                   const tomorrowISO = toISODate(new Date(Date.now() + 86400000));
                   mutateDWSlot(toISODate(), slot.slotIndex, null);
                   mutateDWSlot(tomorrowISO, slot.slotIndex, { projectId: slot.projectId, startHour: slot.startHour, startMin: slot.startMin, durationMin: slot.durationMin, todayTasks: slot.todayTasks });
@@ -504,7 +523,6 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                   Move to Tomorrow
                 </button>
-              )}
             </div>
           </div>
         )}
@@ -512,9 +530,6 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
         {/* Header row */}
         <div style={{ padding: "14px 16px 12px 20px", display: "flex", alignItems: "flex-start", gap: 12 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: domainColor || "var(--text3)", marginBottom: 4 }}>
-              {domain?.name || "Deep Work"}
-            </div>
             <div style={{ fontSize: 18, fontWeight: 800, color: "var(--text)", letterSpacing: "-.02em", lineHeight: 1.15 }}>{proj?.name}</div>
             {!showBody && (
               <>
@@ -523,10 +538,9 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
                   {!isSessionMode && hasTodayTasks ? ` · ${relevantDone}/${relevantTasks.length}` : ""}
                 </div>
                 {!isSessionMode && !hasTodayTasks && (
-                  <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 6, cursor: "pointer", color: "var(--text2)", fontSize: 13 }}
+                  <div style={{ marginTop: 4, cursor: "pointer", color: "var(--text3)", fontSize: 12 }}
                     onClick={e => { e.stopPropagation(); setPickerState({ blockId: slot.id, projectId: proj.id, selected: new Set(), newText: "" }); setExpandedId(slot.id); }}>
-                    <span style={{ fontSize: 16, lineHeight: 1 }}>+</span>
-                    <span>Pick tasks for this block</span>
+                    + Pick tasks
                   </div>
                 )}
               </>
@@ -636,10 +650,9 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
                 )}
               </>
             ) : (
-              <div style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", color: "var(--text3)", fontSize: 13 }}
+              <div style={{ cursor: "pointer", color: "var(--text3)", fontSize: 12 }}
                 onClick={() => setPickerState({ blockId: slot.id, projectId: proj.id, selected: new Set(), newText: "" })}>
-                <span style={{ fontSize: 16, lineHeight: 1 }}>+</span>
-                <span>Pick tasks for this block</span>
+                + Pick tasks
               </div>
             )}
           </div>
@@ -653,79 +666,48 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
   return (
     <div className="screen active" style={{ display: "flex", flexDirection: "column", position: "relative" }}>
       {/* Full-screen ambient phase glow */}
-      {!viewingTomorrow && (
-        <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0, background: `radial-gradient(ellipse at center, ${PHASE_COLORS[currentPhase]?.glow || "transparent"} 0%, transparent 70%)` }} />
-      )}
+      <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0, background: `radial-gradient(ellipse at center, ${PHASE_COLORS[currentPhase]?.glow || "transparent"} 0%, transparent 70%)` }} />
       <StatusBar />
-      <div ref={scrollRef} className="scroll" style={{ flex: 1, paddingBottom: showShutdownFooter ? 160 : 100 }}>
+      <div ref={scrollRef} className="scroll" style={{ flex: 1, paddingBottom: 80 }}>
 
         {/* ── HEADER ── */}
         <div style={{ padding: "14px 24px 10px" }}>
-          {viewingTomorrow && (
-            <button onClick={() => setViewingTomorrow(false)} style={{ background: "none", border: "none", cursor: "pointer", padding: "0 0 8px", display: "flex", alignItems: "center", gap: 4, color: "var(--text3)", fontFamily: "'DM Sans',sans-serif", fontSize: 12, fontWeight: 600 }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              Today
-            </button>
-          )}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <div>
-              {viewingTomorrow && (
-                <div style={{ fontSize: 22, fontWeight: 700, color: "var(--text)", letterSpacing: "-.02em", marginBottom: 2 }}>Tomorrow</div>
-              )}
-              <div style={{ fontSize: 14, color: "var(--text2)", fontWeight: 500 }}>
-                {days[viewDate.getDay()]}, {months[viewDate.getMonth()]} {viewDate.getDate()}
-              </div>
-              <div style={{ fontSize: 13, color: "var(--text3)", marginTop: 4 }}>
-                {viewingTomorrow
-                  ? `${timeline.length} block${timeline.length !== 1 ? "s" : ""} planned`
-                  : `${greeting}${name ? `, ${name}` : ""}.`
-                }
-              </div>
+          <div>
+            <div style={{ fontSize: 14, color: "var(--text2)", fontWeight: 500 }}>
+              {days[viewDate.getDay()]}, {months[viewDate.getMonth()]} {viewDate.getDate()}
             </div>
-            <button onClick={() => setSettingsOpen(true)}
-              style={{ background: "none", border: "none", cursor: "pointer", padding: 4, color: "var(--text3)", marginTop: 2 }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" stroke="currentColor" strokeWidth="2" />
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" stroke="currentColor" strokeWidth="2" />
-              </svg>
-            </button>
+            <div style={{ fontSize: 13, color: "var(--text3)", marginTop: 4 }}>
+              {`${greeting}${name ? `, ${name}` : ""}.`}
+            </div>
           </div>
         </div>
 
         {/* ── BIO-PHASE BAR ── */}
-        {!viewingTomorrow && (
-          <div style={{ padding: "0 16px 16px" }}>
-            <div style={{ display: "flex", marginBottom: 6 }}>
-              {BIO_PHASES.map(p => (
-                <span key={p.id} style={{ flex: p.endMin - p.startMin, textAlign: "center", fontSize: 10, fontWeight: 700, textTransform: "uppercase", color: "var(--text3)", lineHeight: 1.2 }}>
-                  {p.label}
-                </span>
-              ))}
-            </div>
-            <div style={{ position: "relative", height: 4, background: "var(--bg4)", borderRadius: 2 }}>
-              <div style={{ position: "absolute", left: 0, top: 0, height: "100%", background: "var(--accent)", borderRadius: 2, width: `${barPct}%` }} />
-              <div className="work-bio-dot" style={{ left: `${barPct}%`, background: PHASE_COLORS[currentPhase]?.css || "var(--accent)" }} />
-            </div>
+        <div style={{ padding: "0 16px 16px" }}>
+          <div style={{ display: "flex", marginBottom: 6 }}>
+            {BIO_PHASES.map(p => (
+              <span key={p.id} style={{ flex: p.endMin - p.startMin, textAlign: "center", fontSize: 10, fontWeight: 700, textTransform: "uppercase", color: "var(--text3)", lineHeight: 1.2 }}>
+                {p.label}
+              </span>
+            ))}
           </div>
-        )}
+          <div style={{ position: "relative", height: 4, background: "var(--bg4)", borderRadius: 2 }}>
+            <div style={{ position: "absolute", left: 0, top: 0, height: "100%", background: "var(--accent)", borderRadius: 2, width: `${barPct}%` }} />
+            <div className="work-bio-dot" style={{ left: `${barPct}%`, background: PHASE_COLORS[currentPhase]?.css || "var(--accent)" }} />
+          </div>
+        </div>
 
         {/* ── BLOCKS BY PHASE ── */}
-        {timeline.length === 0 && !hasShallowContent && (
-          <div style={{ textAlign: "center", padding: "40px 24px", fontSize: 13, color: "var(--text3)" }}>
-            No blocks today.
-          </div>
-        )}
 
         {groupedBlocks.map(group => {
           const hasItems = group.items.length > 0;
           const isShallowPhase = group.id === "shallow";
-          const showShallowBanner = isShallowPhase && shallowCount > 0;
 
           const isWindPhase = group.id === "wind";
-          if (!hasItems && !showShallowBanner && !isWindPhase) return null;
+          if (!hasItems && !isShallowPhase && !isWindPhase) return null;
 
           const phaseColor = PHASE_COLORS[group.id];
-          const isActivePhase = !viewingTomorrow && currentPhase === group.id;
+          const isActivePhase = currentPhase === group.id;
 
           return (
             <div key={group.id}>
@@ -738,16 +720,10 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
                 <div style={{ flex: 1, height: 1, background: "var(--border2)" }} />
               </div>
 
-              {/* Empty state for Wind Down */}
-              {isWindPhase && !hasItems && (
-                <div style={{ padding: "12px 16px", fontSize: 13, color: "var(--text3)" }}>
-                  No blocks scheduled
-                </div>
-              )}
 
               {/* Block cards */}
               {group.items.map(item => {
-                const isNow = !viewingTomorrow && currentItem?.id === item.id;
+                const isNow = currentItem?.id === item.id;
                 if (item.type === "routine") return renderRoutineCard(item, isNow);
                 if (item.type === "deepwork") {
                   const slot = item.data;
@@ -757,53 +733,55 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
                 return null;
               })}
 
-              {/* Shallow work banner under shallow phase */}
-              {showShallowBanner && (
-                <div style={{ margin: "0 12px 8px" }}>
-                  <div
-                    onClick={() => setShallowExpanded(!shallowExpanded)}
-                    style={{ background: "var(--bg2)", borderRadius: 10, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}
-                  >
-                    <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>Loose Tasks</span>
-                    {shallowCount > 0 && (
+              {/* Shallow work section */}
+              {isShallowPhase && (
+                hasShallowOrPicks ? (
+                  <div style={{ margin: "0 12px 8px" }}>
+                    <div
+                      onClick={() => setShallowExpanded(!shallowExpanded)}
+                      style={{ background: "var(--bg2)", borderRadius: shallowExpanded ? "10px 10px 0 0" : 10, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}
+                    >
+                      <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>Loose Tasks</span>
                       <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text2)", background: "var(--bg3)", borderRadius: 12, padding: "2px 8px" }}>
-                        {shallowUndone > 0 ? shallowUndone : shallowCount}
+                        {shallowUndone + todayPickTasks.filter(t => !t.done).length || shallowCount + todayPickTasks.length}
                       </span>
+                    </div>
+                    {shallowExpanded && (
+                      <div style={{ background: "var(--bg2)", borderRadius: "0 0 10px 10px", marginTop: -2, padding: "0 16px 8px" }}>
+                        {todayPickTasks.map((t, i) => (
+                          <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderTop: "1px solid var(--border2)", cursor: "pointer" }}
+                            onClick={() => toggleTodayPickTask(t)}>
+                            <div className={`tl-check ${t.done ? "done" : ""}`} style={{ width: 20, height: 20, flexShrink: 0 }}>
+                              {t.done && <span style={{ fontSize: 10, color: "#fff", fontWeight: 700 }}>✓</span>}
+                            </div>
+                            <span style={{ fontSize: 14, color: t.done ? "var(--text3)" : "var(--text)", textDecoration: t.done ? "line-through" : "none", flex: 1 }}>{t.text}</span>
+                          </div>
+                        ))}
+                        {shallowTasks.map((t, i) => (
+                          <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderTop: "1px solid var(--border2)", cursor: "pointer" }}
+                            onClick={() => toggleShallowTask(t.id)}>
+                            <div className={`tl-check ${t.done ? "done" : ""}`} style={{ width: 20, height: 20, flexShrink: 0 }}>
+                              {t.done && <span style={{ fontSize: 10, color: "#fff", fontWeight: 700 }}>✓</span>}
+                            </div>
+                            <span style={{ fontSize: 14, color: t.done ? "var(--text3)" : "var(--text)", textDecoration: t.done ? "line-through" : "none", flex: 1 }}>{t.text}</span>
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
-                  {shallowExpanded && (
-                    <div style={{ background: "var(--bg2)", borderRadius: "0 0 10px 10px", marginTop: -2, padding: "0 16px 8px" }}>
-                      {shallowTasks.map((t, i) => (
-                        <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderTop: "1px solid var(--border2)", cursor: "pointer" }}
-                          onClick={() => toggleShallowTask(t.id)}>
-                          <div className={`tl-check ${t.done ? "done" : ""}`} style={{ width: 20, height: 20, flexShrink: 0 }}>
-                            {t.done && <span style={{ fontSize: 10, color: "#fff", fontWeight: 700 }}>✓</span>}
-                          </div>
-                          <span style={{ fontSize: 14, color: t.done ? "var(--text3)" : "var(--text)", textDecoration: t.done ? "line-through" : "none", flex: 1 }}>{t.text}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                ) : (
+                  <div style={{ padding: "8px 16px 4px", cursor: "pointer", color: "var(--text3)", fontSize: 13 }}
+                    onClick={() => onGoToTasks()}>
+                    + Add from Tasks
+                  </div>
+                )
               )}
             </div>
           );
         })}
 
-        {/* Render shallow phase header + banner if no blocks exist in shallow but there are shallow tasks */}
-        {shallowCount > 0 && !groupedBlocks.some(g => g.id === "shallow" && (g.items.length > 0 || true)) ? null : null}
 
-        {/* ── TOMORROW PILL ── */}
-        {!viewingTomorrow && (
-          <div style={{ textAlign: "center", padding: "16px 0 16px" }}>
-            <button onClick={() => setViewingTomorrow(true)}
-              style={{ background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 22, padding: "8px 20px", fontSize: 13, fontWeight: 600, color: "var(--text2)", cursor: "pointer", fontFamily: "'DM Sans',sans-serif" }}>
-              Tomorrow →
-            </button>
-          </div>
-        )}
 
-        <div className="spacer" />
       </div>
 
       {/* ── SHUTDOWN RITUAL FOOTER ── */}
@@ -823,10 +801,6 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
         </div>
       )}
 
-      {/* ── SETTINGS SHEET ── */}
-      {settingsOpen && (
-        <TodaySettingsSheet data={data} setData={setData} onClose={() => setSettingsOpen(false)} />
-      )}
 
       {/* ── SHUTDOWN SHEET ── */}
       {shutdownOpen && (

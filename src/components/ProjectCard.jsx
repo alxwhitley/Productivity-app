@@ -8,7 +8,7 @@ const PROJ_COLORS = DOMAIN_COLORS;
 
 function ProjectCard({ proj, domain, isExp, newTaskText,
   onToggleExpand, onToggleStatus, onDelete, onEditSave,
-  onToggleTask, onDeleteTask, onSaveTask, onNewTaskChange, onAddTask, autoFocus,
+  onToggleTask, onDeleteTask, onSaveTask, onTodayTask, onNewTaskChange, onAddTask, autoFocus,
   sessionLog, onModeToggle, scrollIntoView }) {
   const isSessionMode = proj.mode === "sessions";
   const [addingTask, setAddingTask] = useState(false);
@@ -181,6 +181,7 @@ function ProjectCard({ proj, domain, isExp, newTaskText,
               onToggle={() => onToggleTask(t.id)}
               onDelete={() => onDeleteTask(t.id)}
               onSave={text => onSaveTask(t.id, text)}
+              onToday={onTodayTask ? () => onTodayTask(t.id) : undefined}
               scrollIntoView={doScrollIntoView}
             />
           ))}

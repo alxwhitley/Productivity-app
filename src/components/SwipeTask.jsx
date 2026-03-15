@@ -1,13 +1,14 @@
 import { useState, useRef } from "react";
 
-function SwipeTask({ task, onToggle, onDelete, onSave, scrollIntoView }) {
+function SwipeTask({ task, onToggle, onDelete, onSave, onToday, scrollIntoView }) {
   const [offset, setOffset]   = useState(0);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft]     = useState(task.text);
   const [bouncing, setBouncing] = useState(false);
   const startX = useRef(null);
-  const THRESHOLD = 56;
-  const MAX = 72;
+  const hasToday = onToday && !task.done;
+  const MAX = hasToday ? 128 : 72;
+  const THRESHOLD = hasToday ? 80 : 56;
 
   const onTouchStart = e => { startX.current = e.touches[0].clientX; };
   const onTouchMove  = e => {
@@ -39,8 +40,16 @@ function SwipeTask({ task, onToggle, onDelete, onSave, scrollIntoView }) {
 
   return (
     <div className={`st-wrap${bouncing ? " flash" : ""}`}>
-      <div className="st-delete-bg" onClick={onDelete}>
-        <span className="st-delete-ico">Delete</span>
+      <div className="st-delete-bg" style={{ display: "flex" }}>
+        {onToday && !task.done && (
+          <div style={{ width: 56, background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+            onClick={() => { onToday(); setOffset(0); }}>
+            <span style={{ color: "#000", fontSize: 11, fontWeight: 700, letterSpacing: ".03em", textTransform: "uppercase" }}>Today</span>
+          </div>
+        )}
+        <div style={{ flex: 1, background: "var(--red)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }} onClick={onDelete}>
+          <span className="st-delete-ico">Delete</span>
+        </div>
       </div>
       <div
         className="st-inner"

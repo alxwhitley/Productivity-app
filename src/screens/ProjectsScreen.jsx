@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { uid } from "../utils.js";
-import GearIcon from "../components/GearIcon.jsx";
+import { uid, toISODate } from "../utils.js";
 import StatusBar from "../components/StatusBar.jsx";
 import ProjectCard from "../components/ProjectCard.jsx";
 import ProjectsManageSheet from "../sheets/ProjectsManageSheet.jsx";
@@ -25,6 +24,9 @@ export default function ProjectsScreen({ data, setData }) {
   const [newLooseTopText, setNewLooseTopText] = useState("");
   const looseTopRef = useRef(null);
   const [removingLooseId, setRemovingLooseId] = useState(null);
+  const [looseSwipeId, setLooseSwipeId] = useState(null);
+  const [looseSwipeX, setLooseSwipeX] = useState(0);
+  const looseSwipeStart = useRef(null);
 
   const scrollRef = useRef(null);
 
@@ -153,6 +155,16 @@ export default function ProjectsScreen({ data, setData }) {
     setNewLooseTopText("");
   };
 
+  const addToToday = (taskId) => {
+    const todayISO = toISODate();
+    setData(d => {
+      const picks = { ...(d.todayLoosePicks || {}) };
+      const existing = picks[todayISO] || [];
+      if (existing.includes(taskId)) return d;
+      return { ...d, todayLoosePicks: { ...picks, [todayISO]: [...existing, taskId] } };
+    });
+  };
+
   const handlePlusTap = (e) => {
     e.stopPropagation();
     setLooseExpanded(true);
@@ -169,7 +181,16 @@ export default function ProjectsScreen({ data, setData }) {
             <div className="ph-eye">Your Work</div>
             <div className="ph-title">Projects</div>
           </div>
-          <button className="tab-gear" onClick={() => setShowManage(true)}><GearIcon size={20} /></button>
+          <button className="tab-gear" onClick={() => setShowManage(true)}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <line x1="4" y1="6" x2="20" y2="6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              <line x1="4" y1="12" x2="20" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              <line x1="4" y1="18" x2="20" y2="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              <circle cx="9" cy="6" r="2" fill="var(--bg)" stroke="currentColor" strokeWidth="2" />
+              <circle cx="15" cy="12" r="2" fill="var(--bg)" stroke="currentColor" strokeWidth="2" />
+              <circle cx="9" cy="18" r="2" fill="var(--bg)" stroke="currentColor" strokeWidth="2" />
+            </svg>
+          </button>
         </div>
         <div className="ph-sub">{activeCount} active · {projects.length - activeCount} in backlog</div>
       </div>
@@ -258,36 +279,62 @@ export default function ProjectsScreen({ data, setData }) {
               )}
 
               {/* Existing loose tasks */}
-              {domainLoose.map(t => (
-                <div key={t.id} className={`loose-domain-row${removingLooseId === t.id ? " loose-removing" : ""}`}>
-                  <div
-                    className={`loose-domain-check${removingLooseId === t.id ? " done" : ""}`}
-                    onClick={() => toggleLoose(t.id)}
-                  >
-                    {removingLooseId === t.id && <span style={{ fontSize: 10, color: "#fff", fontWeight: 700 }}>✓</span>}
-                  </div>
-                  {editingLooseId === t.id ? (
-                    <input
-                      className="loose-domain-edit"
-                      value={editingLooseText}
-                      autoFocus
-                      onFocus={e => scrollIntoView(e.target)}
-                      onChange={e => setEditingLooseText(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === "Enter") saveLooseEdit(t.id, editingLooseText);
-                        if (e.key === "Escape") { setEditingLooseId(null); setEditingLooseText(""); }
+              {domainLoose.map(t => {
+                const isLooseSwiping = looseSwipeId === t.id;
+                const lsx = isLooseSwiping ? looseSwipeX : 0;
+                return (
+                  <div key={t.id} className={`loose-domain-row${removingLooseId === t.id ? " loose-removing" : ""}`}
+                    style={{ position: "relative", overflow: "hidden" }}>
+                    {/* Swipe reveal: Today button */}
+                    <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, display: "flex", alignItems: "stretch", zIndex: 0 }}>
+                      <div style={{ width: 64, background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+                        onClick={() => { addToToday(t.id); setLooseSwipeId(null); setLooseSwipeX(0); }}>
+                        <span style={{ color: "#000", fontSize: 11, fontWeight: 700, letterSpacing: ".03em", textTransform: "uppercase" }}>Today</span>
+                      </div>
+                    </div>
+                    <div style={{ position: "relative", zIndex: 1, background: "var(--bg)", display: "flex", alignItems: "center", gap: 10, padding: "9px 0",
+                      transform: `translateX(${Math.min(0, lsx)}px)`, transition: looseSwipeStart.current === null ? "transform .2s ease" : "none" }}
+                      onTouchStart={e => { looseSwipeStart.current = e.touches[0].clientX; setLooseSwipeId(t.id); setLooseSwipeX(0); }}
+                      onTouchMove={e => {
+                        if (looseSwipeStart.current === null) return;
+                        const dx = e.touches[0].clientX - looseSwipeStart.current;
+                        if (dx < 0) setLooseSwipeX(Math.max(dx, -72));
                       }}
-                      onBlur={() => saveLooseEdit(t.id, editingLooseText)}
-                    />
-                  ) : (
-                    <span
-                      className={`loose-domain-text${removingLooseId === t.id ? " done" : ""}`}
-                      onClick={() => { if (removingLooseId) return; setEditingLooseId(t.id); setEditingLooseText(t.text); }}
-                      style={{ cursor: "text" }}
-                    >{t.text}</span>
-                  )}
-                </div>
-              ))}
+                      onTouchEnd={() => {
+                        setLooseSwipeX(looseSwipeX < -40 ? -64 : 0);
+                        if (looseSwipeX >= -40) setLooseSwipeId(null);
+                        looseSwipeStart.current = null;
+                      }}>
+                      <div
+                        className={`loose-domain-check${removingLooseId === t.id ? " done" : ""}`}
+                        onClick={() => toggleLoose(t.id)}
+                      >
+                        {removingLooseId === t.id && <span style={{ fontSize: 10, color: "#fff", fontWeight: 700 }}>✓</span>}
+                      </div>
+                      {editingLooseId === t.id ? (
+                        <input
+                          className="loose-domain-edit"
+                          value={editingLooseText}
+                          autoFocus
+                          onFocus={e => scrollIntoView(e.target)}
+                          onChange={e => setEditingLooseText(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === "Enter") saveLooseEdit(t.id, editingLooseText);
+                            if (e.key === "Escape") { setEditingLooseId(null); setEditingLooseText(""); }
+                          }}
+                          onBlur={() => saveLooseEdit(t.id, editingLooseText)}
+                        />
+                      ) : (
+                        <span
+                          className={`loose-domain-text${removingLooseId === t.id ? " done" : ""}`}
+                          onClick={() => { if (removingLooseId) return; setEditingLooseId(t.id); setEditingLooseText(t.text); }}
+                          style={{ cursor: "text" }}
+                        >{t.text}</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
 
               {/* Bottom dotted circle add row */}
               {addingLooseBottom ? (
@@ -340,6 +387,7 @@ export default function ProjectsScreen({ data, setData }) {
             onToggleTask={taskId => toggleTask(proj.id, taskId)}
             onDeleteTask={taskId => deleteTask(proj.id, taskId)}
             onSaveTask={(taskId, text) => saveTask(proj.id, taskId, text)}
+            onTodayTask={taskId => addToToday(taskId)}
             onNewTaskChange={v => setNewTaskText(t => ({ ...t, [proj.id]: v }))}
             onAddTask={() => addTask(proj.id)}
           />

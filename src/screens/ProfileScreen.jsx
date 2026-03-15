@@ -40,7 +40,7 @@ export default function ProfileScreen({ data, setData, onClose }) {
 
   // ── Settings state ──
   const [nameVal, setNameVal] = useState(data.todayPrefs?.name || "");
-  const prefs = data.todayPrefs || { name: "", showShutdown: true, hideTimes: false };
+  const prefs = data.todayPrefs || { name: "", showShutdown: true, hideTimes: false, defaultBlock: "9" };
 
   const updatePref = (key, value) => {
     setData(d => ({
@@ -79,11 +79,7 @@ export default function ProfileScreen({ data, setData, onClose }) {
         </div>
 
         {/* ── Settings ── */}
-        <div style={{ fontSize:11, fontWeight:700, letterSpacing:".08em", textTransform:"uppercase", color:"var(--text3)", padding:"16px 16px 8px", display:"flex", alignItems:"center", gap:6 }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-            <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" stroke="currentColor" strokeWidth="2" />
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" stroke="currentColor" strokeWidth="2" />
-          </svg>
+        <div style={{ fontSize:11, fontWeight:700, letterSpacing:".08em", textTransform:"uppercase", color:"var(--text3)", padding:"16px 16px 8px" }}>
           Settings
         </div>
         <div style={{ padding:"0 16px" }}>
@@ -126,6 +122,21 @@ export default function ProfileScreen({ data, setData, onClose }) {
             </div>
           </div>
 
+          {/* Default First Block */}
+          <div className="set-row" style={{ marginTop:12 }}>
+            <div>
+              <div className="set-row-label">Default First Block</div>
+              <div className="set-row-sub">Start time for your first block</div>
+            </div>
+            <select className="form-select" style={{ width:"auto", minWidth:90 }}
+              value={prefs.defaultBlock || "9"}
+              onChange={e => updatePref("defaultBlock", e.target.value)}>
+              {[5,6,7,8,9,10,11,12].map(h => (
+                <option key={h} value={String(h)}>{h > 12 ? h-12 : h}:00 {h >= 12 ? "PM" : "AM"}</option>
+              ))}
+            </select>
+          </div>
+
           {/* Deep Work Targets */}
           <div style={{ marginTop:16 }}>
             <div className="set-section">Deep Work Targets</div>
@@ -152,6 +163,21 @@ export default function ProfileScreen({ data, setData, onClose }) {
                   }))}
                 />
               </div>
+            </div>
+            <div style={{ marginTop:12 }}>
+              <div className="set-row-sub" style={{ marginBottom:6 }}>Max deep work blocks per day</div>
+              <div style={{ display:"flex", gap:8 }}>
+                {[1,2,3,4,5].map(n => (
+                  <button key={n} onClick={() => setData(d => ({
+                    ...d,
+                    deepWorkTargets: { ...(d.deepWorkTargets || {}), maxDeepBlocks: n },
+                  }))}
+                    style={{ flex:1, padding:"9px 0", borderRadius:10, border:`1.5px solid ${n === (data.deepWorkTargets?.maxDeepBlocks ?? 3) ? "var(--accent)" : "var(--border)"}`, background: n === (data.deepWorkTargets?.maxDeepBlocks ?? 3) ? "var(--accent-s)" : "var(--bg3)", color: n === (data.deepWorkTargets?.maxDeepBlocks ?? 3) ? "var(--accent)" : "var(--text2)", fontSize:15, fontWeight:700, cursor:"pointer", fontFamily:"'DM Sans',sans-serif", transition:"all .15s" }}>
+                    {n}
+                  </button>
+                ))}
+              </div>
+              <div style={{ fontSize:11, color:"var(--text3)", marginTop:6 }}>Huberman recommends 1–3 blocks of 90 min each</div>
             </div>
           </div>
         </div>
