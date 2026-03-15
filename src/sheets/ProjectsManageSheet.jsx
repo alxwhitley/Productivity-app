@@ -51,50 +51,52 @@ function ProjectsManageSheet({ data, setData, onClose, onAddProject }) {
         <div className="sheet-scroll">
 
           {/* ── CATEGORIES ── */}
-          <div className="set-section">Categories</div>
-          {catEdits.map(c => (
-            <div key={c.id} style={{ marginBottom: 10 }}>
+          <div className="sh" style={{ paddingTop: 8 }}>
+            <span className="sh-label">Categories</span>
+          </div>
+          {catEdits.map((c, i) => (
+            <div key={c.id} style={{ padding: "10px 20px", borderBottom: "1px solid var(--border2)" }}>
               <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
-                <div style={{ width:12, height:12, borderRadius:"50%", background:c.color, flexShrink:0 }} />
+                <div style={{ width:22, height:22, borderRadius:"50%", background:c.color, flexShrink:0, boxShadow: `0 0 0 2px var(--bg2), 0 0 0 3.5px ${c.color}` }} />
                 <input className="pm-proj-name" style={{ flex:1 }} value={c.name} onChange={e => updateCat(c.id,"name",e.target.value)} />
-                <button style={{ background:"none", border:"none", color:"var(--red)", fontSize:16, cursor:"pointer", padding:"0 4px" }} onClick={() => removeCat(c.id)}>✕</button>
+                <button style={{ background:"none", border:"none", color:"var(--red)", fontSize:13, cursor:"pointer", padding:"0 4px", fontFamily:"'DM Sans',sans-serif", fontWeight:500 }} onClick={() => removeCat(c.id)}>Remove</button>
               </div>
-              <div style={{ display:"flex", gap:6, flexWrap:"wrap", paddingLeft:20 }}>
+              <div style={{ display:"flex", gap:6, flexWrap:"wrap", paddingLeft:30 }}>
                 {COLORS.map(col => (
                   <div key={col} onClick={() => updateCat(c.id,"color",col)}
-                    style={{ width:22, height:22, borderRadius:"50%", background:col, cursor:"pointer", border: c.color===col ? "2px solid #fff" : "2px solid transparent", transform: c.color===col ? "scale(1.2)" : "scale(1)", transition:"transform .1s" }} />
+                    style={{ width:22, height:22, borderRadius:"50%", background:col, cursor:"pointer", boxShadow: c.color===col ? `0 0 0 2px var(--bg2), 0 0 0 3.5px ${col}` : "none", transition:"box-shadow .1s" }} />
                 ))}
               </div>
             </div>
           ))}
           {catEdits.length < 4 && (
-            <div style={{ marginTop:8, background:"var(--bg3)", borderRadius:10, padding:"10px 12px" }}>
-              <div style={{ fontSize:11, fontWeight:700, letterSpacing:".07em", textTransform:"uppercase", color:"var(--text3)", marginBottom:8 }}>Add Category</div>
-              <input className="set-input" placeholder="Category name…" value={newCatName} onChange={e => setNewCatName(e.target.value)} style={{ marginBottom:8 }} />
+            <div style={{ padding: "12px 20px" }}>
+              <input className="set-input" placeholder="New category name…" value={newCatName} onChange={e => setNewCatName(e.target.value)} style={{ marginBottom:8 }} />
               <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:8 }}>
                 {COLORS.map(col => (
                   <div key={col} onClick={() => setNewCatColor(col)}
-                    style={{ width:22, height:22, borderRadius:"50%", background:col, cursor:"pointer", border: newCatColor===col ? "2px solid #fff" : "2px solid transparent" }} />
+                    style={{ width:22, height:22, borderRadius:"50%", background:col, cursor:"pointer", boxShadow: newCatColor===col ? `0 0 0 2px var(--bg2), 0 0 0 3.5px ${col}` : "none", transition:"box-shadow .1s" }} />
                 ))}
               </div>
-              <button className="form-btn" style={{ marginTop:0 }} disabled={!newCatName.trim()} onClick={addCategory}>Add Category</button>
+              <span style={{ fontSize:13, color:"var(--accent)", fontWeight:600, cursor:"pointer" }} onClick={addCategory}>+ Add Category</span>
             </div>
           )}
 
           {/* ── ADD PROJECT ── */}
           {onAddProject && (
-            <>
-              <div className="set-section" style={{ marginTop:20 }}>New Project</div>
-              <button className="form-btn" style={{ marginTop:0 }} onClick={() => { onClose(); setTimeout(() => onAddProject(), 100); }}>+ Add Project</button>
-            </>
+            <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--border2)" }}>
+              <span style={{ fontSize:13, color:"var(--accent)", fontWeight:600, cursor:"pointer" }} onClick={() => { onClose(); setTimeout(() => onAddProject(), 100); }}>+ Add Project</span>
+            </div>
           )}
 
           {/* ── EDIT EXISTING PROJECTS ── */}
-          <div className="set-section" style={{ marginTop:20 }}>Edit Projects</div>
+          <div className="sh" style={{ paddingTop: 16 }}>
+            <span className="sh-label">Projects</span>
+          </div>
           {projEdits.map(pe => {
             const dom = catEdits.find(c => c.id === pe.domainId);
             return (
-              <div key={pe.id} className="pm-proj-row">
+              <div key={pe.id} className="pm-proj-row" style={{ borderBottom: "1px solid var(--border2)" }}>
                 <div className="pm-proj-swatch" style={{ background: dom?.color }} />
                 <input className="pm-proj-name" value={pe.name} onChange={e => updateProjEdit(pe.id,"name",e.target.value)} />
                 <select style={{ background:"var(--bg3)", border:"1px solid var(--border)", borderRadius:7, padding:"5px 8px", color:"var(--text)", fontFamily:"'DM Sans',sans-serif", fontSize:16, outline:"none" }}
@@ -105,7 +107,9 @@ function ProjectsManageSheet({ data, setData, onClose, onAddProject }) {
             );
           })}
 
-          <button className="form-btn" style={{ marginTop:20 }} onClick={saveAll}>Save All Changes</button>
+          <div style={{ padding: "16px 20px", textAlign: "center" }}>
+            <span style={{ fontSize:14, color:"var(--accent)", fontWeight:600, cursor:"pointer" }} onClick={saveAll}>Save All Changes</span>
+          </div>
         </div>
       </div>
     </>

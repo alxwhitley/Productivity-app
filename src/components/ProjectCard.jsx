@@ -2,25 +2,25 @@ import { useState, useRef, useEffect } from "react";
 import { getPct } from "../utils.js";
 import { DOMAIN_COLORS } from "../constants.js";
 import SwipeTask from "./SwipeTask.jsx";
-import WaveIcon from "./WaveIcon.jsx";
 
 const PROJ_COLORS = DOMAIN_COLORS;
 
 function ProjectCard({ proj, domain, isExp, newTaskText,
   onToggleExpand, onToggleStatus, onDelete, onEditSave,
   onToggleTask, onDeleteTask, onSaveTask, onTodayTask, onNewTaskChange, onAddTask, autoFocus,
-  sessionLog, onModeToggle, scrollIntoView }) {
-  const isSessionMode = proj.mode === "sessions";
+  data, onTypeChange, scrollIntoView }) {
+  const isSessionMode = (proj.type || proj.mode) === "sessions";
   const [addingTask, setAddingTask] = useState(false);
   const [newText, setNewText] = useState("");
   const taskInputRef = useRef(null);
   const nameInputRef = useRef(null);
+  const [customizeOpen, setCustomizeOpen] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
 
   const pct = getPct(proj.tasks);
   const [swipeX, setSwipeX] = useState(0);
   const [showEdit, setShowEdit] = useState(!!autoFocus);
   const [draftName, setDraftName] = useState(proj.name);
-  const [draftColor, setDraftColor] = useState(domain?.color || PROJ_COLORS[0]);
   const startX = useRef(null);
   const MAX = 160; const SNAP = 60;
 
@@ -53,19 +53,32 @@ function ProjectCard({ proj, domain, isExp, newTaskText,
     if (scrollIntoView && el) scrollIntoView(el);
   };
 
+  // Sessions hours from blockCompletions + deepWorkSlots
+  const getSessionHours = () => {
+    const completions = (data?.blockCompletions || []);
+    const slots = data?.deepWorkSlots || {};
+    let totalMins = 0;
+    for (const c of completions) {
+      const dateSlots = slots[c.date] || [];
+      for (const s of dateSlots) {
+        if (s && s.projectId === proj.id) {
+          totalMins += c.durationMin || 0;
+          break;
+        }
+      }
+    }
+    return (totalMins / 60).toFixed(1);
+  };
+
+  const isBacklog = proj.status !== "active";
+  const showBody = isExp || customizeOpen;
+
   return (
-    <div style={{ margin: "0 16px 8px", borderRadius: 14, background: "var(--bg2)", overflow: "hidden" }}>
+    <div style={{ margin: "0 16px 8px", borderRadius: 14, background: "var(--bg2)", overflow: "hidden", filter: isBacklog ? "grayscale(1)" : "none", opacity: isBacklog ? 0.5 : 1 }}>
       {/* Header — swipeable */}
-      <div style={{ position: "relative", overflow: "hidden", borderRadius: isExp || showEdit ? "14px 14px 0 0" : 14 }}>
-        {/* Action bg: Session toggle + Delete */}
+      <div style={{ position: "relative", overflow: "hidden", borderRadius: showBody || showEdit ? "14px 14px 0 0" : 14 }}>
+        {/* Action bg: Delete */}
         <div style={{ position: "absolute", inset: 0, display: "flex", justifyContent: "flex-end" }}>
-          <div style={{ width: 80, background: "var(--blue)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, cursor: "pointer" }} onClick={e => { e.stopPropagation(); onModeToggle(); setSwipeX(0); }}>
-            {isSessionMode
-              ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#fff" strokeWidth="1.8"/><path d="M9 12l2 2 4-4" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              : <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M20 12a8 8 0 1 1-2-5.3" stroke="#fff" strokeWidth="2" strokeLinecap="round"/><path d="M20 7v5h-5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            }
-            <span style={{ color: "#fff", fontSize: 11, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase" }}>{isSessionMode ? "Tasks" : "Session"}</span>
-          </div>
           <div style={{ width: 80, background: "var(--red)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }} onClick={onDelete}>
             <span style={{ color: "#fff", fontSize: 12, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase" }}>Delete</span>
           </div>
@@ -77,11 +90,11 @@ function ProjectCard({ proj, domain, isExp, newTaskText,
           onTouchStart={onTouchStart}
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
-          onClick={() => { if (swipeX < 0) { setSwipeX(0); return; } onToggleExpand(); }}
+          onClick={() => { if (swipeX < 0) { setSwipeX(0); return; } if (!customizeOpen) onToggleExpand(); }}
         >
           <div className="proj-card-top">
-            {/* Mode icon replaces stripe */}
-            <div style={{ width:32, height:32, borderRadius:"50%", background: `${domain?.color || "var(--text3)"}18`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, opacity: proj.status === "active" ? 1 : 0.4 }}>
+            {/* Mode icon */}
+            <div style={{ width:32, height:32, borderRadius:"50%", background: `${domain?.color || "var(--text3)"}18`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
               {isSessionMode
                 ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M20 12a8 8 0 1 1-2-5.3" stroke={domain?.color || "var(--text3)"} strokeWidth="2" strokeLinecap="round"/><path d="M20 7v5h-5" stroke={domain?.color || "var(--text3)"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                 : <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke={domain?.color || "var(--text3)"} strokeWidth="1.8"/><path d="M9 12l2 2 4-4" stroke={domain?.color || "var(--text3)"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -106,74 +119,89 @@ function ProjectCard({ proj, domain, isExp, newTaskText,
               >{proj.name || <span style={{color:"var(--text3)"}}>Untitled</span>}</span>
             )}
             <div style={{ display:"flex", alignItems:"center", gap:8, flexShrink:0 }}>
-              <span className={`proj-card-badge ${proj.status === "active" ? "badge-active" : "badge-backlog"}`} onClick={e => { e.stopPropagation(); onToggleStatus(e); }}>
-                {proj.status === "active" ? "Active" : "Backlog"}
-              </span>
+              {/* ··· customize trigger */}
+              <span
+                style={{ fontSize: 18, color: "var(--text3)", cursor: "pointer", padding: "0 2px", lineHeight: 1 }}
+                onClick={e => { e.stopPropagation(); setCustomizeOpen(!customizeOpen); setDeleteConfirm(false); }}
+              >···</span>
               {!showEdit && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ color:"var(--text3)", opacity:.4, transform: isExp ? "rotate(90deg)" : "rotate(0deg)", transition:"transform .2s", flexShrink:0 }}><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
             </div>
           </div>
-          {isSessionMode ? (() => {
-            const projSessions = (sessionLog || []).filter(s => s.projectId === proj.id);
-            const weekStart = new Date(); weekStart.setDate(weekStart.getDate() - weekStart.getDay()); weekStart.setHours(0,0,0,0);
-            const weekSessions = projSessions.filter(s => new Date(s.date) >= weekStart);
-            const weekMins = weekSessions.reduce((a,s) => a + (s.durationMin||0), 0);
-            const weekHrs = (weekMins/60).toFixed(1);
-            const weekTarget = 10;
-            const barPct = Math.min((weekMins/60) / weekTarget * 100, 100);
-            return (
-              <>
-                <div className="proj-session-bar-wrap">
-                  <div className="proj-session-bar-fill" style={{ width:`${barPct}%`, background: domain?.color || "var(--blue)" }} />
-                </div>
-                <div className="proj-card-meta">
-                  <span className="proj-card-tasks">{projSessions.length} sessions total · {weekHrs}h this week</span>
-                  <WaveIcon size={13} color={proj.status === "active" ? (domain?.color || "var(--blue)") : "var(--text3)"} />
-                </div>
-              </>
-            );
-          })() : (
+          {isSessionMode ? (
+            <div className="proj-card-meta">
+              <span className="proj-card-tasks" style={{ color: "var(--text2)" }}>{getSessionHours()} hrs logged</span>
+            </div>
+          ) : (
             <>
               <div className="proj-bar-wrap">
                 <div className="proj-bar-fill" style={{ width: `${pct}%`, background: domain?.color }} />
               </div>
               <div className="proj-card-meta">
                 <span className="proj-card-tasks">{proj.tasks.filter(t => t.done).length} of {proj.tasks.length} tasks</span>
-                <span className="proj-card-pct" style={{ color: proj.status === "active" ? domain?.color : "var(--text3)" }}>{pct}%</span>
+                <span className="proj-card-pct" style={{ color: domain?.color || "var(--text3)" }}>{pct}%</span>
               </div>
             </>
           )}
         </div>
       </div>
 
-      {/* Tasks / Session Log */}
-      {isExp && (
+      {/* ── Customize panel ── */}
+      {customizeOpen && (
+        <div className="proj-tasks-expand" style={{ padding: "12px 16px 16px" }}>
+          {/* Type */}
+          <div className="sh" style={{ padding: "0 0 8px" }}>
+            <span className="sh-label">Type</span>
+          </div>
+          <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+            {["tasks", "sessions"].map(t => {
+              const sel = (proj.type || proj.mode || "tasks") === t;
+              return (
+                <button key={t} onClick={() => onTypeChange(t)} style={{
+                  background: sel ? "var(--bg3)" : "transparent",
+                  border: sel ? "1.5px solid var(--text3)" : "1.5px solid var(--border)",
+                  color: sel ? "var(--text)" : "var(--text3)",
+                  borderRadius: 8, padding: "6px 16px", fontSize: 13, fontWeight: 600,
+                  cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
+                }}>{t === "tasks" ? "Tasks" : "Sessions"}</button>
+              );
+            })}
+          </div>
+
+          {/* Status */}
+          <div className="sh" style={{ padding: "0 0 8px" }}>
+            <span className="sh-label">Status</span>
+          </div>
+          <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+            {["active", "backlog"].map(s => {
+              const sel = proj.status === s;
+              return (
+                <button key={s} onClick={e => { e.stopPropagation(); onToggleStatus(e); }} style={{
+                  background: sel ? "var(--bg3)" : "transparent",
+                  border: sel ? "1.5px solid var(--text3)" : "1.5px solid var(--border)",
+                  color: sel ? "var(--text)" : "var(--text3)",
+                  borderRadius: 8, padding: "6px 16px", fontSize: 13, fontWeight: 600,
+                  cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
+                }}>{s === "active" ? "Active" : "Backlog"}</button>
+              );
+            })}
+          </div>
+
+          {/* Delete */}
+          <div style={{ paddingTop: 8, borderTop: "1px solid var(--border2)" }}>
+            <span
+              style={{ fontSize: 13, color: "var(--red)", cursor: "pointer", fontWeight: 500 }}
+              onClick={() => {
+                if (deleteConfirm) { onDelete(); setCustomizeOpen(false); }
+                else setDeleteConfirm(true);
+              }}
+            >{deleteConfirm ? "Tap again to confirm" : "Delete project"}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Tasks (only for type === "tasks") */}
+      {isExp && !customizeOpen && !isSessionMode && (
         <div className="proj-tasks-expand">
-          {isSessionMode ? (() => {
-            const projSessions = (sessionLog || []).filter(s => s.projectId === proj.id).slice().reverse();
-            const recent = projSessions.slice(0, 5);
-            return (
-              <>
-                <div style={{ display:"flex", alignItems:"center", gap:5, padding:"2px 0 10px", borderBottom:"1px solid var(--border2)", marginBottom:8 }}>
-                  <WaveIcon size={12} color="var(--blue)" />
-                  <span style={{ fontSize:11, color:"var(--text3)", fontWeight:600, letterSpacing:".05em", textTransform:"uppercase" }}>Session Mode</span>
-                </div>
-                {recent.length === 0 ? (
-                  <div style={{ fontSize:12, color:"var(--text3)", padding:"8px 0", textAlign:"center" }}>No sessions logged yet.</div>
-                ) : (
-                  <div className="proj-session-log">
-                    {recent.map(s => (
-                      <div key={s.id} className="proj-session-log-item">
-                        <div style={{ width:6, height:6, borderRadius:"50%", background: domain?.color || "var(--blue)", flexShrink:0, marginTop:5 }} />
-                        <span className="proj-session-log-note">{s.note || <span style={{fontStyle:"italic",opacity:.5}}>No note</span>}</span>
-                        <span className="proj-session-log-meta">{s.date} · {s.durationMin}m</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </>
-            );
-          })() : (
-          <>
           {proj.tasks.map(t => (
             <SwipeTask
               key={t.id}
@@ -212,8 +240,6 @@ function ProjectCard({ proj, domain, isExp, newTaskText,
               <span className="dotted-add-placeholder">Add task…</span>
             </div>
           )}
-        </>
-        )}
         </div>
       )}
     </div>

@@ -36,7 +36,7 @@ function getPhaseForMins(mins) {
 }
 
 function getTodayBlockCompletionState({ slot, project, manualCompleted }) {
-  const isSessionMode = project?.mode === "sessions";
+  const isSessionMode = (project?.type || project?.mode) === "sessions";
   const todayTaskIds = slot.todayTasks;
   const hasTodayTasks = Array.isArray(todayTaskIds) && todayTaskIds.length > 0;
   const relevantTasks = hasTodayTasks
@@ -81,7 +81,6 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
   const [editingDwTaskId, setEditingDwTaskId] = useState(null);
   const [editingDwTaskText, setEditingDwTaskText] = useState("");
   const [shutdownOpen, setShutdownOpen] = useState(false);
-  const [shallowExpanded, setShallowExpanded] = useState(false);
 
   const scrollRef = useRef(null);
 
@@ -684,15 +683,18 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
 
         {/* ── BIO-PHASE BAR ── */}
         <div style={{ padding: "0 16px 16px" }}>
-          <div style={{ display: "flex", marginBottom: 6 }}>
-            {BIO_PHASES.map(p => (
-              <span key={p.id} style={{ flex: p.endMin - p.startMin, textAlign: "center", fontSize: 10, fontWeight: 700, textTransform: "uppercase", color: "var(--text3)", lineHeight: 1.2 }}>
-                {p.label}
-              </span>
-            ))}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", color: PHASE_COLORS[currentPhase]?.css || "var(--text3)" }}>
+              {BIO_PHASES.find(p => p.id === currentPhase)?.label || ""}
+            </span>
+            <div style={{ display: "flex", gap: 5 }}>
+              {BIO_PHASES.map(p => (
+                <div key={p.id} style={{ width: 6, height: 6, borderRadius: "50%", background: currentPhase === p.id ? (PHASE_COLORS[p.id]?.css || "var(--text3)") : "var(--bg4)" }} />
+              ))}
+            </div>
           </div>
           <div style={{ position: "relative", height: 4, background: "var(--bg4)", borderRadius: 2 }}>
-            <div style={{ position: "absolute", left: 0, top: 0, height: "100%", background: "var(--accent)", borderRadius: 2, width: `${barPct}%` }} />
+            <div style={{ position: "absolute", left: 0, top: 0, height: "100%", background: PHASE_COLORS[currentPhase]?.css || "var(--accent)", borderRadius: 2, width: `${barPct}%` }} />
             <div className="work-bio-dot" style={{ left: `${barPct}%`, background: PHASE_COLORS[currentPhase]?.css || "var(--accent)" }} />
           </div>
         </div>
@@ -712,12 +714,17 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
           return (
             <div key={group.id}>
               {/* Phase header */}
-              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "16px 16px 6px" }}>
-                <div style={{ width: 8, height: 8, borderRadius: "50%", background: isActivePhase ? (phaseColor?.css || "var(--text3)") : "var(--text3)", flexShrink: 0 }} />
-                <span style={{ fontSize: 11, fontWeight: isActivePhase ? 700 : 500, textTransform: "uppercase", color: isActivePhase ? "var(--text2)" : "var(--text3)", whiteSpace: "nowrap", letterSpacing: ".06em" }}>
-                  {group.label}
-                </span>
-                <div style={{ flex: 1, height: 1, background: "var(--border2)" }} />
+              <div style={{ padding: "16px 16px 6px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: isActivePhase ? (phaseColor?.css || "var(--text3)") : "var(--text3)", flexShrink: 0 }} />
+                  <span style={{ fontSize: 11, fontWeight: isActivePhase ? 700 : 500, textTransform: "uppercase", color: isActivePhase ? "var(--text2)" : "var(--text3)", whiteSpace: "nowrap", letterSpacing: ".06em" }}>
+                    {group.label}
+                  </span>
+                  <div style={{ flex: 1, height: 1, background: "var(--border2)" }} />
+                </div>
+                {isShallowPhase && (
+                  <div style={{ fontSize: 11, fontWeight: 400, color: "var(--text3)", marginTop: 3, paddingLeft: 16 }}>quick tasks · emails · admin</div>
+                )}
               </div>
 
 
@@ -736,38 +743,25 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
               {/* Shallow work section */}
               {isShallowPhase && (
                 hasShallowOrPicks ? (
-                  <div style={{ margin: "0 12px 8px" }}>
-                    <div
-                      onClick={() => setShallowExpanded(!shallowExpanded)}
-                      style={{ background: "var(--bg2)", borderRadius: shallowExpanded ? "10px 10px 0 0" : 10, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}
-                    >
-                      <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>Loose Tasks</span>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text2)", background: "var(--bg3)", borderRadius: 12, padding: "2px 8px" }}>
-                        {shallowUndone + todayPickTasks.filter(t => !t.done).length || shallowCount + todayPickTasks.length}
-                      </span>
-                    </div>
-                    {shallowExpanded && (
-                      <div style={{ background: "var(--bg2)", borderRadius: "0 0 10px 10px", marginTop: -2, padding: "0 16px 8px" }}>
-                        {todayPickTasks.map((t, i) => (
-                          <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderTop: "1px solid var(--border2)", cursor: "pointer" }}
-                            onClick={() => toggleTodayPickTask(t)}>
-                            <div className={`tl-check ${t.done ? "done" : ""}`} style={{ width: 20, height: 20, flexShrink: 0 }}>
-                              {t.done && <span style={{ fontSize: 10, color: "#fff", fontWeight: 700 }}>✓</span>}
-                            </div>
-                            <span style={{ fontSize: 14, color: t.done ? "var(--text3)" : "var(--text)", textDecoration: t.done ? "line-through" : "none", flex: 1 }}>{t.text}</span>
-                          </div>
-                        ))}
-                        {shallowTasks.map((t, i) => (
-                          <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderTop: "1px solid var(--border2)", cursor: "pointer" }}
-                            onClick={() => toggleShallowTask(t.id)}>
-                            <div className={`tl-check ${t.done ? "done" : ""}`} style={{ width: 20, height: 20, flexShrink: 0 }}>
-                              {t.done && <span style={{ fontSize: 10, color: "#fff", fontWeight: 700 }}>✓</span>}
-                            </div>
-                            <span style={{ fontSize: 14, color: t.done ? "var(--text3)" : "var(--text)", textDecoration: t.done ? "line-through" : "none", flex: 1 }}>{t.text}</span>
-                          </div>
-                        ))}
+                  <div style={{ padding: "0 16px 8px" }}>
+                    {todayPickTasks.map((t, i) => (
+                      <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: "1px solid var(--border2)", cursor: "pointer" }}
+                        onClick={() => toggleTodayPickTask(t)}>
+                        <div className={`tl-check ${t.done ? "done" : ""}`} style={{ width: 20, height: 20, flexShrink: 0 }}>
+                          {t.done && <span style={{ fontSize: 10, color: "#fff", fontWeight: 700 }}>✓</span>}
+                        </div>
+                        <span style={{ fontSize: 14, color: t.done ? "var(--text3)" : "var(--text)", textDecoration: t.done ? "line-through" : "none", flex: 1 }}>{t.text}</span>
                       </div>
-                    )}
+                    ))}
+                    {shallowTasks.map((t, i) => (
+                      <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: "1px solid var(--border2)", cursor: "pointer" }}
+                        onClick={() => toggleShallowTask(t.id)}>
+                        <div className={`tl-check ${t.done ? "done" : ""}`} style={{ width: 20, height: 20, flexShrink: 0 }}>
+                          {t.done && <span style={{ fontSize: 10, color: "#fff", fontWeight: 700 }}>✓</span>}
+                        </div>
+                        <span style={{ fontSize: 14, color: t.done ? "var(--text3)" : "var(--text)", textDecoration: t.done ? "line-through" : "none", flex: 1 }}>{t.text}</span>
+                      </div>
+                    ))}
                   </div>
                 ) : (
                   <div style={{ padding: "8px 16px 4px", cursor: "pointer", color: "var(--text3)", fontSize: 13 }}
@@ -775,6 +769,16 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
                     + Add from Tasks
                   </div>
                 )
+              )}
+
+              {/* Wind Down empty state */}
+              {isWindPhase && !hasItems && !shutdownDoneToday && (
+                <div
+                  style={{ padding: "8px 16px 4px", cursor: "pointer", color: "var(--text3)", fontSize: 13, fontWeight: 500 }}
+                  onClick={() => setShutdownOpen(true)}
+                >
+                  Begin shutdown ritual →
+                </div>
               )}
             </div>
           );

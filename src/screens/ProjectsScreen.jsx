@@ -100,9 +100,9 @@ export default function ProjectsScreen({ data, setData }) {
     setPendingModeProj({ id: uid(), domainId: activeDomain, name: "", status: "backlog", tasks: [] });
   };
 
-  const confirmNewProject = (mode) => {
+  const confirmNewProject = (type) => {
     if (!pendingModeProj) return;
-    const newProj = { ...pendingModeProj, mode };
+    const newProj = { ...pendingModeProj, type };
     setData(d => ({ ...d, projects: [...d.projects, newProj] }));
     setNewProjId(newProj.id);
     setPendingModeProj(null);
@@ -376,9 +376,9 @@ export default function ProjectsScreen({ data, setData }) {
             domain={domains.find(d => d.id === proj.domainId)}
             isExp={!collapsedProjs.has(proj.id)}
             newTaskText={newTaskText[proj.id] || ""}
-            sessionLog={data.sessionLog || []}
+            data={data}
             scrollIntoView={scrollIntoView}
-            onModeToggle={() => setData(d => ({ ...d, projects: d.projects.map(p => p.id === proj.id ? { ...p, mode: p.mode === "sessions" ? "tasks" : "sessions" } : p) }))}
+            onTypeChange={type => setData(d => ({ ...d, projects: d.projects.map(p => p.id === proj.id ? { ...p, type } : p) }))}
             onToggleExpand={() => setCollapsedProjs(s => { const n = new Set(s); n.has(proj.id) ? n.delete(proj.id) : n.add(proj.id); return n; })}
             onToggleStatus={e => toggleStatus(proj.id, e)}
             onDelete={() => deleteProject(proj.id)}

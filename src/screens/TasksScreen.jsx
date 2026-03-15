@@ -270,23 +270,18 @@ export default function TasksScreen({ data, setData }) {
           <button className={`tasks-filter-pill ${filter === "quickwins" ? "active" : ""}`} onClick={() => setFilter("quickwins")}>⚡ Quick Wins</button>
         </div>
 
-        {/* ── SECTION: QUEUE ── */}
-        <div className="sh" style={{ paddingTop: 4 }}>
-          <span className="sh-label">
-            Queue
-            {fabQueue.length > 0 && <span className="tasks-count-badge">{fabQueue.length}</span>}
-          </span>
-        </div>
-        {processedToday > 0 && fabQueue.length > 0 && (
-          <div style={{ padding: "0 16px 4px 26px", fontSize: 12, color: "var(--text3)" }}>
-            Processed {processedToday} of {totalProcessed} today
-          </div>
-        )}
-
         <div style={{ padding: "0 16px" }}>
           {/* Queue clear message */}
           {fabQueue.length === 0 && showClearMsg && (
             <div className="tasks-clear-msg">Queue clear ✓</div>
+          )}
+
+          {/* Empty state */}
+          {filteredFab.length === 0 && !showClearMsg && (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", paddingTop: "25vh" }}>
+              <div style={{ fontSize: 15, fontWeight: 500, color: "var(--text2)" }}>Nothing in the queue</div>
+              <div style={{ fontSize: 13, fontWeight: 400, color: "var(--text3)", marginTop: 6 }}>Tap below to capture a task</div>
+            </div>
           )}
 
           {filteredFab.map((item, idx) => {

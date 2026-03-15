@@ -75,7 +75,7 @@ export const INITIAL_DATA = {
 //   3. The rest of the app is unchanged
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 export const STORAGE_KEY    = "nave_data_v1";       // new key — clean break from momentum_v2
 export const THEME_KEY      = "nave_theme";
 
@@ -189,5 +189,14 @@ export const MIGRATIONS = [
       delete next.captured;
       return next;
     }
+  },
+  // v5: add type field to projects (from mode, defaulting to "tasks")
+  {
+    version: 5,
+    up: (data) => ({
+      ...data,
+      projects: (data.projects || []).map(p => ({ ...p, type: p.mode || p.type || "tasks" })),
+      schemaVersion: 5,
+    })
   },
 ];
