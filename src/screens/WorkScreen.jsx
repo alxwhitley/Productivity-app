@@ -364,6 +364,8 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
         boxShadow: `inset 0 0 0 1.5px ${domainColor}60`,
         opacity: isPast && isCompleted ? 0.45 : 1,
       }}>
+        {/* Deep Work label */}
+        <div className="dw-card-label">Deep Work</div>
         {/* Row 1: domain pill + type badge */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <span className="domain-pill" style={{ background: `${domainColor}30`, color: domainColor }}>{domainName || "No domain"}</span>

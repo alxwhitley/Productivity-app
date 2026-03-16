@@ -288,7 +288,8 @@
   .dw-carousel.single{overflow-y:hidden;}
   .work-card-area.shallow-expanded .dw-carousel{transform:translateY(-100%);opacity:0;pointer-events:none;}
   .dw-card-snap{scroll-snap-align:start;scroll-snap-stop:always;flex-shrink:0;height:100%;padding:8px 16px;box-sizing:border-box;}
-  .dw-card-inner{width:100%;height:100%;border-radius:24px;padding:20px;display:flex;flex-direction:column;overflow:hidden;box-sizing:border-box;}
+  .dw-card-label{font-size:11px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:var(--blue);margin-bottom:8px;}
+  .dw-card-inner{width:100%;height:100%;border-radius:28px;padding:20px;display:flex;flex-direction:column;overflow:hidden;box-sizing:border-box;}
   .dw-card-inner .task-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
   .domain-pill{display:inline-flex;align-items:center;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;}
   .dw-task-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border2);}
@@ -302,7 +303,7 @@
   .dw-side-dot.active{background:var(--accent);}
 
   /* Shallow Work card */
-  .shallow-card{position:absolute;bottom:0;left:16px;right:16px;height:64px;border-radius:24px;background:rgba(75,170,187,0.09);border:1.5px solid rgba(75,170,187,0.25);overflow:hidden;transition:all 280ms ease-in-out;display:flex;flex-direction:column;cursor:pointer;}
+  .shallow-card{position:absolute;bottom:0;left:16px;right:16px;height:64px;border-radius:28px;background:rgba(75,170,187,0.09);border:1.5px solid rgba(75,170,187,0.25);overflow:hidden;transition:all 280ms ease-in-out;display:flex;flex-direction:column;cursor:pointer;}
   .shallow-card.expanded{top:0;height:auto;bottom:0;left:16px;right:16px;cursor:default;}
   .shallow-card-rest{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:64px;flex-shrink:0;}
   .shallow-card.expanded .shallow-card-rest{display:none;}
@@ -824,7 +825,7 @@
   .dw-empty.dw-pulse{animation:dw-pulse-ring 1000ms ease-out 2;}
 
   /* ── Floating pill nav ── */
-  .pill-nav{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);display:flex;gap:0;background:var(--bg2);border:1px solid var(--border);border-radius:999px;padding:6px 8px;z-index:50;box-shadow:0 4px 24px rgba(0,0,0,.25);}
+  .pill-nav{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);display:flex;gap:0;background:var(--bg2);border:1px solid var(--border);border-radius:28px;padding:6px 8px;z-index:50;box-shadow:0 4px 24px rgba(0,0,0,.25);}
   .pill-nav-btn{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 20px 4px;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;background:transparent;color:var(--text3);position:relative;transition:color .15s;}
   .pill-nav-icon{display:flex;align-items:center;justify-content:center;height:22px;}
   .pill-nav-label{font-size:11px;font-weight:600;line-height:1;}
