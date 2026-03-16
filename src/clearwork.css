@@ -282,15 +282,12 @@
   /* Work card area */
   .work-card-area{flex:1;position:relative;overflow:hidden;margin-bottom:12px;}
 
-  /* DW Carousel */
-  .dw-carousel{position:absolute;inset:0 0 76px 0;overflow:hidden;transition:transform 280ms ease-in-out,opacity 280ms ease-in-out;}
+  /* DW Carousel — scroll snap */
+  .dw-carousel{position:absolute;inset:0 0 76px 0;display:flex;flex-direction:column;overflow-y:scroll;overflow-x:hidden;scroll-snap-type:y mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;-ms-overflow-style:none;transition:transform 280ms ease-in-out,opacity 280ms ease-in-out;}
+  .dw-carousel::-webkit-scrollbar{display:none;}
+  .dw-carousel.single{overflow-y:hidden;}
   .work-card-area.shallow-expanded .dw-carousel{transform:translateY(-100%);opacity:0;pointer-events:none;}
-  .dw-card-full{position:absolute;inset:12px 16px;display:flex;flex-direction:column;transition:transform 280ms ease-in-out,opacity 280ms ease-in-out;overflow:hidden;transform:translateY(110%);}
-  .dw-card-full.exiting-up{transform:translateY(-100%);}
-  .dw-card-full.entering-down{transform:translateY(100%);}
-  .dw-card-full.exiting-down{transform:translateY(100%);}
-  .dw-card-full.entering-up{transform:translateY(-100%);}
-  .dw-card-full.active{transform:translateY(0);}
+  .dw-card-snap{scroll-snap-align:start;scroll-snap-stop:always;flex-shrink:0;height:100%;padding:8px 16px;box-sizing:border-box;}
   .dw-card-inner{width:100%;height:100%;border-radius:18px;padding:20px;display:flex;flex-direction:column;overflow:hidden;box-sizing:border-box;}
   .dw-card-inner .task-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
   .dw-side-dots{position:absolute;left:8px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:6px;align-items:center;z-index:2;}

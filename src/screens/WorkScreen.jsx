@@ -81,8 +81,7 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
 
   // Carousel state
   const [activeCardIdx, setActiveCardIdx] = useState(0);
-  const [cardAnim, setCardAnim] = useState(null); // { direction: "up"|"down", phase: "exit"|"enter" }
-  const swipeRef = useRef(null);
+  const carouselRef = useRef(null);
 
   // Shallow card expand
   const [shallowExpanded, setShallowExpanded] = useState(false);
@@ -292,46 +291,20 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
   // Routines for today
   const todayRoutines = getRoutinesForDate(data.routineBlocks || [], today);
 
-  // ── Carousel: only assigned DW slots ──
-  const carouselSlots = todayDWSlots; // show all slots (assigned and unassigned)
-  const hasMultipleCards = carouselSlots.length > 1;
+  // ── Carousel ──
+  const carouselSlots = todayDWSlots;
 
-  // Clamp activeCardIdx
-  const clampedIdx = Math.min(activeCardIdx, Math.max(0, carouselSlots.length - 1));
-  if (clampedIdx !== activeCardIdx) setActiveCardIdx(clampedIdx);
-
-  // ── Swipe handling for carousel ──
-  const handleCarouselTouchStart = (e) => {
-    swipeRef.current = { y: e.touches[0].clientY, x: e.touches[0].clientX, locked: false };
-  };
-
-  const handleCarouselTouchMove = (e) => {
-    if (!swipeRef.current) return;
-    const dy = e.touches[0].clientY - swipeRef.current.y;
-    const dx = e.touches[0].clientX - swipeRef.current.x;
-    if (!swipeRef.current.locked && Math.abs(dx) > Math.abs(dy)) {
-      swipeRef.current = null;
-      return;
-    }
-    swipeRef.current.locked = true;
-    swipeRef.current.dy = dy;
-  };
-
-  const handleCarouselTouchEnd = () => {
-    if (!swipeRef.current || !swipeRef.current.locked) { swipeRef.current = null; return; }
-    const dy = swipeRef.current.dy || 0;
-    swipeRef.current = null;
-    if (!hasMultipleCards) return;
-    if (dy < -40 && activeCardIdx < carouselSlots.length - 1) {
-      // swipe up → next card
-      setCardAnim({ direction: "up", from: activeCardIdx, to: activeCardIdx + 1, phase: "go" });
-      setTimeout(() => { setActiveCardIdx(prev => prev + 1); setCardAnim(null); }, 280);
-    } else if (dy > 40 && activeCardIdx > 0) {
-      // swipe down → prev card
-      setCardAnim({ direction: "down", from: activeCardIdx, to: activeCardIdx - 1, phase: "go" });
-      setTimeout(() => { setActiveCardIdx(prev => prev - 1); setCardAnim(null); }, 280);
-    }
-  };
+  // Scroll-driven dot indicator
+  useEffect(() => {
+    const el = carouselRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const index = Math.round(el.scrollTop / el.clientHeight);
+      setActiveCardIdx(index);
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, []);
 
   // ── Render a single DW carousel card ──
   function renderDWCarouselCard(slot) {
@@ -559,14 +532,6 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
     );
   }
 
-  // ── Determine animation classes ──
-  const getCardClass = (idx) => {
-    if (!cardAnim) return idx === activeCardIdx ? "dw-card-full active" : "dw-card-full";
-    if (idx === cardAnim.from) return `dw-card-full exiting-${cardAnim.direction}`;
-    if (idx === cardAnim.to) return `dw-card-full entering-${cardAnim.direction === "up" ? "down" : "up"} active`;
-    return "dw-card-full";
-  };
-
   // ══════ RENDER ══════
 
   return (
@@ -610,40 +575,36 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
 
       {/* ── WORK CARD AREA (DW carousel + shallow card) ── */}
       <div className={`work-card-area${shallowExpanded ? " shallow-expanded" : ""}`}>
+        {/* Side dots */}
+        {carouselSlots.length > 1 && (
+          <div className="dw-side-dots">
+            {carouselSlots.map((_, i) => (
+              <div key={i} className={`dw-side-dot${i === activeCardIdx ? " active" : ""}`} />
+            ))}
+          </div>
+        )}
+
         {/* DW carousel */}
-        <div className="dw-carousel"
-          onTouchStart={handleCarouselTouchStart}
-          onTouchMove={handleCarouselTouchMove}
-          onTouchEnd={handleCarouselTouchEnd}
-        >
-          {/* Side dots */}
-          {hasMultipleCards && (
-            <div className="dw-side-dots">
-              {carouselSlots.map((_, i) => (
-                <div key={i} className={`dw-side-dot${i === activeCardIdx ? " active" : ""}`} />
-              ))}
-            </div>
-          )}
-
-          {/* Cards — only render active + animating */}
-          {carouselSlots.map((slot, i) => {
-            const isVisible = i === activeCardIdx || (cardAnim && (i === cardAnim.from || i === cardAnim.to));
-            if (!isVisible) return null;
-            return <div key={slot.id} className={getCardClass(i)}>{renderDWCarouselCard(slot)}</div>;
-          })}
-
-          {/* Empty state when no slots at all */}
-          {carouselSlots.length === 0 && (
-            <div className="dw-card-full active" style={{
-              border: "1.5px dashed var(--border)", background: "var(--bg2)",
-              alignItems: "center", justifyContent: "center", textAlign: "center",
-            }}>
-              <div style={{ color: "var(--text3)", fontSize: 15, fontWeight: 500, marginBottom: 16 }}>No deep work scheduled</div>
-              <button style={{
-                background: "none", border: "1.5px solid var(--accent)", borderRadius: 10,
-                padding: "10px 20px", fontSize: 14, fontWeight: 700, color: "var(--accent)",
-                cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
-              }}>+ Plan your day</button>
+        <div className={`dw-carousel${carouselSlots.length <= 1 ? " single" : ""}`} ref={carouselRef}>
+          {carouselSlots.length > 0 ? (
+            carouselSlots.map(slot => (
+              <div key={slot.id} className="dw-card-snap">
+                {renderDWCarouselCard(slot)}
+              </div>
+            ))
+          ) : (
+            <div className="dw-card-snap">
+              <div className="dw-card-inner" style={{
+                border: "1.5px dashed var(--border)", background: "var(--bg2)",
+                alignItems: "center", justifyContent: "center", textAlign: "center",
+              }}>
+                <div style={{ color: "var(--text3)", fontSize: 15, fontWeight: 500, marginBottom: 16 }}>No deep work scheduled</div>
+                <button style={{
+                  background: "none", border: "1.5px solid var(--accent)", borderRadius: 10,
+                  padding: "10px 20px", fontSize: 14, fontWeight: 700, color: "var(--accent)",
+                  cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
+                }}>+ Plan your day</button>
+              </div>
             </div>
           )}
         </div>
