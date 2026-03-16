@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect } from "react";
 import { getPct } from "../utils.js";
-import SwipeTask from "./SwipeTask.jsx";
+import TaskRow from "./TaskRow.jsx";
 
 function ProjectCard({ proj, domain: domainProp, isExp, newTaskText,
   onToggleExpand, onToggleStatus, onDelete, onEditSave,
-  onToggleTask, onDeleteTask, onSaveTask, onTodayTask, onNewTaskChange, onAddTask, autoFocus,
+  onToggleTask, onDeleteTask, onSaveTask, onQuickWinTask, onNewTaskChange, onAddTask, autoFocus,
   data, onTypeChange, scrollIntoView }) {
   // Always read domain from live data to avoid stale color references
   const domain = (data?.domains || []).find(d => d.id === proj.domainId) || domainProp;
@@ -202,14 +202,13 @@ function ProjectCard({ proj, domain: domainProp, isExp, newTaskText,
       {isExp && !customizeOpen && !isSessionMode && (
         <div className="proj-tasks-expand">
           {proj.tasks.map(t => (
-            <SwipeTask
+            <TaskRow
               key={t.id}
               task={t}
               onToggle={() => onToggleTask(t.id)}
               onDelete={() => onDeleteTask(t.id)}
-              onSave={text => onSaveTask(t.id, text)}
-              onToday={onTodayTask ? () => onTodayTask(t.id) : undefined}
-              scrollIntoView={doScrollIntoView}
+              onEdit={text => onSaveTask(t.id, text)}
+              onQuickWin={() => onQuickWinTask(t.id)}
             />
           ))}
           {addingTask ? (

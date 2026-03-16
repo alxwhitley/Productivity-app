@@ -3,6 +3,7 @@ import { uid, toISODate } from "../utils.js";
 import StatusBar from "../components/StatusBar.jsx";
 import ProjectCard from "../components/ProjectCard.jsx";
 import ProjectsManageSheet from "../sheets/ProjectsManageSheet.jsx";
+import TaskRow from "../components/TaskRow.jsx";
 
 export default function ProjectsScreen({ data, setData }) {
   const { domains, projects } = data;
@@ -15,8 +16,6 @@ export default function ProjectsScreen({ data, setData }) {
 
   // Loose task state
   const [looseExpanded, setLooseExpanded] = useState(false);
-  const [editingLooseId, setEditingLooseId] = useState(null);
-  const [editingLooseText, setEditingLooseText] = useState("");
   const [addingLooseBottom, setAddingLooseBottom] = useState(false);
   const [newLooseBottomText, setNewLooseBottomText] = useState("");
   const looseBottomRef = useRef(null);
@@ -24,9 +23,6 @@ export default function ProjectsScreen({ data, setData }) {
   const [newLooseTopText, setNewLooseTopText] = useState("");
   const looseTopRef = useRef(null);
   const [removingLooseId, setRemovingLooseId] = useState(null);
-  const [looseSwipeId, setLooseSwipeId] = useState(null);
-  const [looseSwipeX, setLooseSwipeX] = useState(0);
-  const looseSwipeStart = useRef(null);
 
   const scrollRef = useRef(null);
 
@@ -88,6 +84,12 @@ export default function ProjectsScreen({ data, setData }) {
     )
   }));
 
+  const toggleQuickWinTask = (projectId, taskId) => setData(d => ({
+    ...d, projects: d.projects.map(p =>
+      p.id === projectId ? { ...p, tasks: p.tasks.map(t => t.id === taskId ? { ...t, quickWin: !(t.quickWin ?? false) } : t) } : p
+    )
+  }));
+
   const saveProjectEdit = (projectId, { name }) => {
     setData(d => ({
       ...d,
@@ -111,27 +113,49 @@ export default function ProjectsScreen({ data, setData }) {
 
   // ── Loose task helpers ──
   const toggleLoose = (id) => {
-    setRemovingLooseId(id);
-    setTimeout(() => {
+    const task = (data.looseTasks || []).find(t => t.id === id);
+    const wasDone = task?.done ?? false;
+    if (!wasDone) {
+      setRemovingLooseId(id);
+      setTimeout(() => {
+        setData(d => ({
+          ...d,
+          looseTasks: (d.looseTasks || []).map(t =>
+            t.id === id ? { ...t, done: true, doneAt: new Date().toISOString() } : t
+          ),
+        }));
+        setRemovingLooseId(null);
+      }, 300);
+    } else {
       setData(d => ({
         ...d,
         looseTasks: (d.looseTasks || []).map(t =>
-          t.id === id ? { ...t, done: true, doneAt: new Date().toISOString() } : t
+          t.id === id ? { ...t, done: false, doneAt: null } : t
         ),
       }));
-      setRemovingLooseId(null);
-    }, 300);
+    }
+  };
+
+  const deleteLoose = (id) => {
+    setData(d => ({ ...d, looseTasks: (d.looseTasks || []).filter(t => t.id !== id) }));
   };
 
   const saveLooseEdit = (id, text) => {
     const trimmed = text.trim();
     if (!trimmed) {
-      setData(d => ({ ...d, looseTasks: (d.looseTasks || []).filter(t => t.id !== id) }));
+      deleteLoose(id);
     } else {
       setData(d => ({ ...d, looseTasks: (d.looseTasks || []).map(t => t.id === id ? { ...t, text: trimmed } : t) }));
     }
-    setEditingLooseId(null);
-    setEditingLooseText("");
+  };
+
+  const toggleQuickWinLoose = (id) => {
+    setData(d => ({
+      ...d,
+      looseTasks: (d.looseTasks || []).map(t =>
+        t.id === id ? { ...t, quickWin: !(t.quickWin ?? false) } : t
+      ),
+    }));
   };
 
   const addLooseTaskBottom = () => {
@@ -278,62 +302,17 @@ export default function ProjectsScreen({ data, setData }) {
               )}
 
               {/* Existing loose tasks */}
-              {domainLoose.map(t => {
-                const isLooseSwiping = looseSwipeId === t.id;
-                const lsx = isLooseSwiping ? looseSwipeX : 0;
-                return (
-                  <div key={t.id} className={`loose-domain-row${removingLooseId === t.id ? " loose-removing" : ""}`}
-                    style={{ position: "relative", overflow: "hidden" }}>
-                    {/* Swipe reveal: Today button */}
-                    <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, display: "flex", alignItems: "stretch", zIndex: 0 }}>
-                      <div style={{ width: 64, background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
-                        onClick={() => { addToToday(t.id); setLooseSwipeId(null); setLooseSwipeX(0); }}>
-                        <span style={{ color: "#000", fontSize: 11, fontWeight: 700, letterSpacing: ".03em", textTransform: "uppercase" }}>Today</span>
-                      </div>
-                    </div>
-                    <div style={{ position: "relative", zIndex: 1, background: "var(--bg)", display: "flex", alignItems: "center", gap: 10, padding: "9px 0",
-                      transform: `translateX(${Math.min(0, lsx)}px)`, transition: looseSwipeStart.current === null ? "transform .2s ease" : "none" }}
-                      onTouchStart={e => { looseSwipeStart.current = e.touches[0].clientX; setLooseSwipeId(t.id); setLooseSwipeX(0); }}
-                      onTouchMove={e => {
-                        if (looseSwipeStart.current === null) return;
-                        const dx = e.touches[0].clientX - looseSwipeStart.current;
-                        if (dx < 0) setLooseSwipeX(Math.max(dx, -72));
-                      }}
-                      onTouchEnd={() => {
-                        setLooseSwipeX(looseSwipeX < -40 ? -64 : 0);
-                        if (looseSwipeX >= -40) setLooseSwipeId(null);
-                        looseSwipeStart.current = null;
-                      }}>
-                      <div
-                        className={`loose-domain-check${removingLooseId === t.id ? " done" : ""}`}
-                        onClick={() => toggleLoose(t.id)}
-                      >
-                        {removingLooseId === t.id && <span style={{ fontSize: 10, color: "#fff", fontWeight: 700 }}>✓</span>}
-                      </div>
-                      {editingLooseId === t.id ? (
-                        <input
-                          className="loose-domain-edit"
-                          value={editingLooseText}
-                          autoFocus
-                          onFocus={e => scrollIntoView(e.target)}
-                          onChange={e => setEditingLooseText(e.target.value)}
-                          onKeyDown={e => {
-                            if (e.key === "Enter") saveLooseEdit(t.id, editingLooseText);
-                            if (e.key === "Escape") { setEditingLooseId(null); setEditingLooseText(""); }
-                          }}
-                          onBlur={() => saveLooseEdit(t.id, editingLooseText)}
-                        />
-                      ) : (
-                        <span
-                          className={`loose-domain-text${removingLooseId === t.id ? " done" : ""}`}
-                          onClick={() => { if (removingLooseId) return; setEditingLooseId(t.id); setEditingLooseText(t.text); }}
-                          style={{ cursor: "text" }}
-                        >{t.text}</span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+              {domainLoose.map(t => (
+                <div key={t.id} className={removingLooseId === t.id ? "loose-removing" : ""} style={{ padding: "0 14px" }}>
+                  <TaskRow
+                    task={t}
+                    onToggle={() => toggleLoose(t.id)}
+                    onEdit={(text) => saveLooseEdit(t.id, text)}
+                    onDelete={() => deleteLoose(t.id)}
+                    onQuickWin={() => toggleQuickWinLoose(t.id)}
+                  />
+                </div>
+              ))}
 
               {/* Bottom dotted circle add row */}
               {addingLooseBottom ? (
@@ -386,7 +365,7 @@ export default function ProjectsScreen({ data, setData }) {
             onToggleTask={taskId => toggleTask(proj.id, taskId)}
             onDeleteTask={taskId => deleteTask(proj.id, taskId)}
             onSaveTask={(taskId, text) => saveTask(proj.id, taskId, text)}
-            onTodayTask={taskId => addToToday(taskId)}
+            onQuickWinTask={taskId => toggleQuickWinTask(proj.id, taskId)}
             onNewTaskChange={v => setNewTaskText(t => ({ ...t, [proj.id]: v }))}
             onAddTask={() => addTask(proj.id)}
           />

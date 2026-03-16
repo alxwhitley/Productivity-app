@@ -4,6 +4,7 @@ import { getDeepSlots } from "../constants.js";
 import StatusBar from "../components/StatusBar.jsx";
 import ShutdownSheet from "../sheets/ShutdownSheet.jsx";
 import DWPickerSheet from "../sheets/DWPickerSheet.jsx";
+import TaskRow from "../components/TaskRow.jsx";
 
 // Bio-phase definitions (hardcoded wake 7am)
 const BIO_PHASES = [
@@ -72,14 +73,11 @@ function getTodayBlockTimingState({ slot, lateStarted, getElapsedMs }) {
 export default function WorkScreen({ data, setData, onGoToTasks }) {
   const [expandedId, setExpandedId] = useState(null);
   const [celebratingId, setCelebratingId] = useState(null);
-  const [recentlyChecked, setRecentlyChecked] = useState(new Set());
   const [dwOverflowOpen, setDwOverflowOpen] = useState(null);
   const [dwPickerOpen, setDwPickerOpen] = useState(null); // { slot, preProjectId?, preTasks? }
   const [lateStarted, setLateStarted] = useState({});
   const [tick, setTick] = useState(0);
   const [pickerState, setPickerState] = useState(null);
-  const [editingDwTaskId, setEditingDwTaskId] = useState(null);
-  const [editingDwTaskText, setEditingDwTaskText] = useState("");
   const [shutdownOpen, setShutdownOpen] = useState(false);
 
   const scrollRef = useRef(null);
@@ -609,36 +607,21 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
               );
             })() : hasTodayTasks ? (
               <>
-                {relevantTasks.map((t, i) => (
-                  <div key={t.id} className="tl-task-row" style={{ padding: "8px 0", borderBottom: i < relevantTasks.length - 1 ? "1px solid var(--border2)" : "none" }}>
-                    <div className={`tl-check ${t.done ? "done" : ""} ${recentlyChecked.has(t.id) ? "bounce" : ""}`}
-                      style={{ width: 20, height: 20, flexShrink: 0 }}
-                      onClick={() => {
-                        toggleTask(proj.id, t.id);
-                        if (!t.done) {
-                          const remaining = relevantTasks.filter(rt => rt.id !== t.id && !rt.done);
-                          if (remaining.length === 0) { logSession(proj.id, slot.durationMin, null); markManualDone(slot.id, proj.id, slot.todayTasks); }
-                        }
-                      }}>
-                      {t.done && <span style={{ fontSize: 10, color: "#fff", fontWeight: 700 }}>✓</span>}
-                    </div>
-                    {editingDwTaskId === t.id ? (
-                      <input autoFocus
-                        style={{ flex: 1, background: "transparent", border: "none", borderBottom: "1.5px solid var(--accent)", outline: "none", color: "var(--text)", fontSize: 14, fontFamily: "'DM Sans',sans-serif", padding: "1px 0" }}
-                        value={editingDwTaskText} onChange={e => setEditingDwTaskText(e.target.value)}
-                        onBlur={() => {
-                          const txt = editingDwTaskText.trim();
-                          if (txt && txt !== t.text) setData(d => ({ ...d, projects: d.projects.map(p => p.id !== proj.id ? p : { ...p, tasks: p.tasks.map(tk => tk.id !== t.id ? tk : { ...tk, text: txt }) }) }));
-                          setEditingDwTaskId(null);
-                        }}
-                        onKeyDown={e => { if (e.key === "Enter" || e.key === "Escape") e.target.blur(); }} />
-                    ) : (
-                      <span className={`tl-task-txt ${t.done ? "done" : ""}`} style={{ fontSize: 14, cursor: "text" }}
-                        onClick={() => { if (!t.done) { setEditingDwTaskId(t.id); setEditingDwTaskText(t.text); } }}>
-                        {t.text}
-                      </span>
-                    )}
-                  </div>
+                {relevantTasks.map(t => (
+                  <TaskRow
+                    key={t.id}
+                    task={t}
+                    onToggle={() => {
+                      toggleTask(proj.id, t.id);
+                      if (!t.done) {
+                        const remaining = relevantTasks.filter(rt => rt.id !== t.id && !rt.done);
+                        if (remaining.length === 0) { logSession(proj.id, slot.durationMin, null); markManualDone(slot.id, proj.id, slot.todayTasks); }
+                      }
+                    }}
+                    onEdit={(newText) => setData(d => ({ ...d, projects: d.projects.map(p => p.id !== proj.id ? p : { ...p, tasks: p.tasks.map(tk => tk.id !== t.id ? tk : { ...tk, text: newText }) }) }))}
+                    onDelete={() => setData(d => ({ ...d, projects: d.projects.map(p => p.id !== proj.id ? p : { ...p, tasks: p.tasks.filter(tk => tk.id !== t.id) }) }))}
+                    onQuickWin={() => setData(d => ({ ...d, projects: d.projects.map(p => ({ ...p, tasks: p.tasks.map(tk => tk.id !== t.id ? tk : { ...tk, quickWin: !(tk.quickWin ?? false) }) })) }))}
+                  />
                 ))}
                 {/* Done button — only after timer has been started */}
                 {timerActive && (

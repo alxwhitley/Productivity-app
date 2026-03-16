@@ -139,7 +139,7 @@ function GoalRow({ goal, idx, total, readOnly, getDomain, onToggle, onDelete }) 
   const resetSwipe = () => { setSwipeX(0); setShowDelete(false); };
 
   return (
-    <div ref={rowRef} style={{ position: "relative", overflow: "hidden", borderBottom: "1px solid var(--border2)" }}>
+    <div ref={rowRef} style={{ position: "relative", overflow: "hidden", borderLeft: `4px solid ${dom?.color || "var(--text3)"}` }}>
       {/* Delete reveal */}
       {!readOnly && (
         <div style={{
@@ -158,31 +158,42 @@ function GoalRow({ goal, idx, total, readOnly, getDomain, onToggle, onDelete }) 
         onTouchEnd={handleTouchEnd}
         onClick={() => { if (showDelete) resetSwipe(); }}
         style={{
-          display: "flex", alignItems: "center", gap: 8, padding: "13px 0",
-          opacity: goal.done ? 0.5 : 1, transition: "transform .2s, opacity .15s",
+          display: "flex", alignItems: "center", gap: 8, padding: "14px 16px",
+          transition: "transform .2s, opacity .15s",
           transform: `translateX(${swipeX}px)`, background: "var(--bg)",
           position: "relative", zIndex: 1,
         }}
       >
-        <div style={{ width: 8, height: 8, borderRadius: "50%", background: dom?.color || "var(--text3)", flexShrink: 0 }} />
         <span style={{
           fontSize: 10, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase",
           padding: "2px 6px", borderRadius: 4, lineHeight: 1, background: pill.bg, color: pill.color, flexShrink: 0,
         }}>{goal.type}</span>
-        <div style={{ flex: 1, minWidth: 0, fontSize: 15, color: "var(--text)", textDecoration: goal.done ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        <div style={{
+          flex: 1, minWidth: 0, fontSize: 17, letterSpacing: "-0.01em",
+          color: goal.done ? "var(--text3)" : "var(--text)",
+          fontWeight: goal.done ? 500 : 600,
+          textDecoration: goal.done ? "line-through" : "none",
+          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+        }}>
           {goal.text}
         </div>
         {!readOnly && (
           <div onClick={(e) => { e.stopPropagation(); onToggle(goal.id); }} style={{
-            width: 22, height: 22, borderRadius: "50%", flexShrink: 0, cursor: "pointer",
+            width: 24, height: 24, borderRadius: "50%", flexShrink: 0, cursor: "pointer",
             background: goal.done ? "var(--green)" : "transparent",
-            border: goal.done ? "none" : "1.5px solid var(--border)",
+            border: goal.done ? "none" : "2px solid var(--border)",
             display: "flex", alignItems: "center", justifyContent: "center",
           }}>
-            {goal.done && <span style={{ fontSize: 11, color: "#fff", fontWeight: 700 }}>✓</span>}
+            {goal.done && (
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M2.5 6L5 8.5L9.5 3.5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
           </div>
         )}
       </div>
+      {/* Bottom divider */}
+      <div style={{ borderBottom: "1px solid var(--border2)", marginLeft: 16 }} />
     </div>
   );
 }
