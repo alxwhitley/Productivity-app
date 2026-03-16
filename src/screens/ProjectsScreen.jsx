@@ -382,7 +382,7 @@ export default function ProjectsScreen({ data, setData }) {
         <div className="spacer" />
       </div>
 
-      {showManage && <ProjectsManageSheet data={data} setData={setData} onClose={() => setShowManage(false)} onAddProject={addProject} />}
+      {showManage && <ProjectsManageSheet data={data} setData={setData} onClose={() => setShowManage(false)} />}
     </div>
   );
 }
