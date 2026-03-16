@@ -270,14 +270,6 @@
   /* Work screen — cards & bio bar */
   .work-card{margin:0 12px 8px;border-radius:14px;overflow:hidden;transition:opacity .2s,border-color .2s,box-shadow .3s;}
   .work-card.past-block{opacity:0.45;transition:opacity 0.3s ease;}
-  .phase-bar-wrap{padding:0 16px;margin-bottom:16px;}
-  .phase-bar-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
-  .phase-bar-label{font-size:11px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;}
-  .phase-bar-dots{display:flex;gap:5px;align-items:center;}
-  .phase-bar-dot{width:6px;height:6px;border-radius:50%;background:var(--border);}
-  .phase-bar-dot.active{background:currentColor;}
-  .phase-bar-track{height:3px;border-radius:2px;background:var(--bg4);overflow:hidden;}
-  .phase-bar-fill{height:100%;border-radius:2px;transition:width 1s linear;}
 
   /* Work card area */
   .work-card-area{flex:1;position:relative;overflow:hidden;margin-bottom:12px;}
@@ -291,9 +283,13 @@
   .dw-card-header-row{display:flex;align-items:center;gap:6px;margin-bottom:4px;}
   .dw-card-label{font-size:11px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:var(--blue);}
   .dw-card-domain{font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;}
-  .dw-complete-row{display:flex;align-items:center;gap:8px;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+  .dw-action-row{display:flex;gap:10px;margin-top:12px;flex-shrink:0;}
+  .dw-btn-complete{flex:1;padding:11px;border-radius:12px;background:rgba(69,193,122,0.12);color:var(--green);font-size:14px;font-weight:600;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;}
+  .dw-btn-skip{flex:1;padding:11px;border-radius:12px;background:var(--bg3);color:var(--text3);font-size:14px;font-weight:600;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;}
+  .dw-complete-row,.dw-skipped-row{display:flex;align-items:center;gap:8px;margin-top:12px;cursor:pointer;-webkit-tap-highlight-color:transparent;}
   .dw-complete-label{font-size:14px;font-weight:600;color:var(--green);}
-  .dw-undo-label{font-size:12px;color:var(--text3);}
+  .dw-skipped-label{font-size:14px;font-weight:600;color:var(--text3);}
+  .dw-undo-label{font-size:12px;color:var(--text3);margin-left:4px;}
   .dw-card-inner{width:100%;height:100%;border-radius:28px;padding:20px;display:flex;flex-direction:column;overflow:hidden;box-sizing:border-box;}
   .dw-card-inner .task-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
   .dw-task-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border2);}

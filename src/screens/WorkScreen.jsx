@@ -36,7 +36,7 @@ function getPhaseForMins(mins) {
   return mins < 420 ? "peak" : "wind";
 }
 
-function getTodayBlockCompletionState({ slot, project, manualCompleted }) {
+function getTodayBlockCompletionState({ slot, project, manualCompleted, manualSkipped }) {
   const isSessionMode = (project?.type || project?.mode) === "sessions";
   const todayTaskIds = slot.todayTasks;
   const hasTodayTasks = Array.isArray(todayTaskIds) && todayTaskIds.length > 0;
@@ -48,7 +48,8 @@ function getTodayBlockCompletionState({ slot, project, manualCompleted }) {
     ? manualCompleted.has(slot.id)
     : (relevantTasks.length > 0 && relevantDone === relevantTasks.length);
   const isCompleted = allTasksDone || manualCompleted.has(slot.id);
-  return { isSessionMode, todayTaskIds, hasTodayTasks, relevantTasks, relevantDone, allTasksDone, isCompleted };
+  const isSkipped = manualSkipped?.has(slot.id) || false;
+  return { isSessionMode, todayTaskIds, hasTodayTasks, relevantTasks, relevantDone, allTasksDone, isCompleted, isSkipped };
 }
 
 function getTodayBlockTimingState({ slot, lateStarted, getElapsedMs }) {
@@ -91,7 +92,10 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
 
   const todayStr = new Date().toDateString();
   const manualCompleted = new Set(
-    (data.blockCompletions || []).filter(c => c.date === todayStr).map(c => c.blockId)
+    (data.blockCompletions || []).filter(c => c.date === todayStr && !c.skipped).map(c => c.blockId)
+  );
+  const manualSkipped = new Set(
+    (data.blockCompletions || []).filter(c => c.date === todayStr && c.skipped).map(c => c.blockId)
   );
 
   const { domains, projects } = data;
@@ -199,6 +203,22 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
     });
   };
 
+  const markSkipped = (blockId) => {
+    setData(d => {
+      const existing = d.blockCompletions || [];
+      const alreadyLogged = existing.some(c => c.blockId === blockId && c.date === todayStr);
+      const blockCompletions = alreadyLogged ? existing : [...existing, { blockId, date: todayStr, skipped: true }];
+      return { ...d, blockCompletions };
+    });
+  };
+
+  const unmarkSkipped = (blockId) => {
+    setData(d => ({
+      ...d,
+      blockCompletions: (d.blockCompletions || []).filter(c => !(c.blockId === blockId && c.date === todayStr)),
+    }));
+  };
+
   // Live tick every second
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 1000);
@@ -252,9 +272,6 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
       phase: def.phase,
     };
   });
-
-  // Bio bar position
-  const barPct = Math.max(0, Math.min(100, (nowMins - 420) / BIO_TOTAL * 100));
 
   // ── Today's Shallow Work ──
   const todayISO = toISODate();
@@ -336,7 +353,7 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
     const isSessionMode = (proj?.type || proj?.mode) === "sessions";
     const typeBadge = isSessionMode ? "Session" : "Task-based";
 
-    const { hasTodayTasks, relevantTasks, relevantDone, isCompleted } = getTodayBlockCompletionState({ slot, project: proj, manualCompleted });
+    const { hasTodayTasks, relevantTasks, relevantDone, isCompleted, isSkipped } = getTodayBlockCompletionState({ slot, project: proj, manualCompleted, manualSkipped });
     const { timerActive, isRunning, countdownLabel: cdStr } = getTodayBlockTimingState({ slot, lateStarted, getElapsedMs });
 
     const blockEndMins = slot.startHour * 60 + slot.startMin + slot.durationMin;
@@ -362,11 +379,15 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
         background: cardBg,
         border: "none",
         boxShadow: `inset 0 0 0 1.5px ${domainColor}60`,
-        opacity: isPast && isCompleted ? 0.45 : 1,
+        opacity: (isPast && isCompleted) || isSkipped ? 0.45 : 1,
       }}>
-        {/* Header row: DEEP WORK · domain */}
+        {/* Header row: DEEP WORK · domain (or SKIPPED) */}
         <div className="dw-card-header-row">
-          <span className="dw-card-label">Deep Work</span>
+          {isSkipped ? (
+            <span className="dw-card-label" style={{ color: "var(--text3)" }}>Skipped</span>
+          ) : (
+            <span className="dw-card-label">Deep Work</span>
+          )}
           <span className="dw-card-domain" style={{ color: domainColor }}>· {domainName || "No domain"}</span>
         </div>
 
@@ -378,32 +399,44 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
         {/* Project name */}
         <div style={{ fontSize: 22, fontWeight: 700, color: "var(--text)", marginTop: 12, lineHeight: 1.2 }}>{proj?.name}</div>
 
-        {/* Timer / Complete row */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
-          {isCompleted ? (
-            <div className="dw-complete-row" onClick={() => unmarkManualDone(slot.id, proj?.id, slot.todayTasks)}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              <span className="dw-complete-label">Complete</span>
-              <span className="dw-undo-label">Tap to undo</span>
-            </div>
-          ) : (
-            <>
-              <button onClick={(e) => { e.stopPropagation(); isRunning ? pauseTimerSlot(slot.id) : startTimerSlot(slot.id); }} style={{
-                width: 20, height: 20, background: "none", border: "none", cursor: "pointer",
-                color: "var(--text2)", display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
-              }}>
-                {isRunning
-                  ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor"/></svg>
-                  : <svg width="12" height="13" viewBox="0 0 16 18" fill="none"><path d="M1 1l14 8-14 8V1z" fill="currentColor"/></svg>
-                }
-              </button>
-              <span style={{ fontSize: 15, color: "var(--text2)", fontVariantNumeric: "tabular-nums", fontFamily: "'DM Sans', sans-serif" }}>
-                {cdStr}
-              </span>
-              <span style={{ fontSize: 13, color: "var(--text3)" }}>{slot.durationMin} min</span>
-            </>
-          )}
-        </div>
+        {/* Timer row */}
+        {!isCompleted && !isSkipped && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+            <button onClick={(e) => { e.stopPropagation(); isRunning ? pauseTimerSlot(slot.id) : startTimerSlot(slot.id); }} style={{
+              width: 20, height: 20, background: "none", border: "none", cursor: "pointer",
+              color: "var(--text2)", display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+            }}>
+              {isRunning
+                ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor"/></svg>
+                : <svg width="12" height="13" viewBox="0 0 16 18" fill="none"><path d="M1 1l14 8-14 8V1z" fill="currentColor"/></svg>
+              }
+            </button>
+            <span style={{ fontSize: 15, color: "var(--text2)", fontVariantNumeric: "tabular-nums", fontFamily: "'DM Sans', sans-serif" }}>
+              {cdStr}
+            </span>
+            <span style={{ fontSize: 13, color: "var(--text3)" }}>{slot.durationMin} min</span>
+          </div>
+        )}
+
+        {/* Action / state row */}
+        {isCompleted ? (
+          <div className="dw-complete-row" onClick={() => unmarkManualDone(slot.id, proj?.id, slot.todayTasks)}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <span className="dw-complete-label">Complete</span>
+            <span className="dw-undo-label">Tap to undo</span>
+          </div>
+        ) : isSkipped ? (
+          <div className="dw-skipped-row" onClick={() => unmarkSkipped(slot.id)}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M13 5l7 7-7 7M5 5l7 7-7 7" stroke="var(--text3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <span className="dw-skipped-label">Skipped</span>
+            <span className="dw-undo-label">Tap to undo</span>
+          </div>
+        ) : (
+          <div className="dw-action-row">
+            <button className="dw-btn-complete" onClick={handleDone}>Complete</button>
+            <button className="dw-btn-skip" onClick={() => markSkipped(slot.id)}>Skip</button>
+          </div>
+        )}
 
         {/* Divider */}
         <div style={{ height: 1, background: "var(--border)", margin: "12px 0" }} />
@@ -549,23 +582,6 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
               <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5" />
             </svg>
           </button>
-        </div>
-      </div>
-
-      {/* ── PHASE BAR ── */}
-      <div className="phase-bar-wrap">
-        <div className="phase-bar-row">
-          <span className="phase-bar-label" style={{ color: PHASE_COLORS[currentPhase]?.css || "var(--text3)" }}>
-            {BIO_PHASES.find(p => p.id === currentPhase)?.label || ""}
-          </span>
-          <div className="phase-bar-dots" style={{ color: PHASE_COLORS[currentPhase]?.css || "var(--text3)" }}>
-            {BIO_PHASES.filter(p => p.id !== "wind").map(p => (
-              <div key={p.id} className={`phase-bar-dot${currentPhase === p.id ? " active" : ""}`} />
-            ))}
-          </div>
-        </div>
-        <div className="phase-bar-track">
-          <div className="phase-bar-fill" style={{ width: `${barPct}%`, background: PHASE_COLORS[currentPhase]?.css || "var(--accent)" }} />
         </div>
       </div>
 

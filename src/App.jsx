@@ -79,16 +79,18 @@ export default function App() {
   const currentHour = now.getHours();
   const shutdownDoneToday = safeData.shutdownDone && safeData.shutdownDate === todayISO;
 
-  // Check if all DW blocks are complete
+  // Check if all DW blocks are complete or skipped
+  const todayDateStr = new Date().toDateString();
   const allDWComplete = (() => {
-    const completions = safeData.blockCompletions.filter(c => c.date === todayISO);
-    const completedIds = new Set(completions.map(c => c.blockId));
+    const completions = safeData.blockCompletions.filter(c => c.date === todayDateStr);
+    const resolvedIds = new Set(completions.map(c => c.blockId));
     const maxBlocks = safeData.deepWorkTargets?.maxDeepBlocks ?? 3;
+    if (maxBlocks === 0) return true;
     let allDone = true;
     for (let i = 0; i < maxBlocks; i++) {
-      if (!completedIds.has(`dw-${todayISO}-${i}`)) { allDone = false; break; }
+      if (!resolvedIds.has(`dw-${todayISO}-${i}`)) { allDone = false; break; }
     }
-    return allDone && maxBlocks > 0;
+    return allDone;
   })();
 
   const showBanner = currentHour >= safeData.shutdownTriggerHour || allDWComplete;
