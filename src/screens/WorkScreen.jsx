@@ -653,21 +653,20 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
           </div>
         </div>
 
-        {/* ── BIO-PHASE BAR ── */}
-        <div style={{ padding: "0 16px 16px" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", color: PHASE_COLORS[currentPhase]?.css || "var(--text3)" }}>
+        {/* ── PHASE BAR ── */}
+        <div className="phase-bar-wrap">
+          <div className="phase-bar-row">
+            <span className="phase-bar-label" style={{ color: PHASE_COLORS[currentPhase]?.css || "var(--text3)" }}>
               {BIO_PHASES.find(p => p.id === currentPhase)?.label || ""}
             </span>
-            <div style={{ display: "flex", gap: 5 }}>
-              {BIO_PHASES.map(p => (
-                <div key={p.id} style={{ width: 6, height: 6, borderRadius: "50%", background: currentPhase === p.id ? (PHASE_COLORS[p.id]?.css || "var(--text3)") : "var(--bg4)" }} />
+            <div className="phase-bar-dots" style={{ color: PHASE_COLORS[currentPhase]?.css || "var(--text3)" }}>
+              {BIO_PHASES.filter(p => p.id !== "wind").map(p => (
+                <div key={p.id} className={`phase-bar-dot${currentPhase === p.id ? " active" : ""}`} />
               ))}
             </div>
           </div>
-          <div style={{ position: "relative", height: 4, background: "var(--bg4)", borderRadius: 2 }}>
-            <div style={{ position: "absolute", left: 0, top: 0, height: "100%", background: PHASE_COLORS[currentPhase]?.css || "var(--accent)", borderRadius: 2, width: `${barPct}%` }} />
-            <div className="work-bio-dot" style={{ left: `${barPct}%`, background: PHASE_COLORS[currentPhase]?.css || "var(--accent)" }} />
+          <div className="phase-bar-track">
+            <div className="phase-bar-fill" style={{ width: `${barPct}%`, background: PHASE_COLORS[currentPhase]?.css || "var(--accent)" }} />
           </div>
         </div>
 
