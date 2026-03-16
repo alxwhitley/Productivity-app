@@ -385,13 +385,14 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
         background: "var(--bg2)",
         border: "1.5px dashed var(--border)",
         cursor: "pointer",
+        height: 64, overflow: "hidden",
       }} onClick={() => setDwPickerOpen({ slot })}>
-        <div style={{ padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ padding: "14px 16px", display: "flex", alignItems: "center", gap: 12, height: "100%", boxSizing: "border-box" }}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity=".3" /></svg>
           <div style={{ flex: 1, color: "var(--text2)" }}>
-            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".07em", textTransform: "uppercase" }}>Deep Work Block</span>
+            <span style={{ fontSize: 15, fontWeight: 600 }}>Deep Work Block</span>
           </div>
-          <span style={{ fontSize: 11, color: "var(--text2)" }}>{(data.todayPrefs || {}).hideTimes ? "" : fmtTime(slot.startHour, slot.startMin) + " · "}{slot.durationMin} min</span>
+          <span style={{ fontSize: 12, color: "var(--text2)" }}>{(data.todayPrefs || {}).hideTimes ? "" : fmtTime(slot.startHour, slot.startMin) + " · "}{slot.durationMin} min</span>
         </div>
       </div>
     );
@@ -409,24 +410,24 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
     const showBody = isExp && !isCompleted;
     const isPicking = pickerState?.blockId === slot.id;
 
-    // Done card — expandable review state
+    // Done card
     if (isCompleted) {
       const isExpDone = expandedId === slot.id;
       return (
         <div key={slot.id} className="work-card" style={{
           background: "var(--bg2)", border: "1px solid var(--border)", opacity: 0.55, position: "relative", cursor: "pointer",
+          height: isExpDone ? 180 : 64, overflow: "hidden", transition: "height .2s ease",
         }} onClick={() => setExpandedId(isExpDone ? null : slot.id)}>
           <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: "var(--border)", borderRadius: "14px 0 0 14px" }} />
-          <div style={{ padding: "14px 16px 14px 20px", display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ padding: "12px 16px 0 20px", display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 18, fontWeight: 800, color: "var(--text3)", letterSpacing: "-.02em" }}>{proj?.name}</div>
-              <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 3 }}>{data.todayPrefs?.hideTimes ? "" : `${fmtTime(slot.startHour, slot.startMin)} · `}{slot.durationMin} min</div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text3)", letterSpacing: "-.01em" }}>{proj?.name}</div>
+              <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>{data.todayPrefs?.hideTimes ? "" : `${fmtTime(slot.startHour, slot.startMin)} · `}{slot.durationMin} min</div>
             </div>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style={{ color: "var(--text3)", opacity: .4, transform: isExpDone ? "rotate(90deg)" : "none", transition: "transform .2s" }}><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </div>
           {isExpDone && hasTodayTasks && (
-            <div style={{ padding: "0 16px 14px 20px" }} onClick={e => e.stopPropagation()}>
+            <div style={{ padding: "8px 16px 14px 20px", overflowY: "auto", maxHeight: 120 }} onClick={e => e.stopPropagation()}>
               {relevantTasks.map((t, i) => (
                 <div key={t.id} className="tl-task-row" style={{ padding: "8px 0", borderBottom: i < relevantTasks.length - 1 ? "1px solid var(--border2)" : "none" }}>
                   <div className={`tl-check ${t.done ? "done" : ""}`}
@@ -462,12 +463,14 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
         background: "var(--bg2)",
         border: "1px solid var(--border)",
         position: "relative",
+        height: showBody ? 180 : 64, overflow: "hidden",
+        transition: "height .2s ease",
       }} onClick={() => setExpandedId(isExp ? null : slot.id)}>
         <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: domainColor || "var(--text3)", borderRadius: "14px 0 0 14px" }} />
 
         {/* Overflow menu overlay */}
         {dwOverflowOpen === slot.id && (
-          <div style={{ position: "absolute", inset: 0, background: "var(--bg2)", borderRadius: 14, zIndex: 10, display: "flex", flexDirection: "column", padding: "16px 16px 14px" }} onClick={e => e.stopPropagation()}>
+          <div style={{ position: "absolute", inset: 0, background: "var(--bg2)", borderRadius: 14, zIndex: 10, display: "flex", flexDirection: "column", padding: "16px 16px 14px", overflow: "auto" }} onClick={e => e.stopPropagation()}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text2)" }}>{proj?.name}</span>
               <button onClick={() => setDwOverflowOpen(null)}
@@ -508,25 +511,15 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
         )}
 
         {/* Header row */}
-        <div style={{ padding: "14px 16px 12px 20px", display: "flex", alignItems: "flex-start", gap: 12 }}>
+        <div style={{ padding: "12px 16px 0 20px", display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 18, fontWeight: 800, color: "var(--text)", letterSpacing: "-.02em", lineHeight: 1.15 }}>{proj?.name}</div>
-            {!showBody && (
-              <>
-                <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 4 }}>
-                  {data.todayPrefs?.hideTimes ? "" : `${fmtTime(slot.startHour, slot.startMin)} · `}{slot.durationMin} min
-                  {!isSessionMode && hasTodayTasks ? ` · ${relevantDone}/${relevantTasks.length}` : ""}
-                </div>
-                {!isSessionMode && !hasTodayTasks && (
-                  <div style={{ marginTop: 4, cursor: "pointer", color: "var(--text3)", fontSize: 12 }}
-                    onClick={e => { e.stopPropagation(); setPickerState({ blockId: slot.id, projectId: proj.id, selected: new Set(), newText: "" }); setExpandedId(slot.id); }}>
-                    + Pick tasks
-                  </div>
-                )}
-              </>
-            )}
+            <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", letterSpacing: "-.01em", lineHeight: 1.15 }}>{proj?.name}</div>
+            <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>
+              {data.todayPrefs?.hideTimes ? "" : `${fmtTime(slot.startHour, slot.startMin)} · `}{slot.durationMin} min
+              {!showBody && !isSessionMode && hasTodayTasks ? ` · ${relevantDone}/${relevantTasks.length}` : ""}
+            </div>
           </div>
-          {/* Right controls — compact timer + overflow + chevron */}
+          {/* Right controls */}
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
             <button style={{ width: 20, height: 20, background: "none", border: "none", cursor: "pointer", color: "var(--text2)", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, flexShrink: 0 }}
               onClick={e => { e.stopPropagation(); isRunning ? pauseTimerSlot(slot.id) : startTimerSlot(slot.id); }}>
@@ -546,15 +539,12 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
                 </svg>
               </button>
             )}
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style={{ color: "var(--text3)", opacity: .4, transform: isExp ? "rotate(90deg)" : "none", transition: "transform .2s" }}><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </div>
         </div>
 
         {/* ── EXPANDED BODY: tasks + done ── */}
         {showBody && (
-          <div style={{ padding: "0 16px 14px 20px" }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: 12, color: "var(--text2)", marginBottom: 10 }}>{data.todayPrefs?.hideTimes ? "" : `${fmtTime(slot.startHour, slot.startMin)} · `}{slot.durationMin} min</div>
-
+          <div style={{ padding: "6px 16px 10px 20px", overflowY: "auto", maxHeight: 120 }} onClick={e => e.stopPropagation()}>
             {isPicking ? (() => {
               const ps = pickerState;
               const confirmPick = () => {
@@ -606,10 +596,9 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
                     onQuickWin={() => setData(d => ({ ...d, projects: d.projects.map(p => ({ ...p, tasks: p.tasks.map(tk => tk.id !== t.id ? tk : { ...tk, quickWin: !(tk.quickWin ?? false) }) })) }))}
                   />
                 ))}
-                {/* Done button — only after timer has been started */}
                 {timerActive && (
                   <button onClick={handleDone}
-                    style={{ width: "100%", marginTop: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "var(--green)", border: "none", borderRadius: 10, padding: "12px 0", fontSize: 13, fontWeight: 700, color: "#fff", cursor: "pointer", fontFamily: "'DM Sans',sans-serif" }}>
+                    style={{ width: "100%", marginTop: 8, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "var(--green)", border: "none", borderRadius: 10, padding: "10px 0", fontSize: 13, fontWeight: 700, color: "#fff", cursor: "pointer", fontFamily: "'DM Sans',sans-serif" }}>
                     Done ✓
                   </button>
                 )}
@@ -714,12 +703,10 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
 
               {/* Shallow work section */}
               {isShallowPhase && (
-                <>
-                  <div className="sh" style={{ padding: "4px 16px 6px" }}>
-                    <span className="sh-label" style={{ color: "var(--teal)", borderColor: "var(--teal)" }}>Today's Shallow Work</span>
-                  </div>
+                <div style={{ margin: "8px 12px 0", background: "var(--bg2)", borderRadius: 14, padding: 16, borderLeft: "3px solid var(--teal)" }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--teal)", marginBottom: 8 }}>Today's Shallow Work</div>
                   {hasShallowPicks ? (
-                    <div style={{ padding: "0 16px 8px" }}>
+                    <>
                       {todayPickTasks.map(t => (
                         <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: "1px solid var(--border2)", cursor: "pointer" }}
                           onClick={() => toggleTodayPickTask(t)}>
@@ -729,14 +716,14 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
                           <span style={{ fontSize: 14, color: t.done ? "var(--text3)" : "var(--text)", textDecoration: t.done ? "line-through" : "none", flex: 1 }}>{t.text}</span>
                         </div>
                       ))}
-                    </div>
+                    </>
                   ) : (
-                    <div style={{ padding: "8px 16px 4px", cursor: "pointer", color: "var(--text3)", fontSize: 13 }}
+                    <div style={{ cursor: "pointer", color: "var(--text3)", fontSize: 13 }}
                       onClick={() => onGoToTasks()}>
                       + Add from Tasks
                     </div>
                   )}
-                </>
+                </div>
               )}
 
             </div>

@@ -340,25 +340,6 @@ export default function SeasonScreen({ data, setData, onOpenProfile }) {
     return true;
   });
 
-  // ── Weekly review dots ──
-  const totalWeeksInQ = Math.ceil((qEnd - qStart) / (7 * 86400000));
-  const weekDots = [];
-  let shutdownWeeks = 0;
-  for (let w = 0; w < totalWeeksInQ; w++) {
-    const ws = new Date(qStart);
-    ws.setDate(ws.getDate() + w * 7);
-    const we = new Date(ws);
-    we.setDate(we.getDate() + 7);
-    const hasActivity = seasonCompletions.some(c => {
-      const d = new Date(c.date);
-      return d >= ws && d < we;
-    });
-    const past = we <= now;
-    weekDots.push({ filled: hasActivity, past });
-    if (hasActivity) shutdownWeeks++;
-  }
-  const pastWeeks = weekDots.filter(w => w.past).length;
-
   // ── Render ──
   const filledSlots = goals.slice(0, MAX_GOALS);
   const emptyCount = MAX_GOALS - filledSlots.length;
@@ -601,26 +582,6 @@ export default function SeasonScreen({ data, setData, onOpenProfile }) {
               );
             })
           )}
-        </div>
-
-        {/* ── WEEKLY REVIEWS ── */}
-        <div className="sh" style={{ paddingTop: 8 }}>
-          <span className="sh-label">WEEKLY REVIEWS</span>
-        </div>
-        <div style={{ padding: "0 16px" }}>
-          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 10 }}>
-            {weekDots.map((w, i) => (
-              <div key={i} style={{
-                width: 14, height: 14, borderRadius: "50%",
-                background: w.filled ? "#B89B6A" : "transparent",
-                border: w.filled ? "none" : "1.5px solid var(--border)",
-                opacity: w.past || w.filled ? 1 : 0.4,
-              }} />
-            ))}
-          </div>
-          <div style={{ fontSize: 12, color: "var(--text3)" }}>
-            {shutdownWeeks} of {pastWeeks} weeks with a shutdown completed
-          </div>
         </div>
 
         <div className="spacer" />
