@@ -452,23 +452,12 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
           </div>
         )}
 
-        {/* Action / state row */}
-        {isCompleted ? (
-          <div className="dw-complete-row" onClick={() => unmarkManualDone(slot.id, proj?.id, slot.todayTasks)}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            <span className="dw-complete-label">Complete</span>
-            <span className="dw-undo-label">Tap to undo</span>
-          </div>
-        ) : isSkipped ? (
+        {/* Skipped state row */}
+        {isSkipped && (
           <div className="dw-skipped-row" onClick={() => unmarkSkipped(slot.id)}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M13 5l7 7-7 7M5 5l7 7-7 7" stroke="var(--text3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
             <span className="dw-skipped-label">Skipped</span>
             <span className="dw-undo-label">Tap to undo</span>
-          </div>
-        ) : (
-          <div className="dw-action-row">
-            <button className="dw-btn-complete" onClick={handleDone}>Complete</button>
-            <button className="dw-btn-skip" onClick={() => markSkipped(slot.id)}>Skip</button>
           </div>
         )}
 
@@ -515,11 +504,10 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
               {relevantTasks.map(t => (
                 <div key={t.id} className="dw-task-row" style={{ opacity: t.done ? 0.45 : 1, cursor: "pointer" }}
                   onClick={() => {
-                    toggleTask(proj.id, t.id);
-                    if (!t.done) {
-                      const remaining = relevantTasks.filter(rt => rt.id !== t.id && !rt.done);
-                      if (remaining.length === 0) { logSession(proj.id, slot.durationMin, null); markManualDone(slot.id, proj.id, slot.todayTasks); }
+                    if (isCompleted) {
+                      unmarkManualDone(slot.id, proj?.id, slot.todayTasks);
                     }
+                    toggleTask(proj.id, t.id);
                   }}>
                   <div className={`dw-task-circle${t.done ? " done" : ""}`}>
                     {t.done && <span style={{ fontSize: 10, color: "#fff", fontWeight: 700 }}>✓</span>}
@@ -527,12 +515,6 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
                   <span className={`dw-task-text${t.done ? " done" : ""}`} style={{ flex: 1 }}>{t.text}</span>
                 </div>
               ))}
-              {timerActive && !isCompleted && (
-                <button onClick={handleDone}
-                  style={{ width: "100%", marginTop: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "var(--green)", border: "none", borderRadius: 10, padding: "10px 0", fontSize: 13, fontWeight: 700, color: "#fff", cursor: "pointer", fontFamily: "'DM Sans',sans-serif" }}>
-                  Done ✓
-                </button>
-              )}
             </>
           ) : (
             <div style={{ cursor: "pointer", color: "var(--blue)", fontSize: 13, fontWeight: 600 }}
@@ -541,6 +523,39 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
             </div>
           )}
         </div>
+
+        {/* Bottom action row — Complete + Skip */}
+        {!isCompleted && !isSkipped && (() => {
+          const allTasksDone = isSessionMode
+            ? true
+            : (relevantTasks.length > 0 && relevantTasks.every(t => t.done));
+          const canComplete = allTasksDone;
+          return (
+            <div style={{ display: "flex", gap: 10, padding: "12px 0 0", marginTop: "auto", flexShrink: 0 }}>
+              <button
+                onClick={canComplete ? handleDone : undefined}
+                style={{
+                  flex: 1, padding: "13px 0", borderRadius: 12, fontSize: 15, fontWeight: 700,
+                  border: "none", cursor: canComplete ? "pointer" : "default",
+                  fontFamily: "'DM Sans',sans-serif",
+                  background: canComplete ? "var(--accent)" : "var(--bg3)",
+                  color: canComplete ? "#000" : "var(--text3)",
+                  transition: "background .2s, color .2s",
+                }}
+              >Complete</button>
+              {!canComplete && (
+                <button
+                  onClick={() => markSkipped(slot.id)}
+                  style={{
+                    flex: 1, padding: "13px 0", borderRadius: 12, fontSize: 15, fontWeight: 700,
+                    border: "none", cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
+                    background: "var(--bg3)", color: "var(--text3)",
+                  }}
+                >Skip</button>
+              )}
+            </div>
+          );
+        })()}
       </div>
     );
   }
