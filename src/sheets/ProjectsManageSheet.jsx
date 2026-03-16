@@ -65,6 +65,18 @@ function ProjectsManageSheet({ data, setData, onClose }) {
     setExpandedDomainId(null);
   };
 
+  const moveDomain = (domainId, direction) => {
+    setData(d => {
+      const doms = [...d.domains];
+      const idx = doms.findIndex(dom => dom.id === domainId);
+      if (idx === -1) return d;
+      const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+      if (swapIdx < 0 || swapIdx >= doms.length) return d;
+      [doms[idx], doms[swapIdx]] = [doms[swapIdx], doms[idx]];
+      return { ...d, domains: doms };
+    });
+  };
+
   const handleAddDomain = () => {
     const name = newDomainName.trim();
     if (!name) return;
@@ -187,7 +199,7 @@ function ProjectsManageSheet({ data, setData, onClose }) {
               DOMAINS
             </div>
 
-            {domains.map(dom => {
+            {domains.map((dom, domIdx) => {
               const isExpanded = expandedDomainId === dom.id;
               const domProjects = projects.filter(p => p.domainId === dom.id);
 
@@ -204,6 +216,42 @@ function ProjectsManageSheet({ data, setData, onClose }) {
                   >
                     <div style={{ width: 10, height: 10, borderRadius: "50%", background: dom.color, flexShrink: 0 }} />
                     <span style={{ flex: 1, fontSize: 15, fontWeight: 500, color: "var(--text)" }}>{dom.name}</span>
+                    {!isExpanded && (
+                      <div style={{ display: "flex", gap: 2, marginLeft: "auto" }} onClick={e => e.stopPropagation()}>
+                        <button
+                          onClick={() => moveDomain(dom.id, "up")}
+                          disabled={domIdx === 0}
+                          style={{
+                            width: 28, height: 28, background: "none", border: "none",
+                            cursor: domIdx === 0 ? "default" : "pointer",
+                            color: domIdx === 0 ? "var(--text3)" : "var(--text2)",
+                            opacity: domIdx === 0 ? 0.3 : 1,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            padding: 0,
+                          }}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                            <path d="M18 15l-6-6-6 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => moveDomain(dom.id, "down")}
+                          disabled={domIdx === domains.length - 1}
+                          style={{
+                            width: 28, height: 28, background: "none", border: "none",
+                            cursor: domIdx === domains.length - 1 ? "default" : "pointer",
+                            color: domIdx === domains.length - 1 ? "var(--text3)" : "var(--text2)",
+                            opacity: domIdx === domains.length - 1 ? 0.3 : 1,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            padding: 0,
+                          }}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                            <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </button>
+                      </div>
+                    )}
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
                       style={{ color: "var(--text3)", transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)", transition: "transform .2s", flexShrink: 0 }}>
                       <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
