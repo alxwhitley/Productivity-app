@@ -84,8 +84,8 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
   const [cardAnim, setCardAnim] = useState(null); // { direction: "up"|"down", phase: "exit"|"enter" }
   const swipeRef = useRef(null);
 
-  // Shallow overlay
-  const [shallowOpen, setShallowOpen] = useState(false);
+  // Shallow card expand
+  const [shallowExpanded, setShallowExpanded] = useState(false);
 
   // Routine expand
   const [expandedRoutineId, setExpandedRoutineId] = useState(null);
@@ -608,119 +608,127 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
         </div>
       </div>
 
-      {/* ── DW CARD CAROUSEL ── */}
-      <div className="dw-carousel"
-        onTouchStart={handleCarouselTouchStart}
-        onTouchMove={handleCarouselTouchMove}
-        onTouchEnd={handleCarouselTouchEnd}
-      >
-        {/* Side dots */}
-        {hasMultipleCards && (
-          <div className="dw-side-dots">
-            {carouselSlots.map((_, i) => (
-              <div key={i} className={`dw-side-dot${i === activeCardIdx ? " active" : ""}`} />
-            ))}
-          </div>
-        )}
+      {/* ── WORK CARD AREA (DW carousel + shallow card) ── */}
+      <div className={`work-card-area${shallowExpanded ? " shallow-expanded" : ""}`}>
+        {/* DW carousel */}
+        <div className="dw-carousel"
+          onTouchStart={handleCarouselTouchStart}
+          onTouchMove={handleCarouselTouchMove}
+          onTouchEnd={handleCarouselTouchEnd}
+        >
+          {/* Side dots */}
+          {hasMultipleCards && (
+            <div className="dw-side-dots">
+              {carouselSlots.map((_, i) => (
+                <div key={i} className={`dw-side-dot${i === activeCardIdx ? " active" : ""}`} />
+              ))}
+            </div>
+          )}
 
-        {/* Cards — only render active + animating */}
-        {carouselSlots.map((slot, i) => {
-          const isVisible = i === activeCardIdx || (cardAnim && (i === cardAnim.from || i === cardAnim.to));
-          if (!isVisible) return null;
-          return <div key={slot.id} className={getCardClass(i)}>{renderDWCarouselCard(slot)}</div>;
-        })}
+          {/* Cards — only render active + animating */}
+          {carouselSlots.map((slot, i) => {
+            const isVisible = i === activeCardIdx || (cardAnim && (i === cardAnim.from || i === cardAnim.to));
+            if (!isVisible) return null;
+            return <div key={slot.id} className={getCardClass(i)}>{renderDWCarouselCard(slot)}</div>;
+          })}
 
-        {/* Empty state when no slots at all */}
-        {carouselSlots.length === 0 && (
-          <div className="dw-card-full active" style={{
-            border: "1.5px dashed var(--border)", background: "var(--bg2)",
-            alignItems: "center", justifyContent: "center", textAlign: "center",
-          }}>
-            <div style={{ color: "var(--text3)", fontSize: 15, fontWeight: 500, marginBottom: 16 }}>No deep work scheduled</div>
-            <button style={{
-              background: "none", border: "1.5px solid var(--accent)", borderRadius: 10,
-              padding: "10px 20px", fontSize: 14, fontWeight: 700, color: "var(--accent)",
-              cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
-            }}>+ Plan your day</button>
+          {/* Empty state when no slots at all */}
+          {carouselSlots.length === 0 && (
+            <div className="dw-card-full active" style={{
+              border: "1.5px dashed var(--border)", background: "var(--bg2)",
+              alignItems: "center", justifyContent: "center", textAlign: "center",
+            }}>
+              <div style={{ color: "var(--text3)", fontSize: 15, fontWeight: 500, marginBottom: 16 }}>No deep work scheduled</div>
+              <button style={{
+                background: "none", border: "1.5px solid var(--accent)", borderRadius: 10,
+                padding: "10px 20px", fontSize: 14, fontWeight: 700, color: "var(--accent)",
+                cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
+              }}>+ Plan your day</button>
+            </div>
+          )}
+        </div>
+
+        {/* Shallow work card */}
+        <div className={`shallow-card${shallowExpanded ? " expanded" : ""}`}
+          onClick={() => { if (!shallowExpanded) setShallowExpanded(true); }}>
+
+          {/* Rest state row */}
+          <div className="shallow-card-rest">
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".07em", textTransform: "uppercase", color: "var(--teal)" }}>Shallow Work</div>
+              <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 2 }}>
+                {shallowCount === 0 ? "No tasks queued" : `${shallowCount} task${shallowCount !== 1 ? "s" : ""} queued${shallowDoneCount > 0 ? ` · ${shallowDoneCount} done` : ""}`}
+              </div>
+            </div>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ color: "var(--text3)" }}>
+              <path d="M18 15l-6-6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
           </div>
-        )}
+
+          {/* Expanded full content */}
+          <div className="shallow-card-full">
+            {/* Header */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".07em", textTransform: "uppercase", color: "var(--teal)" }}>Shallow Work</span>
+              <button onClick={(e) => { e.stopPropagation(); setShallowExpanded(false); }} style={{
+                width: 26, height: 26, borderRadius: "50%", background: "var(--bg3)", border: "none",
+                display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--text2)",
+              }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></svg>
+              </button>
+            </div>
+
+            {/* Task list */}
+            <div style={{ flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
+              {todayPickTasks.length === 0 ? (
+                <div style={{ textAlign: "center", color: "var(--text3)", fontSize: 14, padding: "32px 0" }}>No tasks queued</div>
+              ) : (
+                todayPickTasks.map((t, i) => (
+                  <div key={t.id} style={{
+                    display: "flex", alignItems: "center", gap: 10, padding: "10px 0",
+                    borderBottom: i < todayPickTasks.length - 1 ? "1px solid var(--border2)" : "none",
+                    opacity: t.done ? 0.45 : 1, cursor: "pointer",
+                  }} onClick={(e) => { e.stopPropagation(); toggleTodayPickTask(t); }}>
+                    <div style={{
+                      width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
+                      border: t.done ? "none" : "1.5px solid var(--border)",
+                      background: t.done ? "var(--green)" : "transparent",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      {t.done && <span style={{ fontSize: 10, color: "#fff", fontWeight: 700 }}>✓</span>}
+                    </div>
+                    <span style={{ fontSize: 14, color: t.done ? "var(--text3)" : "var(--text)", textDecoration: t.done ? "line-through" : "none", flex: 1 }}>{t.text}</span>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Bottom actions */}
+            <div style={{ display: "flex", gap: 10, paddingTop: 12, borderTop: "1px solid var(--border2)", flexShrink: 0 }}>
+              <button onClick={(e) => { e.stopPropagation(); onGoToTasks(); }} style={{
+                flex: 1, padding: "12px", borderRadius: 10, fontSize: 14, fontWeight: 600,
+                background: "var(--bg3)", border: "none", color: "var(--text)", cursor: "pointer",
+                fontFamily: "'DM Sans',sans-serif", textAlign: "center",
+              }}>+ Add task</button>
+              <button onClick={(e) => { e.stopPropagation(); onGoToTasks(); }} style={{
+                flex: 1, padding: "12px", borderRadius: 10, fontSize: 14, fontWeight: 600,
+                background: "rgba(75,170,187,0.13)", border: "none", color: "var(--teal)", cursor: "pointer",
+                fontFamily: "'DM Sans',sans-serif", textAlign: "center",
+              }}>Pull from Tasks</button>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* ── ROUTINE BLOCKS (below carousel, above shallow bar) ── */}
+      {/* ── ROUTINE BLOCKS ── */}
       {todayRoutines.length > 0 && (
         <div style={{ padding: "0 4px 8px", flexShrink: 0 }}>
           {todayRoutines.map(rb => renderRoutineCard(rb))}
         </div>
       )}
 
-      {/* ── SHALLOW WORK FIXED BAR ── */}
-      <div className="shallow-fixed-bar" onClick={() => setShallowOpen(!shallowOpen)}>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--teal)" }}>Shallow Work</div>
-          <div style={{ fontSize: 11, color: "var(--text3)" }}>
-            {shallowCount === 0 ? "No tasks queued" : `${shallowCount} task${shallowCount !== 1 ? "s" : ""} queued${shallowDoneCount > 0 ? ` · ${shallowDoneCount} done` : ""}`}
-          </div>
-        </div>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ color: "var(--text3)", transform: shallowOpen ? "rotate(180deg)" : "none", transition: "transform .2s" }}>
-          <path d="M18 15l-6-6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-      </div>
-
-      {/* ── SHALLOW WORK OVERLAY ── */}
-      <div className={`shallow-overlay-wrap${shallowOpen ? " open" : ""}`}>
-        <div className="shallow-backdrop" />
-        <div className="shallow-sheet">
-          {/* Header */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px 12px" }}>
-            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".07em", textTransform: "uppercase", color: "var(--teal)" }}>Today's Shallow Work</span>
-            <button onClick={() => setShallowOpen(false)} style={{
-              width: 26, height: 26, borderRadius: "50%", background: "var(--bg3)", border: "none",
-              display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--text2)",
-            }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></svg>
-            </button>
-          </div>
-
-          {/* Task list */}
-          <div style={{ flex: 1, overflowY: "auto", padding: "0 20px" }}>
-            {todayPickTasks.length === 0 ? (
-              <div style={{ textAlign: "center", color: "var(--text3)", fontSize: 14, padding: "32px 0" }}>No tasks queued. Add one below.</div>
-            ) : (
-              todayPickTasks.map((t, i) => (
-                <div key={t.id} style={{
-                  display: "flex", alignItems: "center", gap: 10, padding: "10px 0",
-                  borderBottom: i < todayPickTasks.length - 1 ? "1px solid var(--border2)" : "none",
-                  opacity: t.done ? 0.45 : 1, cursor: "pointer",
-                }} onClick={() => toggleTodayPickTask(t)}>
-                  <div style={{
-                    width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
-                    border: t.done ? "none" : "1.5px solid var(--border)",
-                    background: t.done ? "var(--green)" : "transparent",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                  }}>
-                    {t.done && <span style={{ fontSize: 10, color: "#fff", fontWeight: 700 }}>✓</span>}
-                  </div>
-                  <span style={{ fontSize: 14, color: t.done ? "var(--text3)" : "var(--text)", textDecoration: t.done ? "line-through" : "none", flex: 1 }}>{t.text}</span>
-                </div>
-              ))
-            )}
-          </div>
-
-          {/* Bottom actions */}
-          <div style={{ display: "flex", gap: 8, padding: "12px 20px 16px", flexShrink: 0 }}>
-            <button onClick={() => onGoToTasks()} style={{
-              flex: 1, padding: "10px 12px", borderRadius: 10, fontSize: 13, fontWeight: 600,
-              background: "var(--bg3)", border: "none", color: "var(--text)", cursor: "pointer",
-              fontFamily: "'DM Sans',sans-serif",
-            }}>+ Add task</button>
-            <button onClick={() => onGoToTasks()} style={{
-              flex: 1, padding: "10px 12px", borderRadius: 10, fontSize: 13, fontWeight: 600,
-              background: "rgba(75,170,187,0.13)", border: "none", color: "var(--teal)", cursor: "pointer",
-              fontFamily: "'DM Sans',sans-serif",
-            }}>Pull from Tasks</button>
-          </div>
-        </div>
-      </div>
+      {/* Bottom spacer for pill nav */}
+      <div style={{ height: 80, flexShrink: 0 }} />
 
       {/* ── SHUTDOWN SHEET ── */}
       {shutdownOpen && (
