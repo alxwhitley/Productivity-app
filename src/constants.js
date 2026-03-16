@@ -109,6 +109,8 @@ export const FIELD_DEFAULTS = {
   todayPrefs:     { name:"", showShutdown:true, defaultBlock:"9", hideTimes:false },
   blockCompletions: [], // [{ blockId, date, durationMin }] — "I did this" / Done logs
   deepWorkTargets: { dailyHours: 4, weeklyHours: 20, maxDeepBlocks: 3 }, // user-configurable
+  taskCompletions: {}, // { [dateISO]: [taskId, ...] } — tasks completed today, cleared on shutdown
+  taskQueueOrder:  [], // [taskId, ...] — explicit ordering of queue, preserves position for unchecking
   deepWorkSlots: {}, // { [dateStr]: [{ projectId, startHour, startMin, durationMin, todayTasks }] }
   todayLoosePicks: {}, // { [dateStr]: [looseTaskId, ...] } — tasks picked for today's loose block
   onboardingDone: false,

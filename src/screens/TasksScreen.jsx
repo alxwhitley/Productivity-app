@@ -4,15 +4,21 @@ import StatusBar from "../components/StatusBar.jsx";
 import TaskRow from "../components/TaskRow.jsx";
 
 export default function TasksScreen({ data, setData }) {
-  const [filter, setFilter] = useState("all");
+  const [taskFilter, setTaskFilter] = useState("all");
   const [newItemId, setNewItemId] = useState(null);
   const [processedToday, setProcessedToday] = useState(0);
   const [showClearMsg, setShowClearMsg] = useState(false);
   const [removingId, setRemovingId] = useState(null);
 
+  // Tasks checked during this tab visit stay visible in All view until unmount
+  const sessionCompletedIds = useRef(new Set());
+
+  const todayISO = toISODate();
+  const completedToday = (data.taskCompletions || {})[todayISO] || [];
+  const completedSet = new Set(completedToday);
+
   // Shallow work reset logic on mount
   useEffect(() => {
-    const todayISO = toISODate();
     if (data.swClearDate === todayISO) return;
     const allDates = Object.keys(data.shallowWork || {}).filter(d => d < todayISO);
     let movedItems = [];
@@ -62,17 +68,95 @@ export default function TasksScreen({ data, setData }) {
       setData(d => ({
         ...d,
         fabQueue: (d.fabQueue || []).filter(i => i.id !== itemId),
+        taskCompletions: {
+          ...(d.taskCompletions || {}),
+          [todayISO]: ((d.taskCompletions || {})[todayISO] || []).filter(id => id !== itemId),
+        },
       }));
     });
+    sessionCompletedIds.current.delete(itemId);
   };
 
   const toggleFabDone = (itemId) => {
-    setData(d => ({
-      ...d,
-      fabQueue: (d.fabQueue || []).map(i =>
-        i.id === itemId ? { ...i, done: !(i.done ?? false) } : i
-      ),
-    }));
+    const item = fabQueue.find(i => i.id === itemId);
+    if (!item) return;
+    const wasDone = completedSet.has(itemId);
+
+    if (wasDone) {
+      // Unchecking — remove from completions, restore done: false
+      // Reinsert at stored queue position
+      const queueOrder = data.taskQueueOrder || [];
+      const storedIdx = queueOrder.indexOf(itemId);
+
+      setData(d => {
+        const queue = (d.fabQueue || []).map(i =>
+          i.id === itemId ? { ...i, done: false } : i
+        );
+        // Reorder: move task to its stored position if known
+        if (storedIdx >= 0) {
+          const task = queue.find(i => i.id === itemId);
+          const rest = queue.filter(i => i.id !== itemId);
+          // Find correct insertion point based on stored order
+          let insertAt = rest.length;
+          for (let j = 0; j < rest.length; j++) {
+            const otherIdx = queueOrder.indexOf(rest[j].id);
+            if (otherIdx === -1 || otherIdx > storedIdx) {
+              insertAt = j;
+              break;
+            }
+          }
+          rest.splice(insertAt, 0, task);
+          return {
+            ...d,
+            fabQueue: rest,
+            taskCompletions: {
+              ...(d.taskCompletions || {}),
+              [todayISO]: ((d.taskCompletions || {})[todayISO] || []).filter(id => id !== itemId),
+            },
+          };
+        }
+
+        return {
+          ...d,
+          fabQueue: queue,
+          taskCompletions: {
+            ...(d.taskCompletions || {}),
+            [todayISO]: ((d.taskCompletions || {})[todayISO] || []).filter(id => id !== itemId),
+          },
+        };
+      });
+      sessionCompletedIds.current.delete(itemId);
+    } else {
+      // Checking — mark done, add to completions, record queue position
+      sessionCompletedIds.current.add(itemId);
+      setData(d => {
+        const queue = d.fabQueue || [];
+        const currentIdx = queue.findIndex(i => i.id === itemId);
+        // Build order snapshot: preserve existing order entries, add/update this one
+        const prevOrder = d.taskQueueOrder || [];
+        const orderSet = new Set(prevOrder);
+        let newOrder;
+        if (!orderSet.has(itemId)) {
+          // Insert at current position in the order array
+          newOrder = [...prevOrder];
+          newOrder.splice(currentIdx, 0, itemId);
+        } else {
+          newOrder = prevOrder;
+        }
+
+        return {
+          ...d,
+          fabQueue: queue.map(i =>
+            i.id === itemId ? { ...i, done: true } : i
+          ),
+          taskCompletions: {
+            ...(d.taskCompletions || {}),
+            [todayISO]: [...((d.taskCompletions || {})[todayISO] || []), itemId],
+          },
+          taskQueueOrder: newOrder,
+        };
+      });
+    }
   };
 
   const toggleQuickWin = (itemId) => {
@@ -104,11 +188,25 @@ export default function TasksScreen({ data, setData }) {
     setNewItemId(id);
   };
 
-  // ── Render ──
+  // ── Filtered lists ──
 
-  const filteredFab = filter === "quickwins"
-    ? fabQueue.filter(i => i.quickWin ?? false)
-    : fabQueue;
+  // All view: uncompleted tasks + tasks completed during this session (stay visible until tab change)
+  const allTasks = fabQueue.filter(i =>
+    !completedSet.has(i.id) || sessionCompletedIds.current.has(i.id)
+  );
+
+  const quickWinTasks = fabQueue.filter(i =>
+    (i.quickWin ?? false) && !completedSet.has(i.id)
+  );
+
+  const completedTasks = fabQueue.filter(i => completedSet.has(i.id));
+
+  const visibleTasks =
+    taskFilter === "completed" ? completedTasks :
+    taskFilter === "quickwins" ? quickWinTasks :
+    allTasks;
+
+  const completedCount = completedToday.length;
 
   return (
     <div className="screen active" style={{ display: "flex", flexDirection: "column" }}>
@@ -123,8 +221,11 @@ export default function TasksScreen({ data, setData }) {
 
         {/* ── PILL FILTERS ── */}
         <div className="tasks-filter-row">
-          <button className={`tasks-filter-pill ${filter === "all" ? "active" : ""}`} onClick={() => setFilter("all")}>All</button>
-          <button className={`tasks-filter-pill ${filter === "quickwins" ? "active" : ""}`} onClick={() => setFilter("quickwins")}>⚡ Quick Wins</button>
+          <button className={`tasks-filter-pill${taskFilter === "all" ? " active" : ""}`} onClick={() => setTaskFilter("all")}>All</button>
+          <button className={`tasks-filter-pill${taskFilter === "quickwins" ? " active" : ""}`} onClick={() => setTaskFilter("quickwins")}>⚡ Quick Wins</button>
+          <button className={`tasks-filter-pill${taskFilter === "completed" ? " active" : ""}`} onClick={() => setTaskFilter("completed")}>
+            Completed{completedCount > 0 ? ` ${completedCount}` : ""}
+          </button>
         </div>
 
         <div style={{ padding: "0 16px" }}>
@@ -133,28 +234,35 @@ export default function TasksScreen({ data, setData }) {
             <div className="tasks-clear-msg">Queue clear ✓</div>
           )}
 
-          {/* Empty state */}
-          {filteredFab.length === 0 && !showClearMsg && (
+          {/* Empty states */}
+          {visibleTasks.length === 0 && !showClearMsg && (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", paddingTop: "25vh" }}>
-              <div style={{ fontSize: 15, fontWeight: 500, color: "var(--text2)" }}>Nothing in the queue</div>
-              <div style={{ fontSize: 13, fontWeight: 400, color: "var(--text3)", marginTop: 6 }}>Tap below to capture a task</div>
+              {taskFilter === "completed" ? (
+                <div style={{ fontSize: 14, color: "var(--text3)" }}>No completed tasks yet today.</div>
+              ) : (
+                <>
+                  <div style={{ fontSize: 15, fontWeight: 500, color: "var(--text2)" }}>Nothing in the queue</div>
+                  <div style={{ fontSize: 13, fontWeight: 400, color: "var(--text3)", marginTop: 6 }}>Tap below to capture a task</div>
+                </>
+              )}
             </div>
           )}
 
-          {filteredFab.map(item => {
+          {visibleTasks.map(item => {
             const isNew = newItemId === item.id;
             const isRemoving = removingId === item.id;
+            const isCompleted = completedSet.has(item.id);
 
             return (
-              <div key={item.id} className={isRemoving ? "tasks-removing" : ""}>
+              <div key={item.id} className={isRemoving ? "tasks-removing" : ""} style={isCompleted ? { opacity: 0.6 } : undefined}>
                 <TaskRow
-                  task={item}
+                  task={{ ...item, done: isCompleted }}
                   bg="var(--bg)"
                   autoEdit={isNew}
                   onToggle={() => toggleFabDone(item.id)}
                   onEdit={(text) => { saveFabEdit(item.id, text); setNewItemId(null); }}
                   onDelete={() => { deleteFabItem(item.id); setNewItemId(null); }}
-                  onQuickWin={() => toggleQuickWin(item.id)}
+                  onQuickWin={taskFilter === "completed" ? () => {} : () => toggleQuickWin(item.id)}
                 />
               </div>
             );
@@ -162,10 +270,12 @@ export default function TasksScreen({ data, setData }) {
         </div>
 
         {/* ── TAP EMPTY SPACE TO CAPTURE ── */}
-        <div
-          style={{ flex: 1, minHeight: 120, cursor: "pointer" }}
-          onClick={handleEmptyTap}
-        />
+        {taskFilter !== "completed" && (
+          <div
+            style={{ flex: 1, minHeight: 120, cursor: "pointer" }}
+            onClick={handleEmptyTap}
+          />
+        )}
       </div>
     </div>
   );

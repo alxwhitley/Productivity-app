@@ -87,7 +87,7 @@ export default function ShutdownRitualScreen({ data, setData, onClose }) {
   const quote = SHUTDOWN_QUOTES[dayOfYear % SHUTDOWN_QUOTES.length];
 
   const handleDone = () => {
-    setData(d => ({ ...d, shutdownDone: true, shutdownDate: todayISO, leadDomino: leadText.trim() }));
+    setData(d => ({ ...d, shutdownDone: true, shutdownDate: todayISO, leadDomino: leadText.trim(), taskCompletions: { ...(d.taskCompletions || {}), [todayISO]: [] } }));
     onClose();
   };
 

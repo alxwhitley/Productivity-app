@@ -770,7 +770,7 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
           alreadyDone={shutdownDoneToday}
           onClose={() => setShutdownOpen(false)}
           onComplete={() => {
-            setData(d => ({ ...d, shutdownDone: true, shutdownDate: todayISO }));
+            setData(d => ({ ...d, shutdownDone: true, shutdownDate: todayISO, taskCompletions: { ...(d.taskCompletions || {}), [todayISO]: [] } }));
             setShutdownOpen(false);
           }}
           onCategorizeLoose={(taskId, domainId) => {
