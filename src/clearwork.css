@@ -269,6 +269,7 @@
 
   /* Work screen — cards & bio bar */
   .work-card{margin:0 12px 8px;border-radius:14px;overflow:hidden;transition:opacity .2s,border-color .2s,box-shadow .3s;}
+  .work-card.past-block{opacity:0.45;transition:opacity 0.3s ease;}
   .work-bio-dot{position:absolute;top:50%;width:10px;height:10px;border-radius:50%;background:var(--accent);border:2px solid #fff;box-sizing:border-box;transform:translate(-50%,-50%);z-index:1;}
   .shutdown-row{margin:4px 16px 0;background:var(--bg2);border-radius:14px;padding:14px 18px;display:flex;align-items:center;gap:12px;cursor:pointer;}
   .sd-ico{font-size:17px;}

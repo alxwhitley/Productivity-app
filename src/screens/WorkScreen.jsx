@@ -338,12 +338,16 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
 
   // ── Render helpers ──
 
+  const nowMinsForPast = now.getHours() * 60 + now.getMinutes();
+
   function renderRoutineCard(item, isNow) {
     const rb = item.data;
     const comp = (rb.completions || {})[dateKey] || {};
     const doneCt = rb.tasks.filter(t => comp[t.id]).length;
     const allDone = rb.tasks.length > 0 && doneCt === rb.tasks.length;
     const isExp = expandedId === rb.id;
+    const blockEndMins = rb.startHour * 60 + rb.startMin + rb.durationMin;
+    const isPast = !isNow && blockEndMins < nowMinsForPast;
     const toggleRtTask = (taskId) => {
       setData(d => ({
         ...d,
@@ -356,10 +360,9 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
     };
 
     return (
-      <div key={rb.id} className="work-card" style={{
+      <div key={rb.id} className={`work-card${isPast ? " past-block" : ""}`} style={{
         background: "var(--bg2)",
         border: allDone ? "1px solid rgba(69,193,122,.2)" : isNow ? "1.5px solid rgba(75,170,187,.3)" : "1px solid var(--border)",
-        opacity: allDone ? 0.5 : 1,
       }} onClick={() => setExpandedId(isExp ? null : rb.id)}>
         <div style={{ padding: "14px 16px", display: "flex", alignItems: "flex-start", gap: 12 }}>
           <div style={{ width: 10, height: 10, borderRadius: "50%", background: "var(--teal)", flexShrink: 0, opacity: allDone ? 0.4 : 1, marginTop: 3 }} />
@@ -406,7 +409,7 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
     );
   }
 
-  function renderAssignedCard(slot) {
+  function renderAssignedCard(slot, isNow) {
     const proj = getProject(slot.projectId);
     const domain = proj ? getDomain(proj.domainId) : null;
     const domainColor = domain?.color || null;
@@ -417,26 +420,19 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
     const isExp = expandedId === slot.id;
     const showBody = isExp && !isCompleted;
     const isPicking = pickerState?.blockId === slot.id;
+    const blockEndMins = slot.startHour * 60 + slot.startMin + slot.durationMin;
+    const isPast = !isNow && blockEndMins < nowMinsForPast;
 
     // Done card
     if (isCompleted) {
       const isExpDone = expandedId === slot.id;
       return (
-        <div key={slot.id} className="work-card" style={{
+        <div key={slot.id} className={`work-card${isPast ? " past-block" : ""}`} style={{
           background: "var(--bg2)", border: "1px solid var(--border)", opacity: 0.55, position: "relative", cursor: "pointer",
           height: isExpDone ? 180 : 64, overflow: "hidden", transition: "height .2s ease",
         }} onClick={() => setExpandedId(isExpDone ? null : slot.id)}>
           <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: "var(--border)", borderRadius: "14px 0 0 14px" }} />
           <div style={{ padding: "12px 16px 0 20px", display: "flex", alignItems: "center", gap: 10 }}>
-            {hasTodayTasks ? (
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ color: domainColor || "var(--text3)", flexShrink: 0 }}>
-                <circle cx="10" cy="10" r="8.5" stroke="currentColor" strokeWidth="1.8"/><path d="M6.5 10.5L9 13L13.5 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            ) : (
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ color: domainColor || "var(--text3)", flexShrink: 0 }}>
-                <circle cx="10" cy="10" r="8.5" stroke="currentColor" strokeWidth="1.8"/><circle cx="10" cy="10" r="5" stroke="currentColor" strokeWidth="1.8"/><circle cx="10" cy="10" r="1.5" fill="currentColor"/>
-              </svg>
-            )}
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text3)", letterSpacing: "-.01em" }}>{proj?.name}</div>
               <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>{data.todayPrefs?.hideTimes ? "" : `${fmtTime(slot.startHour, slot.startMin)} · `}{slot.durationMin} min</div>
@@ -476,7 +472,7 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
     };
 
     return (
-      <div key={slot.id} className="work-card" style={{
+      <div key={slot.id} className={`work-card${isPast && !isNow ? " past-block" : ""}`} style={{
         background: "var(--bg2)",
         border: "1px solid var(--border)",
         position: "relative",
@@ -529,15 +525,6 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
 
         {/* Header row */}
         <div style={{ padding: "12px 16px 0 20px", display: "flex", alignItems: "center", gap: 10 }}>
-          {hasTodayTasks ? (
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ color: domainColor || "var(--text3)", flexShrink: 0 }}>
-              <circle cx="10" cy="10" r="8.5" stroke="currentColor" strokeWidth="1.8"/><path d="M6.5 10.5L9 13L13.5 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          ) : (
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ color: domainColor || "var(--text3)", flexShrink: 0 }}>
-              <circle cx="10" cy="10" r="8.5" stroke="currentColor" strokeWidth="1.8"/><circle cx="10" cy="10" r="5" stroke="currentColor" strokeWidth="1.8"/><circle cx="10" cy="10" r="1.5" fill="currentColor"/>
-            </svg>
-          )}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", letterSpacing: "-.01em", lineHeight: 1.15 }}>{proj?.name}</div>
             <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>
@@ -720,7 +707,7 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
                 if (item.type === "deepwork") {
                   const slot = item.data;
                   if (!slot.projectId) return renderUnassignedCard(slot);
-                  return renderAssignedCard(slot);
+                  return renderAssignedCard(slot, isNow);
                 }
                 return null;
               })}
