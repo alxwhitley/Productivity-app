@@ -339,7 +339,7 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
     if (!isAssigned) {
       // Unassigned empty card
       return (
-        <div className="dw-card-full active" style={{
+        <div className="dw-card-inner" style={{
           border: "1.5px dashed var(--border)",
           background: "var(--bg2)",
           alignItems: "center",
@@ -371,7 +371,7 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
     const isPast = blockEndMins < nowMins;
     const isActive = blockStartMins <= nowMins && nowMins < blockEndMins;
 
-    const cardBg = `${domainColor}17`; // ~9% opacity hex
+    const cardBg = `${domainColor}18`; // ~9% opacity hex
     const cardBorder = `${domainColor}40`; // ~25% opacity hex
     const activeBorder = `${domainColor}66`; // ~40% opacity hex
 
@@ -387,7 +387,7 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
     };
 
     return (
-      <div className="dw-card-full active" style={{
+      <div className="dw-card-inner" style={{
         background: cardBg,
         border: `1.5px solid ${isActive ? activeBorder : cardBorder}`,
         opacity: isPast && isCompleted ? 0.45 : 1,
@@ -409,20 +409,22 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
           {isCompleted ? (
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
           ) : (
-            <button onClick={(e) => { e.stopPropagation(); isRunning ? pauseTimerSlot(slot.id) : startTimerSlot(slot.id); }} style={{
-              width: 20, height: 20, background: "none", border: "none", cursor: "pointer",
-              color: "var(--text2)", display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
-            }}>
-              {isRunning
-                ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor"/></svg>
-                : <svg width="12" height="13" viewBox="0 0 16 18" fill="none"><path d="M1 1l14 8-14 8V1z" fill="currentColor"/></svg>
-              }
-            </button>
+            <>
+              <button onClick={(e) => { e.stopPropagation(); isRunning ? pauseTimerSlot(slot.id) : startTimerSlot(slot.id); }} style={{
+                width: 20, height: 20, background: "none", border: "none", cursor: "pointer",
+                color: "var(--text2)", display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+              }}>
+                {isRunning
+                  ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor"/></svg>
+                  : <svg width="12" height="13" viewBox="0 0 16 18" fill="none"><path d="M1 1l14 8-14 8V1z" fill="currentColor"/></svg>
+                }
+              </button>
+              <span style={{ fontSize: 15, color: "var(--text2)", fontVariantNumeric: "tabular-nums", fontFamily: "'DM Sans', sans-serif" }}>
+                {cdStr}
+              </span>
+              <span style={{ fontSize: 13, color: "var(--text3)" }}>{slot.durationMin} min</span>
+            </>
           )}
-          <span style={{ fontSize: 15, color: "var(--text2)", fontVariantNumeric: "tabular-nums", fontFamily: "'DM Sans', sans-serif" }}>
-            {isCompleted ? "Complete" : cdStr}
-          </span>
-          <span style={{ fontSize: 13, color: "var(--text3)" }}>{slot.durationMin} min</span>
         </div>
 
         {/* Divider */}
