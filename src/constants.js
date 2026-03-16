@@ -4,59 +4,39 @@ export const DOMAIN_COLORS = ["#6B7A8D","#C47A7A","#B89B6A","#7A9E7E","#8A7AAE",
 
 export const INITIAL_DATA = {
   domains: [
-    { id: "church", name: "Church", color: "#6B7A8D" },
-    { id: "work",   name: "Work",   color: "#8A7AAE" },
-    { id: "life",   name: "Life",   color: "#7A9E7E" },
+    { id: "domain-1", name: "Work", color: "#6B7A8D" },
   ],
   projects: [
-    { id: "podcast",     domainId: "church", name: "Podcast",        status: "active",  tasks: [
-      { id: "t1", text: "Make intros",                    done: false },
-      { id: "t2", text: "Create script",                  done: true  },
-      { id: "t3", text: "Record intro segment",           done: false },
-      { id: "t4", text: "Send file to editor",            done: false },
+    { id: "proj-1", domainId: "domain-1", name: "My First Project", status: "active", tasks: [
+      { id: "task-1", text: "Break this project into smaller tasks", done: false },
+      { id: "task-2", text: "Assign a Deep Work block to focus on it", done: false },
+      { id: "task-3", text: "Check off tasks as you go", done: false },
     ]},
-    { id: "socialmedia", domainId: "church", name: "Social Media",   status: "backlog", tasks: [
-      { id: "t5", text: "YouTube thumbnails",             done: false },
-      { id: "t6", text: "Schedule week posts",            done: false },
-      { id: "t7", text: "Algorithm research",             done: false },
-    ]},
-    { id: "afterhours",  domainId: "church", name: "After Hours",    status: "backlog", tasks: [
-      { id: "t8",  text: "Create way to give",            done: false },
-      { id: "t9",  text: "Visitor card design",           done: false },
-      { id: "t10", text: "Pizza poster scripts",          done: false },
-      { id: "t11", text: "Justin's testimony",            done: false },
-    ]},
-    { id: "freelance",   domainId: "work",   name: "Freelance",      status: "active",  tasks: [
-      { id: "t12", text: "Create remix link for landing page", done: true },
-      { id: "t13", text: "Reach out to Becky",            done: false },
-      { id: "t14", text: "Check in colleges to pitch",   done: false },
-    ]},
-    { id: "davidv",      domainId: "work",   name: "David Ventures", status: "backlog", tasks: [
-      { id: "t15", text: "Get into Wix",                  done: false },
-      { id: "t16", text: "Brand update",                  done: false },
-    ]},
-    { id: "personal",    domainId: "life",   name: "Personal Admin", status: "active",  tasks: [
-      { id: "t17", text: "Buy journal",                   done: true  },
-      { id: "t18", text: "Real ID",                       done: false },
+    { id: "proj-2", domainId: "domain-1", name: "Learn Clearwork", status: "active", tasks: [
+      { id: "task-4", text: "Explore the Today tab", done: false },
+      { id: "task-5", text: "Add a project in the Projects tab", done: false },
+      { id: "task-6", text: "Set a season goal below", done: false },
     ]},
   ],
   blocks: [],
   inbox: [],
-  looseTasks: [], // [{id, domainId, text, done, doneAt}]
-  weekIntention: "Ship Podcast episode. At least one Freelance deliverable. Get Church Social Media unblocked.",
+  looseTasks: [
+    { id: "lt-1", text: "Swipe me left to queue for Shallow Work", done: false, domainId: null },
+    { id: "lt-2", text: "Swipe me right to mark as a Quick Win", done: false, domainId: null },
+  ],
+  weekIntention: "",
   shutdownDone: false,
   shutdownDate: null,
   seasonGoals: [
-    { id: "sg1", text: "Launch Podcast to 100 listeners", domainId: "church", done: false },
-    { id: "sg2", text: "Land 2 new Freelance clients",    domainId: "work",   done: false },
-    { id: "sg3", text: "Rebuild After Hours community",   domainId: "church", done: false },
+    { id: "sg-1", text: "Complete one meaningful project this season", domainId: "domain-1", done: false },
+    { id: "sg-2", text: "Build a daily Deep Work habit", domainId: "domain-1", done: false },
   ],
-  workWeek: [2,3,4,5,6], // 0=Sun,1=Mon,2=Tue,3=Wed,4=Thu,5=Fri,6=Sat
-  emptyBlocks: [], // template ghost blocks: {id, dayOfWeek, startHour, startMin, durationMin, slotIndex, blockType}
+  workWeek: [2,3,4,5,6],
+  emptyBlocks: [],
   reviewData: {
-    domainBlocks: { church: 5, work: 3, life: 1 },
-    projectProgress: { podcast: { pct: 65, delta: 45 }, freelance: { pct: 40, delta: 20 } },
-    daysWorked: [true, true, "half", true, true, false, false],
+    domainBlocks: {},
+    projectProgress: {},
+    daysWorked: [],
   }
 };
 
@@ -117,6 +97,7 @@ export const FIELD_DEFAULTS = {
   sessionLog: [], // [{ id, projectId, date, durationMin, note }]
   shutdownTriggerHour: 16, // 4 PM default
   leadDomino: "", // "most important thing tomorrow" from shutdown ritual
+  onboardingHints: { swipeChevronSeen: false, dwSlotPulseSeen: false },
 };
 
 // ── Deep work slot defaults ──────────────────────────────────────────────────

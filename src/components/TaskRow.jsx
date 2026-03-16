@@ -8,7 +8,7 @@ import { useState, useRef } from "react";
  * Swipe left    → reveal Today (teal) + Delete (red)
  * Swipe right   → toggle quickWin
  */
-export default function TaskRow({ task, onToggle, onEdit, onDelete, onQuickWin, onToday, isQueuedToday, className, bg, autoEdit }) {
+export default function TaskRow({ task, onToggle, onEdit, onDelete, onQuickWin, onToday, isQueuedToday, className, bg, autoEdit, onSwipeStart }) {
   const [offset, setOffset]     = useState(0);
   const [editing, setEditing]   = useState(!!autoEdit);
   const [draft, setDraft]       = useState(autoEdit ? (task.text || "") : task.text);
@@ -37,7 +37,7 @@ export default function TaskRow({ task, onToggle, onEdit, onDelete, onQuickWin, 
       setOffset(0);
       return;
     }
-    ref.locked = true;
+    if (!ref.locked) { ref.locked = true; if (onSwipeStart) onSwipeStart(); }
     setOffset(Math.max(-MAX_SWIPE, Math.min(80, dx)));
   };
 

@@ -49,6 +49,9 @@ export default function ProfileScreen({ data, setData, onClose }) {
     }));
   };
 
+  const eyebrow = { fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text3)", marginBottom: 12 };
+  const card = { background: "var(--bg2)", borderRadius: 14, padding: 16, margin: "0 16px 12px 16px" };
+
   return (
     <div className="profile-screen">
       {/* Header */}
@@ -62,27 +65,26 @@ export default function ProfileScreen({ data, setData, onClose }) {
         </button>
       </div>
 
-      <div className="scroll" style={{ padding:"0 0 40px" }}>
+      <div className="scroll" style={{ padding:"0 0 32px" }}>
         {/* ── This Week ── */}
-        <div style={{ fontSize:11, fontWeight:700, letterSpacing:".08em", textTransform:"uppercase", color:"var(--text3)", padding:"20px 16px 8px" }}>
-          This Week
-        </div>
-        <div className="profile-stat-row">
-          <div className="profile-stat-card">
-            <div className="profile-stat-number">{tasksCompleted}</div>
-            <div className="profile-stat-label">tasks completed</div>
-          </div>
-          <div className="profile-stat-card">
-            <div className="profile-stat-number">{weekHrs % 1 === 0 ? weekHrs : weekHrs.toFixed(1)}</div>
-            <div className="profile-stat-label">hours of deep work</div>
+        <div style={{ ...card, marginTop: 16 }}>
+          <div style={eyebrow}>This Week</div>
+          <div style={{ display: "flex", gap: 12 }}>
+            <div className="profile-stat-card">
+              <div className="profile-stat-number">{tasksCompleted}</div>
+              <div className="profile-stat-label">tasks completed</div>
+            </div>
+            <div className="profile-stat-card">
+              <div className="profile-stat-number">{weekHrs % 1 === 0 ? weekHrs : weekHrs.toFixed(1)}</div>
+              <div className="profile-stat-label">hours of deep work</div>
+            </div>
           </div>
         </div>
 
         {/* ── Settings ── */}
-        <div style={{ fontSize:11, fontWeight:700, letterSpacing:".08em", textTransform:"uppercase", color:"var(--text3)", padding:"16px 16px 8px" }}>
-          Settings
-        </div>
-        <div style={{ padding:"0 16px" }}>
+        <div style={card}>
+          <div style={eyebrow}>Settings</div>
+
           {/* Name */}
           <div className="set-row">
             <div>
@@ -151,49 +153,49 @@ export default function ProfileScreen({ data, setData, onClose }) {
               ))}
             </select>
           </div>
+        </div>
 
-          {/* Deep Work Targets */}
-          <div style={{ marginTop:16 }}>
-            <div className="set-section">Deep Work Targets</div>
-            <div style={{ display:"flex", gap:12 }}>
-              <div style={{ flex:1 }}>
-                <div className="set-row-sub" style={{ marginBottom:4 }}>Daily hours</div>
-                <input className="set-input"
-                  type="number" min="1" max="12"
-                  value={data.deepWorkTargets?.dailyHours || 4}
-                  onChange={e => setData(d => ({
-                    ...d,
-                    deepWorkTargets: { ...(d.deepWorkTargets || {}), dailyHours: parseInt(e.target.value) || 4 },
-                  }))}
-                />
-              </div>
-              <div style={{ flex:1 }}>
-                <div className="set-row-sub" style={{ marginBottom:4 }}>Weekly hours</div>
-                <input className="set-input"
-                  type="number" min="1" max="60"
-                  value={data.deepWorkTargets?.weeklyHours || 20}
-                  onChange={e => setData(d => ({
-                    ...d,
-                    deepWorkTargets: { ...(d.deepWorkTargets || {}), weeklyHours: parseInt(e.target.value) || 20 },
-                  }))}
-                />
-              </div>
+        {/* ── Deep Work Targets ── */}
+        <div style={card}>
+          <div style={eyebrow}>Deep Work Targets</div>
+          <div style={{ display:"flex", gap:12 }}>
+            <div style={{ flex:1 }}>
+              <div className="set-row-sub" style={{ marginBottom:4 }}>Daily hours</div>
+              <input className="set-input"
+                type="number" min="1" max="12"
+                value={data.deepWorkTargets?.dailyHours || 4}
+                onChange={e => setData(d => ({
+                  ...d,
+                  deepWorkTargets: { ...(d.deepWorkTargets || {}), dailyHours: parseInt(e.target.value) || 4 },
+                }))}
+              />
             </div>
-            <div style={{ marginTop:12 }}>
-              <div className="set-row-sub" style={{ marginBottom:6 }}>Max deep work blocks per day</div>
-              <div style={{ display:"flex", gap:8 }}>
-                {[1,2,3,4,5].map(n => (
-                  <button key={n} onClick={() => setData(d => ({
-                    ...d,
-                    deepWorkTargets: { ...(d.deepWorkTargets || {}), maxDeepBlocks: n },
-                  }))}
-                    style={{ flex:1, padding:"9px 0", borderRadius:10, border:`1.5px solid ${n === (data.deepWorkTargets?.maxDeepBlocks ?? 3) ? "var(--accent)" : "var(--border)"}`, background: n === (data.deepWorkTargets?.maxDeepBlocks ?? 3) ? "var(--accent-s)" : "var(--bg3)", color: n === (data.deepWorkTargets?.maxDeepBlocks ?? 3) ? "var(--accent)" : "var(--text2)", fontSize:15, fontWeight:700, cursor:"pointer", fontFamily:"'DM Sans',sans-serif", transition:"all .15s" }}>
-                    {n}
-                  </button>
-                ))}
-              </div>
-              <div style={{ fontSize:11, color:"var(--text3)", marginTop:6 }}>Huberman recommends 1–3 blocks of 90 min each</div>
+            <div style={{ flex:1 }}>
+              <div className="set-row-sub" style={{ marginBottom:4 }}>Weekly hours</div>
+              <input className="set-input"
+                type="number" min="1" max="60"
+                value={data.deepWorkTargets?.weeklyHours || 20}
+                onChange={e => setData(d => ({
+                  ...d,
+                  deepWorkTargets: { ...(d.deepWorkTargets || {}), weeklyHours: parseInt(e.target.value) || 20 },
+                }))}
+              />
             </div>
+          </div>
+          <div style={{ marginTop:12 }}>
+            <div className="set-row-sub" style={{ marginBottom:6 }}>Max deep work blocks per day</div>
+            <div style={{ display:"flex", gap:8 }}>
+              {[1,2,3,4,5].map(n => (
+                <button key={n} onClick={() => setData(d => ({
+                  ...d,
+                  deepWorkTargets: { ...(d.deepWorkTargets || {}), maxDeepBlocks: n },
+                }))}
+                  style={{ flex:1, padding:"9px 0", borderRadius:10, border:`1.5px solid ${n === (data.deepWorkTargets?.maxDeepBlocks ?? 3) ? "var(--accent)" : "var(--border)"}`, background: n === (data.deepWorkTargets?.maxDeepBlocks ?? 3) ? "var(--accent-s)" : "var(--bg3)", color: n === (data.deepWorkTargets?.maxDeepBlocks ?? 3) ? "var(--accent)" : "var(--text2)", fontSize:15, fontWeight:700, cursor:"pointer", fontFamily:"'DM Sans',sans-serif", transition:"all .15s" }}>
+                  {n}
+                </button>
+              ))}
+            </div>
+            <div style={{ fontSize:11, color:"var(--text3)", marginTop:6 }}>Huberman recommends 1–3 blocks of 90 min each</div>
           </div>
         </div>
 

@@ -253,24 +253,40 @@ export default function TasksScreen({ data, setData }) {
             </div>
           )}
 
-          {visibleTasks.map(item => {
+          {visibleTasks.map((item, idx) => {
             const isNew = newItemId === item.id;
             const isRemoving = removingId === item.id;
             const isCompleted = completedSet.has(item.id);
+            const showChevron = idx === 0 && taskFilter === "all" && !(data.onboardingHints || {}).swipeChevronSeen;
+
+            const dismissChevron = () => {
+              setData(d => ({
+                ...d,
+                onboardingHints: { ...(d.onboardingHints || {}), swipeChevronSeen: true },
+              }));
+            };
 
             return (
-              <div key={item.id} className={isRemoving ? "tasks-removing" : ""} style={isCompleted ? { opacity: 0.6 } : undefined}>
-                <TaskRow
-                  task={{ ...item, done: isCompleted }}
-                  bg="var(--bg)"
-                  autoEdit={isNew}
-                  onToggle={() => toggleFabDone(item.id)}
-                  onEdit={(text) => { saveFabEdit(item.id, text); setNewItemId(null); }}
-                  onDelete={() => { deleteFabItem(item.id); setNewItemId(null); }}
-                  onQuickWin={taskFilter === "completed" ? () => {} : () => toggleQuickWin(item.id)}
-                  onToday={() => toggleTodayPick(item.id)}
-                  isQueuedToday={todayPickIds.includes(item.id)}
-                />
+              <div key={item.id} className={isRemoving ? "tasks-removing" : ""} style={{ ...(isCompleted ? { opacity: 0.6 } : {}), display: "flex", alignItems: "center" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <TaskRow
+                    task={{ ...item, done: isCompleted }}
+                    bg="var(--bg)"
+                    autoEdit={isNew}
+                    onToggle={() => toggleFabDone(item.id)}
+                    onEdit={(text) => { saveFabEdit(item.id, text); setNewItemId(null); }}
+                    onDelete={() => { deleteFabItem(item.id); setNewItemId(null); }}
+                    onQuickWin={taskFilter === "completed" ? () => {} : () => toggleQuickWin(item.id)}
+                    onToday={() => toggleTodayPick(item.id)}
+                    isQueuedToday={todayPickIds.includes(item.id)}
+                    onSwipeStart={showChevron ? dismissChevron : undefined}
+                  />
+                </div>
+                {showChevron && (
+                  <svg className="swipe-hint-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
               </div>
             );
           })}

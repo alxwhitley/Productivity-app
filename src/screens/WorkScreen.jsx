@@ -79,6 +79,7 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
   const [tick, setTick] = useState(0);
   const [pickerState, setPickerState] = useState(null);
   const [shutdownOpen, setShutdownOpen] = useState(false);
+  const [showDwPulse, setShowDwPulse] = useState(false);
 
   const scrollRef = useRef(null);
 
@@ -213,11 +214,21 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
     }
   }, [data.shutdownDone, data.shutdownDate]);
 
+  // DW slot pulse hint on first load
+  useEffect(() => {
+    if (!(data.onboardingHints || {}).dwSlotPulseSeen) {
+      setShowDwPulse(true);
+      const t = setTimeout(() => {
+        setShowDwPulse(false);
+        setData(d => ({ ...d, onboardingHints: { ...(d.onboardingHints || {}), dwSlotPulseSeen: true } }));
+      }, 2000);
+      return () => clearTimeout(t);
+    }
+  }, []);
+
   // ── Date & timeline ──
   const now = new Date();
   const today = new Date();
-  const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
-  const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
   const nowMins = now.getHours() * 60 + now.getMinutes();
   const currentPhase = getPhaseForMins(nowMins);
 
@@ -266,9 +277,6 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
       lastAutoExpanded.current = currentItem.id;
     }
   }, [currentItem?.id]);
-
-  const greeting = now.getHours() < 12 ? "Good morning" : now.getHours() < 17 ? "Good afternoon" : "Good evening";
-  const name = data.todayPrefs?.name;
 
   // ── Bio bar position ──
   const barPct = Math.max(0, Math.min(100, (nowMins - 420) / BIO_TOTAL * 100));
@@ -381,7 +389,7 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
 
   function renderUnassignedCard(slot) {
     return (
-      <div key={slot.id} className="work-card" style={{
+      <div key={slot.id} className={`work-card dw-empty${showDwPulse ? " dw-pulse" : ""}`} style={{
         background: "var(--bg2)",
         border: "1.5px dashed var(--border)",
         cursor: "pointer",
@@ -420,9 +428,15 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
         }} onClick={() => setExpandedId(isExpDone ? null : slot.id)}>
           <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: "var(--border)", borderRadius: "14px 0 0 14px" }} />
           <div style={{ padding: "12px 16px 0 20px", display: "flex", alignItems: "center", gap: 10 }}>
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ color: domainColor || "var(--text3)", flexShrink: 0 }}>
-              <circle cx="10" cy="10" r="8.5" stroke="currentColor" strokeWidth="1.8"/><circle cx="10" cy="10" r="5" stroke="currentColor" strokeWidth="1.8"/><circle cx="10" cy="10" r="1.5" fill="currentColor"/>
-            </svg>
+            {hasTodayTasks ? (
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ color: domainColor || "var(--text3)", flexShrink: 0 }}>
+                <circle cx="10" cy="10" r="8.5" stroke="currentColor" strokeWidth="1.8"/><path d="M6.5 10.5L9 13L13.5 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            ) : (
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ color: domainColor || "var(--text3)", flexShrink: 0 }}>
+                <circle cx="10" cy="10" r="8.5" stroke="currentColor" strokeWidth="1.8"/><circle cx="10" cy="10" r="5" stroke="currentColor" strokeWidth="1.8"/><circle cx="10" cy="10" r="1.5" fill="currentColor"/>
+              </svg>
+            )}
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text3)", letterSpacing: "-.01em" }}>{proj?.name}</div>
               <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>{data.todayPrefs?.hideTimes ? "" : `${fmtTime(slot.startHour, slot.startMin)} · `}{slot.durationMin} min</div>
@@ -515,9 +529,15 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
 
         {/* Header row */}
         <div style={{ padding: "12px 16px 0 20px", display: "flex", alignItems: "center", gap: 10 }}>
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ color: domainColor || "var(--text3)", flexShrink: 0 }}>
-            <circle cx="10" cy="10" r="8.5" stroke="currentColor" strokeWidth="1.8"/><circle cx="10" cy="10" r="5" stroke="currentColor" strokeWidth="1.8"/><circle cx="10" cy="10" r="1.5" fill="currentColor"/>
-          </svg>
+          {hasTodayTasks ? (
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ color: domainColor || "var(--text3)", flexShrink: 0 }}>
+              <circle cx="10" cy="10" r="8.5" stroke="currentColor" strokeWidth="1.8"/><path d="M6.5 10.5L9 13L13.5 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          ) : (
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ color: domainColor || "var(--text3)", flexShrink: 0 }}>
+              <circle cx="10" cy="10" r="8.5" stroke="currentColor" strokeWidth="1.8"/><circle cx="10" cy="10" r="5" stroke="currentColor" strokeWidth="1.8"/><circle cx="10" cy="10" r="1.5" fill="currentColor"/>
+            </svg>
+          )}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", letterSpacing: "-.01em", lineHeight: 1.15 }}>{proj?.name}</div>
             <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>
@@ -631,21 +651,19 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
       <div ref={scrollRef} className="scroll" style={{ flex: 1, paddingBottom: 80 }}>
 
         {/* ── HEADER ── */}
-        <div style={{ padding: "14px 24px 10px", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <div>
-            <div style={{ fontSize: 14, color: "var(--text2)", fontWeight: 500 }}>
-              {days[viewDate.getDay()]}, {months[viewDate.getMonth()]} {viewDate.getDate()}
+        <div className="ph">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div>
+              <div className="ph-eye">Work</div>
+              <div className="ph-title">Today's Work</div>
             </div>
-            <div style={{ fontSize: 13, color: "var(--text3)", marginTop: 4 }}>
-              {`${greeting}${name ? `, ${name}` : ""}.`}
-            </div>
+            <button className="tab-gear" onClick={() => {}}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" stroke="currentColor" strokeWidth="1.5" />
+                <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5" />
+              </svg>
+            </button>
           </div>
-          <button className="tab-gear" onClick={() => {}}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" stroke="currentColor" strokeWidth="1.5" />
-              <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5" />
-            </svg>
-          </button>
         </div>
 
         {/* ── BIO-PHASE BAR ── */}

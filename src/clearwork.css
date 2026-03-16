@@ -778,6 +778,12 @@
 
   .spacer{height:16px;}
 
+  /* ── Onboarding hints ── */
+  @keyframes chevron-nudge{0%{transform:translateX(0);}100%{transform:translateX(-6px);}}
+  .swipe-hint-chevron{animation:chevron-nudge 300ms ease-out forwards;color:var(--text3);opacity:0.7;flex-shrink:0;margin-left:6px;}
+  @keyframes dw-pulse-ring{0%{box-shadow:0 0 0 0px rgba(232,160,48,0.35);}60%{box-shadow:0 0 0 6px rgba(232,160,48,0.1);}100%{box-shadow:0 0 0 8px rgba(232,160,48,0);}}
+  .dw-empty.dw-pulse{animation:dw-pulse-ring 1000ms ease-out 2;}
+
   /* ── Floating pill nav ── */
   .pill-nav{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);display:flex;gap:0;background:var(--bg2);border:1px solid var(--border);border-radius:999px;padding:6px 8px;z-index:50;box-shadow:0 4px 24px rgba(0,0,0,.25);}
   .pill-nav-btn{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 20px 4px;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;background:transparent;color:var(--text3);position:relative;transition:color .15s;}
@@ -809,11 +815,10 @@
   .org-project-name{font-size:13px;color:var(--text);}
 
   /* Profile screen */
-  .profile-screen{position:fixed;inset:0;background:var(--bg);z-index:150;display:flex;flex-direction:column;animation:sheet-up .25s cubic-bezier(.4,0,.2,1);}
+  .profile-screen{position:fixed;top:0;left:50%;transform:translateX(-50%);width:390px;max-width:100vw;height:100%;background:var(--bg);z-index:150;display:flex;flex-direction:column;animation:sheet-up .25s cubic-bezier(.4,0,.2,1);overflow-y:auto;}
   .profile-header{display:flex;align-items:center;justify-content:space-between;padding:20px 20px 12px;border-bottom:1px solid var(--border);flex-shrink:0;}
   .profile-title{font-size:22px;font-weight:800;letter-spacing:-.02em;color:var(--text);}
-  .profile-stat-row{display:flex;gap:12px;padding:20px 16px;}
-  .profile-stat-card{flex:1;background:var(--bg2);border-radius:14px;padding:16px;border:1px solid var(--border);}
+  .profile-stat-card{flex:1;background:var(--bg3);border-radius:12px;padding:16px;border:1px solid var(--border);}
   .profile-stat-number{font-size:32px;font-weight:800;color:var(--accent);letter-spacing:-.03em;line-height:1;margin-bottom:6px;}
   .profile-stat-label{font-size:12px;color:var(--text2);font-weight:600;line-height:1.3;}
 
