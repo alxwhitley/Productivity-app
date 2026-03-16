@@ -350,7 +350,7 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
 
     const proj = getProject(slot.projectId);
     const domain = proj ? getDomain(proj.domainId) : null;
-    const domainColor = domain?.color || "#8A9099";
+    const domainColor = domain?.color || "#5BA8D4";
     const domainName = domain?.name || "";
     const isSessionMode = (proj?.type || proj?.mode) === "sessions";
     const typeBadge = isSessionMode ? "Session" : "Task-based";
@@ -378,9 +378,9 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
 
     return (
       <div className="dw-card-inner" style={{
-        background: cardBg,
+        background: `linear-gradient(180deg, ${domainColor}18 0%, ${domainColor}0A 40%, transparent 100%), var(--bg2)`,
         border: "none",
-        boxShadow: `inset 0 0 0 1.5px ${domainColor}60`,
+        boxShadow: `inset 0 0 0 1.5px ${domainColor}55, 0 0 32px 0 ${domainColor}18`,
         opacity: (isPast && isCompleted) || isSkipped ? 0.45 : 1,
       }}>
         {/* Header row: DEEP WORK · domain (or SKIPPED) */}
@@ -395,7 +395,18 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
 
         {/* Type badge */}
         <div style={{ marginTop: 4 }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text2)", background: "var(--bg3)", borderRadius: 6, padding: "2px 8px" }}>{typeBadge}</span>
+          <span style={{
+            display: "inline-flex", alignItems: "center", gap: 5,
+            fontSize: 11, fontWeight: 700, color: "var(--blue)",
+            background: "rgba(91,138,240,0.12)", borderRadius: 20,
+            padding: "3px 10px 3px 7px",
+          }}>
+            {isSessionMode
+              ? <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2.5"/><polyline points="12 6 12 12 16 14" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></svg>
+              : <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            }
+            {typeBadge}
+          </span>
         </div>
 
         {/* Project name */}
@@ -406,7 +417,7 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
             <button onClick={(e) => { e.stopPropagation(); isRunning ? pauseTimerSlot(slot.id) : startTimerSlot(slot.id); }} style={{
               width: 20, height: 20, background: "none", border: "none", cursor: "pointer",
-              color: "var(--text2)", display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+              color: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
             }}>
               {isRunning
                 ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor"/></svg>

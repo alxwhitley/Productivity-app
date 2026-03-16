@@ -24,7 +24,7 @@ const TYPE_DESC = {
   bonus:     "A stretch goal. Only chase this once your Essential goals are on track.",
 };
 
-const PALETTE = ["#6B7A8D","#C47A7A","#B89B6A","#7A9E7E","#8A7AAE","#8A9099"];
+const PALETTE = ["#E8603C","#5BA8D4","#C46BAE","#7EC8A0"];
 
 function getQuarter(d) { return Math.floor(d.getMonth() / 3) + 1; }
 

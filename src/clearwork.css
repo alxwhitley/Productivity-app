@@ -284,7 +284,7 @@
   .dw-card-label{font-size:11px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:var(--blue);}
   .dw-card-domain{font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;}
   .dw-action-row{display:flex;gap:10px;margin-top:12px;flex-shrink:0;}
-  .dw-btn-complete{flex:1;padding:11px;border-radius:12px;background:rgba(69,193,122,0.12);color:var(--green);font-size:14px;font-weight:600;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;}
+  .dw-btn-complete{flex:1;padding:11px;border-radius:12px;background:var(--accent);color:#000;font-size:14px;font-weight:600;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;}
   .dw-btn-skip{flex:1;padding:11px;border-radius:12px;background:var(--bg3);color:var(--text3);font-size:14px;font-weight:600;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;}
   .dw-complete-row,.dw-skipped-row{display:flex;align-items:center;gap:8px;margin-top:12px;cursor:pointer;-webkit-tap-highlight-color:transparent;}
   .dw-complete-label{font-size:14px;font-weight:600;color:var(--green);}
@@ -299,11 +299,11 @@
   .dw-task-text{font-size:15px;color:var(--text);line-height:1.3;}
   .dw-task-text.done{color:var(--text3);text-decoration:line-through;}
   .dw-side-dots{position:absolute;left:8px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:6px;align-items:center;z-index:2;}
-  .dw-side-dot{width:5px;height:5px;border-radius:50%;background:var(--border);transition:background 200ms;flex-shrink:0;}
-  .dw-side-dot.active{background:var(--accent);}
+  .dw-side-dot{width:5px;height:5px;border-radius:50%;background:var(--text3);opacity:0.35;transition:background 200ms, opacity 200ms;flex-shrink:0;}
+  .dw-side-dot.active{background:var(--accent);opacity:1;}
 
   /* Shallow Work card */
-  .shallow-card{position:absolute;bottom:0;left:16px;right:16px;height:64px;border-radius:28px;background:rgba(75,170,187,0.09);border:1.5px solid rgba(75,170,187,0.25);overflow:hidden;transition:all 280ms ease-in-out;display:flex;flex-direction:column;cursor:pointer;}
+  .shallow-card{position:absolute;bottom:0;left:16px;right:16px;height:64px;border-radius:28px;background:linear-gradient(180deg, rgba(75,170,187,0.10) 0%, rgba(75,170,187,0.04) 50%, transparent 100%), var(--bg2);border:none;box-shadow:inset 0 0 0 1.5px rgba(75,170,187,0.35), 0 0 24px 0 rgba(75,170,187,0.12);overflow:hidden;transition:all 280ms ease-in-out;display:flex;flex-direction:column;cursor:pointer;}
   .shallow-card.expanded{top:0;height:auto;bottom:0;left:0;right:0;border-radius:0;background:var(--bg);border:none;cursor:default;}
   .sw-task-row{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--border2);}
   .sw-task-row:last-child{border-bottom:none;}

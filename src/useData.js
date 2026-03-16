@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "./supabase.js";
-import { STORAGE_KEY, FIELD_DEFAULTS } from "./constants.js";
+import { STORAGE_KEY, FIELD_DEFAULTS, MIGRATIONS } from "./constants.js";
 import { applyDefaults, loadData } from "./utils.js";
 
 // ── Save: localStorage cache + Supabase sync ────────────────────────────────
@@ -27,7 +27,13 @@ export default function useData(userId) {
     supabase.from("user_data").select("data").eq("user_id", userId).single()
       .then(({ data: row, error }) => {
         if (row?.data) {
-          const migrated = applyDefaults(row.data, FIELD_DEFAULTS);
+          let migrated = applyDefaults(row.data, FIELD_DEFAULTS);
+          // Force migrations — run even if schemaVersion is current
+          for (const m of MIGRATIONS) {
+            if (m.force) {
+              migrated = m.up(migrated);
+            }
+          }
           setData(migrated);
           try { localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated)); } catch {}
         }

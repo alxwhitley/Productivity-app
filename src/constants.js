@@ -1,10 +1,10 @@
 // Neutral domain palette — does not conflict with app-level semantic colors
 // Slate, Rose, Sand, Sage, Dusk, Stone
-export const DOMAIN_COLORS = ["#6B7A8D","#C47A7A","#B89B6A","#7A9E7E","#8A7AAE","#8A9099"];
+export const DOMAIN_COLORS = ["#E8603C","#5BA8D4","#C46BAE","#7EC8A0"];
 
 export const INITIAL_DATA = {
   domains: [
-    { id: "domain-1", name: "Work", color: "#6B7A8D" },
+    { id: "domain-1", name: "Work", color: "#5BA8D4" },
   ],
   projects: [
     { id: "proj-1", domainId: "domain-1", name: "My First Project", status: "active", tasks: [
@@ -55,7 +55,7 @@ export const INITIAL_DATA = {
 //   3. The rest of the app is unchanged
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const SCHEMA_VERSION = 8;
+export const SCHEMA_VERSION = 9;
 export const STORAGE_KEY    = "nave_data_v1";       // new key — clean break from momentum_v2
 export const THEME_KEY      = "nave_theme";
 
@@ -189,18 +189,18 @@ export const MIGRATIONS = [
     version: 6,
     up: (data) => {
       const colorMap = {
-        "#5B8AF0": "#6B7A8D", // Blue → Slate
-        "#5b8af0": "#6B7A8D",
-        "#E8A030": "#B89B6A", // Amber → Sand
-        "#e8a030": "#B89B6A",
-        "#45C17A": "#7A9E7E", // Green → Sage
-        "#45c17a": "#7A9E7E",
-        "#9B72CF": "#8A7AAE", // Purple → Dusk
-        "#9b72cf": "#8A7AAE",
-        "#8A9BB0": "#8A9099", // old Slate → Stone
-        "#8a9bb0": "#8A9099",
+        "#5B8AF0": "#5BA8D4", // Blue → Sky
+        "#5b8af0": "#5BA8D4",
+        "#E8A030": "#E8603C", // Amber → Flame
+        "#e8a030": "#E8603C",
+        "#45C17A": "#7EC8A0", // Green → Mint
+        "#45c17a": "#7EC8A0",
+        "#9B72CF": "#C46BAE", // Purple → Fuchsia
+        "#9b72cf": "#C46BAE",
+        "#8A9BB0": "#5BA8D4", // old Slate → Sky
+        "#8a9bb0": "#5BA8D4",
       };
-      const migrate = (color) => colorMap[color] || colorMap[color?.toLowerCase()] || "#8A9099";
+      const migrate = (color) => colorMap[color] || colorMap[color?.toLowerCase()] || "#5BA8D4";
       return {
         ...data,
         domains: (data.domains || []).map(d => ({ ...d, color: migrate(d.color) })),
@@ -243,6 +243,33 @@ export const MIGRATIONS = [
       const next = { ...data, looseTasks, todayLoosePicks: picks, schemaVersion: 8 };
       delete next.shallowWork;
       return next;
+    }
+  },
+  // v9: migrate domain colors from old neutral palette to new vibrant palette
+  {
+    version: 9,
+    force: true,
+    up: (data) => {
+      const colorMap = {
+        "#6B7A8D": "#5BA8D4", // Slate → Sky
+        "#6b7a8d": "#5BA8D4",
+        "#C47A7A": "#E8603C", // Rose → Flame
+        "#c47a7a": "#E8603C",
+        "#B89B6A": "#E8603C", // Sand → Flame
+        "#b89b6a": "#E8603C",
+        "#7A9E7E": "#7EC8A0", // Sage → Mint
+        "#7a9e7e": "#7EC8A0",
+        "#8A7AAE": "#C46BAE", // Dusk → Fuchsia
+        "#8a7aae": "#C46BAE",
+        "#8A9099": "#5BA8D4", // Stone → Sky
+        "#8a9099": "#5BA8D4",
+      };
+      const migrate = (color) => colorMap[color] || colorMap[color?.toLowerCase()] || "#5BA8D4";
+      return {
+        ...data,
+        domains: (data.domains || []).map(d => ({ ...d, color: migrate(d.color) })),
+        schemaVersion: 9,
+      };
     }
   },
 ];

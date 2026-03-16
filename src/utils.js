@@ -103,6 +103,13 @@ export function loadData() {
       }
     }
 
+    // Force migrations — run even if schemaVersion is current
+    for (const m of MIGRATIONS) {
+      if (m.force) {
+        data = m.up(data);
+      }
+    }
+
     // Always fill in any fields added since last save
     return applyDefaults(data, FIELD_DEFAULTS);
   } catch (e) {
