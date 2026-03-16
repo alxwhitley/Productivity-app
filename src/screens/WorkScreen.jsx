@@ -71,24 +71,31 @@ function getTodayBlockTimingState({ slot, lateStarted, getElapsedMs }) {
 }
 
 export default function WorkScreen({ data, setData, onGoToTasks }) {
-  const [expandedId, setExpandedId] = useState(null);
   const [celebratingId, setCelebratingId] = useState(null);
-  const [dwOverflowOpen, setDwOverflowOpen] = useState(null);
-  const [dwPickerOpen, setDwPickerOpen] = useState(null); // { slot, preProjectId?, preTasks? }
+  const [dwPickerOpen, setDwPickerOpen] = useState(null);
   const [lateStarted, setLateStarted] = useState({});
   const [tick, setTick] = useState(0);
   const [pickerState, setPickerState] = useState(null);
   const [shutdownOpen, setShutdownOpen] = useState(false);
   const [showDwPulse, setShowDwPulse] = useState(false);
 
-  const scrollRef = useRef(null);
+  // Carousel state
+  const [activeCardIdx, setActiveCardIdx] = useState(0);
+  const [cardAnim, setCardAnim] = useState(null); // { direction: "up"|"down", phase: "exit"|"enter" }
+  const swipeRef = useRef(null);
+
+  // Shallow overlay
+  const [shallowOpen, setShallowOpen] = useState(false);
+
+  // Routine expand
+  const [expandedRoutineId, setExpandedRoutineId] = useState(null);
 
   const todayStr = new Date().toDateString();
   const manualCompleted = new Set(
     (data.blockCompletions || []).filter(c => c.date === todayStr).map(c => c.blockId)
   );
 
-  const { domains, projects, blocks } = data;
+  const { domains, projects } = data;
 
   const getElapsedMs = (info) => {
     if (!info) return 0;
@@ -113,7 +120,6 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
     });
   };
 
-
   const mutateDWSlot = (dateStr, slotIndex, patch) => {
     setData(prev => {
       const existing = [...((prev.deepWorkSlots || {})[dateStr] || [])];
@@ -124,9 +130,6 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
   };
 
   const viewDateKeyISO_ref = useRef("");
-
-  const saveDWSlot = (slotId, slotIndex, projectId, startHour, startMin, durationMin, todayTasks) =>
-    mutateDWSlot(viewDateKeyISO_ref.current, slotIndex, { projectId, startHour, startMin, durationMin, todayTasks: todayTasks || null });
 
   const saveDWTodayTasks = (slotIndex, taskIds) =>
     mutateDWSlot(viewDateKeyISO_ref.current, slotIndex, { todayTasks: taskIds.length > 0 ? taskIds : null });
@@ -147,8 +150,6 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
         p.id === projectId ? { ...p, tasks: p.tasks.map(t => t.id === taskId ? { ...t, done: !t.done, doneAt: !t.done ? new Date().toISOString() : null } : t) } : p
       )
     }));
-    setRecentlyChecked(prev => { const next = new Set(prev); next.add(taskId); return next; });
-    setTimeout(() => setRecentlyChecked(prev => { const next = new Set(prev); next.delete(taskId); return next; }), 450);
   };
 
   const addTaskToProject = (projectId, text) => {
@@ -178,7 +179,7 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
       return { ...d, projects: updatedProjects, blockCompletions };
     });
     setCelebratingId(blockId);
-    setTimeout(() => { setCelebratingId(null); setExpandedId(null); }, 1600);
+    setTimeout(() => setCelebratingId(null), 1600);
   };
 
   const unmarkManualDone = (blockId, projectId, todayTaskIds) => {
@@ -198,7 +199,6 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
       return { ...d, projects: updatedProjects, blockCompletions };
     });
   };
-
 
   // Live tick every second
   useEffect(() => {
@@ -234,8 +234,6 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
 
   const dateKey = today.toDateString();
   const dateKeyISO = toISODate(today);
-
-  const viewDate = today;
   const viewDateKeyISO = dateKeyISO;
   viewDateKeyISO_ref.current = viewDateKeyISO;
 
@@ -256,32 +254,10 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
     };
   });
 
-  const todayRoutines = getRoutinesForDate(data.routineBlocks || [], today);
-  const viewRoutines = todayRoutines;
-
-  const timeline = [
-    ...viewRoutines.map(r => ({ type: "routine", id: r.id, mins: r.startHour * 60 + r.startMin, data: r })),
-    ...todayDWSlots.map(s => ({ type: "deepwork", id: s.id, mins: s.startHour * 60 + s.startMin, data: s })),
-  ].sort((a, b) => a.mins - b.mins);
-
-  const currentItem = timeline.find(item => {
-    const endMins = item.mins + (item.data.durationMin || 60);
-    return item.mins <= nowMins && nowMins < endMins;
-  });
-
-  // Auto-expand current block
-  const lastAutoExpanded = useRef(null);
-  useEffect(() => {
-    if (currentItem && currentItem.id !== lastAutoExpanded.current) {
-      setExpandedId(currentItem.id);
-      lastAutoExpanded.current = currentItem.id;
-    }
-  }, [currentItem?.id]);
-
-  // ── Bio bar position ──
+  // Bio bar position
   const barPct = Math.max(0, Math.min(100, (nowMins - 420) / BIO_TOTAL * 100));
 
-  // ── Today's Shallow Work (exclusively from todayLoosePicks) ──
+  // ── Today's Shallow Work ──
   const todayISO = toISODate();
   const todayPickIds = (data.todayLoosePicks || {})[todayISO] || [];
   const todayPickTasks = todayPickIds.map(id => {
@@ -293,7 +269,8 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
     }
     return null;
   }).filter(Boolean);
-  const hasShallowPicks = todayPickTasks.length > 0;
+  const shallowCount = todayPickTasks.length;
+  const shallowDoneCount = todayPickTasks.filter(t => t.done).length;
 
   const toggleTodayPickTask = (task) => {
     if (task.source === "project") {
@@ -308,46 +285,236 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
     }
   };
 
-  // ── Shutdown visibility: show at 12pm+ ──
+  // Shutdown visibility
   const showShutdownFooter = nowMins >= 720;
   const shutdownDoneToday = data.shutdownDone && data.shutdownDate === todayISO;
 
-  // ── Group blocks by phase ──
-  // For deep work we use fixed phase assignments; for routines we compute from time
-  const groupedBlocks = BIO_PHASES.map(phase => {
-    const items = [];
-    // Add routines in this phase
-    viewRoutines.forEach(r => {
-      const m = r.startHour * 60 + r.startMin;
-      if (m >= phase.startMin && m < phase.endMin) {
-        items.push({ type: "routine", id: r.id, mins: m, data: r });
-      }
-    });
-    // Add deep work slots assigned to this phase
-    todayDWSlots.forEach(s => {
-      if (s.phase === phase.id) {
-        items.push({ type: "deepwork", id: s.id, mins: s.startHour * 60 + s.startMin, data: s });
-      }
-    });
-    items.sort((a, b) => a.mins - b.mins);
-    return { ...phase, items };
-  });
+  // Routines for today
+  const todayRoutines = getRoutinesForDate(data.routineBlocks || [], today);
 
-  // Determine which phases have content (blocks or shallow banner)
-  const hasShallowContent = true; // Always show shallow phase
+  // ── Carousel: only assigned DW slots ──
+  const carouselSlots = todayDWSlots; // show all slots (assigned and unassigned)
+  const hasMultipleCards = carouselSlots.length > 1;
 
-  // ── Render helpers ──
+  // Clamp activeCardIdx
+  const clampedIdx = Math.min(activeCardIdx, Math.max(0, carouselSlots.length - 1));
+  if (clampedIdx !== activeCardIdx) setActiveCardIdx(clampedIdx);
 
-  const nowMinsForPast = now.getHours() * 60 + now.getMinutes();
+  // ── Swipe handling for carousel ──
+  const handleCarouselTouchStart = (e) => {
+    swipeRef.current = { y: e.touches[0].clientY, x: e.touches[0].clientX, locked: false };
+  };
 
-  function renderRoutineCard(item, isNow) {
-    const rb = item.data;
+  const handleCarouselTouchMove = (e) => {
+    if (!swipeRef.current) return;
+    const dy = e.touches[0].clientY - swipeRef.current.y;
+    const dx = e.touches[0].clientX - swipeRef.current.x;
+    if (!swipeRef.current.locked && Math.abs(dx) > Math.abs(dy)) {
+      swipeRef.current = null;
+      return;
+    }
+    swipeRef.current.locked = true;
+    swipeRef.current.dy = dy;
+  };
+
+  const handleCarouselTouchEnd = () => {
+    if (!swipeRef.current || !swipeRef.current.locked) { swipeRef.current = null; return; }
+    const dy = swipeRef.current.dy || 0;
+    swipeRef.current = null;
+    if (!hasMultipleCards) return;
+    if (dy < -40 && activeCardIdx < carouselSlots.length - 1) {
+      // swipe up → next card
+      setCardAnim({ direction: "up", from: activeCardIdx, to: activeCardIdx + 1, phase: "go" });
+      setTimeout(() => { setActiveCardIdx(prev => prev + 1); setCardAnim(null); }, 280);
+    } else if (dy > 40 && activeCardIdx > 0) {
+      // swipe down → prev card
+      setCardAnim({ direction: "down", from: activeCardIdx, to: activeCardIdx - 1, phase: "go" });
+      setTimeout(() => { setActiveCardIdx(prev => prev - 1); setCardAnim(null); }, 280);
+    }
+  };
+
+  // ── Render a single DW carousel card ──
+  function renderDWCarouselCard(slot) {
+    const isAssigned = !!slot.projectId;
+    if (!isAssigned) {
+      // Unassigned empty card
+      return (
+        <div className="dw-card-full active" style={{
+          border: "1.5px dashed var(--border)",
+          background: "var(--bg2)",
+          alignItems: "center",
+          justifyContent: "center",
+          textAlign: "center",
+        }}>
+          <div style={{ color: "var(--text3)", fontSize: 15, fontWeight: 500, marginBottom: 16 }}>No deep work scheduled</div>
+          <button onClick={() => setDwPickerOpen({ slot })} style={{
+            background: "none", border: "1.5px solid var(--accent)", borderRadius: 10,
+            padding: "10px 20px", fontSize: 14, fontWeight: 700, color: "var(--accent)",
+            cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
+          }}>+ Plan your day</button>
+        </div>
+      );
+    }
+
+    const proj = getProject(slot.projectId);
+    const domain = proj ? getDomain(proj.domainId) : null;
+    const domainColor = domain?.color || "#8A9099";
+    const domainName = domain?.name || "";
+    const isSessionMode = (proj?.type || proj?.mode) === "sessions";
+    const typeBadge = isSessionMode ? "Session" : "Task-based";
+
+    const { hasTodayTasks, relevantTasks, relevantDone, isCompleted } = getTodayBlockCompletionState({ slot, project: proj, manualCompleted });
+    const { timerActive, isRunning, countdownLabel: cdStr } = getTodayBlockTimingState({ slot, lateStarted, getElapsedMs });
+
+    const blockEndMins = slot.startHour * 60 + slot.startMin + slot.durationMin;
+    const blockStartMins = slot.startHour * 60 + slot.startMin;
+    const isPast = blockEndMins < nowMins;
+    const isActive = blockStartMins <= nowMins && nowMins < blockEndMins;
+
+    const cardBg = `${domainColor}17`; // ~9% opacity hex
+    const cardBorder = `${domainColor}40`; // ~25% opacity hex
+    const activeBorder = `${domainColor}66`; // ~40% opacity hex
+
+    const isPicking = pickerState?.blockId === slot.id;
+
+    const handleDone = () => {
+      const info = lateStarted[slot.id];
+      const elapsedMs = getElapsedMs(info);
+      const elapsedMin = Math.round(elapsedMs / 60000);
+      if (elapsedMin > 0) logSession(proj.id, elapsedMin, null);
+      markManualDone(slot.id, proj.id, slot.todayTasks);
+      setLateStarted(prev => { const n = { ...prev }; delete n[slot.id]; return n; });
+    };
+
+    return (
+      <div className="dw-card-full active" style={{
+        background: cardBg,
+        border: `1.5px solid ${isActive ? activeBorder : cardBorder}`,
+        opacity: isPast && isCompleted ? 0.45 : 1,
+      }}>
+        {/* Row 1: domain + type badge */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div style={{ width: 8, height: 8, borderRadius: "50%", background: domainColor, flexShrink: 0 }} />
+            <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--text3)" }}>{domainName}</span>
+          </div>
+          <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text2)", background: "var(--bg3)", borderRadius: 6, padding: "2px 8px" }}>{typeBadge}</span>
+        </div>
+
+        {/* Row 2: project name */}
+        <div style={{ fontSize: 22, fontWeight: 700, color: "var(--text)", marginTop: 12, lineHeight: 1.2 }}>{proj?.name}</div>
+
+        {/* Row 3: timer */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+          {isCompleted ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          ) : (
+            <button onClick={(e) => { e.stopPropagation(); isRunning ? pauseTimerSlot(slot.id) : startTimerSlot(slot.id); }} style={{
+              width: 20, height: 20, background: "none", border: "none", cursor: "pointer",
+              color: "var(--text2)", display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+            }}>
+              {isRunning
+                ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor"/></svg>
+                : <svg width="12" height="13" viewBox="0 0 16 18" fill="none"><path d="M1 1l14 8-14 8V1z" fill="currentColor"/></svg>
+              }
+            </button>
+          )}
+          <span style={{ fontSize: 15, color: "var(--text2)", fontVariantNumeric: "tabular-nums", fontFamily: "'DM Sans', sans-serif" }}>
+            {isCompleted ? "Complete" : cdStr}
+          </span>
+          <span style={{ fontSize: 13, color: "var(--text3)" }}>{slot.durationMin} min</span>
+        </div>
+
+        {/* Divider */}
+        <div style={{ height: 1, background: "var(--border)", margin: "12px 0" }} />
+
+        {/* Task list — scrollable */}
+        <div className="task-scroll">
+          {isPicking ? (() => {
+            const ps = pickerState;
+            const confirmPick = () => {
+              let finalIds = [...ps.selected];
+              if (ps.newText.trim()) { const newId = addTaskToProject(proj.id, ps.newText.trim()); finalIds.push(newId); }
+              saveDWTodayTasks(slot.slotIndex, finalIds);
+              setPickerState(null);
+            };
+            return (
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text3)", letterSpacing: ".05em", textTransform: "uppercase", marginBottom: 8 }}>Pick today's tasks</div>
+                {proj.tasks.filter(t => !t.done).map(t => {
+                  const checked = ps.selected.has(t.id);
+                  return (
+                    <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 2px", cursor: "pointer" }}
+                      onClick={() => setPickerState(prev => { const s = new Set(prev.selected); checked ? s.delete(t.id) : s.add(t.id); return { ...prev, selected: s }; })}>
+                      <div style={{ width: 18, height: 18, borderRadius: 5, border: checked ? "none" : "1.5px solid var(--border)", background: checked ? "var(--accent)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        {checked && <span style={{ fontSize: 10, color: "#000", fontWeight: 800 }}>✓</span>}
+                      </div>
+                      <span style={{ fontSize: 14, color: checked ? "var(--text)" : "var(--text2)" }}>{t.text}</span>
+                    </div>
+                  );
+                })}
+                <input style={{ width: "100%", background: "var(--bg3)", border: "1px solid var(--border2)", borderRadius: 8, padding: "8px 10px", color: "var(--text)", fontSize: 13, fontFamily: "'DM Sans',sans-serif", marginTop: 8, boxSizing: "border-box" }}
+                  placeholder="Add new task…" value={ps.newText}
+                  onChange={e => setPickerState(prev => ({ ...prev, newText: e.target.value }))}
+                  onKeyDown={e => e.key === "Enter" && confirmPick()} />
+                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                  <button className="dw-confirm-btn" style={{ flex: 1 }} onClick={confirmPick}>✓ Confirm</button>
+                  <button className="dw-back" onClick={() => setPickerState(null)}>✕</button>
+                </div>
+              </div>
+            );
+          })() : hasTodayTasks ? (
+            <>
+              {relevantTasks.map((t, i) => (
+                <div key={t.id} style={{
+                  display: "flex", alignItems: "center", gap: 10, padding: "8px 0",
+                  borderBottom: i < relevantTasks.length - 1 ? "1px solid var(--border2)" : "none",
+                  opacity: t.done ? 0.45 : 1,
+                  cursor: "pointer",
+                }} onClick={() => {
+                  toggleTask(proj.id, t.id);
+                  if (!t.done) {
+                    const remaining = relevantTasks.filter(rt => rt.id !== t.id && !rt.done);
+                    if (remaining.length === 0) { logSession(proj.id, slot.durationMin, null); markManualDone(slot.id, proj.id, slot.todayTasks); }
+                  }
+                }}>
+                  <div style={{
+                    width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
+                    border: t.done ? "none" : "1.5px solid var(--border)",
+                    background: t.done ? "var(--green)" : "transparent",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>
+                    {t.done && <span style={{ fontSize: 10, color: "#fff", fontWeight: 700 }}>✓</span>}
+                  </div>
+                  <span style={{ fontSize: 13, color: t.done ? "var(--text2)" : "var(--text2)", textDecoration: t.done ? "line-through" : "none", flex: 1 }}>{t.text}</span>
+                </div>
+              ))}
+              {timerActive && !isCompleted && (
+                <button onClick={handleDone}
+                  style={{ width: "100%", marginTop: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "var(--green)", border: "none", borderRadius: 10, padding: "10px 0", fontSize: 13, fontWeight: 700, color: "#fff", cursor: "pointer", fontFamily: "'DM Sans',sans-serif" }}>
+                  Done ✓
+                </button>
+              )}
+            </>
+          ) : (
+            <div style={{ cursor: "pointer", color: "var(--blue)", fontSize: 13, fontWeight: 600 }}
+              onClick={() => setPickerState({ blockId: slot.id, projectId: proj.id, selected: new Set(), newText: "" })}>
+              + Pick tasks
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Render routine card (kept from old design, still in scroll area) ──
+  function renderRoutineCard(rb) {
     const comp = (rb.completions || {})[dateKey] || {};
     const doneCt = rb.tasks.filter(t => comp[t.id]).length;
     const allDone = rb.tasks.length > 0 && doneCt === rb.tasks.length;
-    const isExp = expandedId === rb.id;
+    const isExp = expandedRoutineId === rb.id;
     const blockEndMins = rb.startHour * 60 + rb.startMin + rb.durationMin;
-    const isPast = !isNow && blockEndMins < nowMinsForPast;
+    const isPast = blockEndMins < nowMins;
     const toggleRtTask = (taskId) => {
       setData(d => ({
         ...d,
@@ -362,8 +529,8 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
     return (
       <div key={rb.id} className={`work-card${isPast ? " past-block" : ""}`} style={{
         background: "var(--bg2)",
-        border: allDone ? "1px solid rgba(69,193,122,.2)" : isNow ? "1.5px solid rgba(75,170,187,.3)" : "1px solid var(--border)",
-      }} onClick={() => setExpandedId(isExp ? null : rb.id)}>
+        border: allDone ? "1px solid rgba(69,193,122,.2)" : "1px solid var(--border)",
+      }} onClick={() => setExpandedRoutineId(isExp ? null : rb.id)}>
         <div style={{ padding: "14px 16px", display: "flex", alignItems: "flex-start", gap: 12 }}>
           <div style={{ width: 10, height: 10, borderRadius: "50%", background: "var(--teal)", flexShrink: 0, opacity: allDone ? 0.4 : 1, marginTop: 3 }} />
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -390,243 +557,13 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
     );
   }
 
-  function renderUnassignedCard(slot) {
-    return (
-      <div key={slot.id} className={`work-card dw-empty${showDwPulse ? " dw-pulse" : ""}`} style={{
-        background: "var(--bg2)",
-        border: "1.5px dashed var(--border)",
-        cursor: "pointer",
-        height: 64, overflow: "hidden",
-      }} onClick={() => setDwPickerOpen({ slot })}>
-        <div style={{ padding: "14px 16px", display: "flex", alignItems: "center", gap: 12, height: "100%", boxSizing: "border-box" }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity=".3" /></svg>
-          <div style={{ flex: 1, color: "var(--text2)" }}>
-            <span style={{ fontSize: 15, fontWeight: 600 }}>Deep Work Block</span>
-          </div>
-          <span style={{ fontSize: 12, color: "var(--text2)" }}>{(data.todayPrefs || {}).hideTimes ? "" : fmtTime(slot.startHour, slot.startMin) + " · "}{slot.durationMin} min</span>
-        </div>
-      </div>
-    );
-  }
-
-  function renderAssignedCard(slot, isNow) {
-    const proj = getProject(slot.projectId);
-    const domain = proj ? getDomain(proj.domainId) : null;
-    const domainColor = domain?.color || null;
-
-    const { isSessionMode, hasTodayTasks, relevantTasks, relevantDone, isCompleted } = getTodayBlockCompletionState({ slot, project: proj, manualCompleted });
-    const { timerActive, isRunning, countdownLabel: cdStr } = getTodayBlockTimingState({ slot, lateStarted, getElapsedMs });
-
-    const isExp = expandedId === slot.id;
-    const showBody = isExp && !isCompleted;
-    const isPicking = pickerState?.blockId === slot.id;
-    const blockEndMins = slot.startHour * 60 + slot.startMin + slot.durationMin;
-    const isPast = !isNow && blockEndMins < nowMinsForPast;
-
-    // Done card
-    if (isCompleted) {
-      const isExpDone = expandedId === slot.id;
-      return (
-        <div key={slot.id} className={`work-card${isPast ? " past-block" : ""}`} style={{
-          background: "var(--bg2)", border: "1px solid var(--border)", opacity: 0.55, position: "relative", cursor: "pointer",
-          height: isExpDone ? 180 : 64, overflow: "hidden", transition: "height .2s ease",
-        }} onClick={() => setExpandedId(isExpDone ? null : slot.id)}>
-          <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: "var(--border)", borderRadius: "14px 0 0 14px" }} />
-          <div style={{ padding: "12px 16px 0 20px", display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text3)", letterSpacing: "-.01em" }}>{proj?.name}</div>
-              <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>{data.todayPrefs?.hideTimes ? "" : `${fmtTime(slot.startHour, slot.startMin)} · `}{slot.durationMin} min</div>
-            </div>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          </div>
-          {isExpDone && hasTodayTasks && (
-            <div style={{ padding: "8px 16px 14px 20px", overflowY: "auto", maxHeight: 120 }} onClick={e => e.stopPropagation()}>
-              {relevantTasks.map((t, i) => (
-                <div key={t.id} className="tl-task-row" style={{ padding: "8px 0", borderBottom: i < relevantTasks.length - 1 ? "1px solid var(--border2)" : "none" }}>
-                  <div className={`tl-check ${t.done ? "done" : ""}`}
-                    style={{ width: 20, height: 20, flexShrink: 0, cursor: "pointer" }}
-                    onClick={() => {
-                      if (t.done) {
-                        toggleTask(proj.id, t.id);
-                        unmarkManualDone(slot.id, proj.id, [t.id]);
-                      }
-                    }}>
-                    {t.done && <span style={{ fontSize: 10, color: "#fff", fontWeight: 700 }}>✓</span>}
-                  </div>
-                  <span style={{ fontSize: 14, color: t.done ? "var(--text2)" : "var(--text)", textDecoration: t.done ? "line-through" : "none", flex: 1 }}>{t.text}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    const handleDone = () => {
-      const info = lateStarted[slot.id];
-      const elapsedMs = getElapsedMs(info);
-      const elapsedMin = Math.round(elapsedMs / 60000);
-      if (elapsedMin > 0) logSession(proj.id, elapsedMin, null);
-      markManualDone(slot.id, proj.id, slot.todayTasks);
-      setLateStarted(prev => { const n = { ...prev }; delete n[slot.id]; return n; });
-    };
-
-    return (
-      <div key={slot.id} className={`work-card${isPast && !isNow ? " past-block" : ""}`} style={{
-        background: "var(--bg2)",
-        border: "1px solid var(--border)",
-        position: "relative",
-        height: showBody ? 180 : 64, overflow: "hidden",
-        transition: "height .2s ease",
-      }} onClick={() => setExpandedId(isExp ? null : slot.id)}>
-        <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: domainColor || "var(--text3)", borderRadius: "14px 0 0 14px" }} />
-
-        {/* Overflow menu overlay */}
-        {dwOverflowOpen === slot.id && (
-          <div style={{ position: "absolute", inset: 0, background: "var(--bg2)", borderRadius: 14, zIndex: 10, display: "flex", flexDirection: "column", padding: "16px 16px 14px", overflow: "auto" }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text2)" }}>{proj?.name}</span>
-              <button onClick={() => setDwOverflowOpen(null)}
-                style={{ background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: "50%", width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--text3)" }}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></svg>
-              </button>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <button onClick={() => { mutateDWSlot(viewDateKeyISO, slot.slotIndex, null); setExpandedId(null); setDwOverflowOpen(null); }}
-                style={{ padding: "14px 16px", background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 14, fontSize: 14, fontWeight: 600, color: "var(--text2)", cursor: "pointer", fontFamily: "'DM Sans',sans-serif", display: "flex", alignItems: "center", gap: 12 }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/></svg>
-                Unassign
-              </button>
-              <button onClick={() => {
-                setDwOverflowOpen(null);
-                setDwPickerOpen({
-                  slot,
-                  preProjectId: slot.projectId,
-                  preTasks: Array.isArray(slot.todayTasks) ? slot.todayTasks : [],
-                });
-              }}
-                style={{ padding: "14px 16px", background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 14, fontSize: 14, fontWeight: 600, color: "var(--text2)", cursor: "pointer", fontFamily: "'DM Sans',sans-serif", display: "flex", alignItems: "center", gap: 12 }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                Change Project
-              </button>
-              <button onClick={() => {
-                  const tomorrowISO = toISODate(new Date(Date.now() + 86400000));
-                  mutateDWSlot(toISODate(), slot.slotIndex, null);
-                  mutateDWSlot(tomorrowISO, slot.slotIndex, { projectId: slot.projectId, startHour: slot.startHour, startMin: slot.startMin, durationMin: slot.durationMin, todayTasks: slot.todayTasks });
-                  setExpandedId(null); setDwOverflowOpen(null);
-                }}
-                  style={{ padding: "14px 16px", background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 14, fontSize: 14, fontWeight: 600, color: "var(--text2)", cursor: "pointer", fontFamily: "'DM Sans',sans-serif", display: "flex", alignItems: "center", gap: 12 }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  Move to Tomorrow
-                </button>
-            </div>
-          </div>
-        )}
-
-        {/* Header row */}
-        <div style={{ padding: "12px 16px 0 20px", display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", letterSpacing: "-.01em", lineHeight: 1.15 }}>{proj?.name}</div>
-            <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>
-              {data.todayPrefs?.hideTimes ? "" : `${fmtTime(slot.startHour, slot.startMin)} · `}{slot.durationMin} min
-              {!showBody && !isSessionMode && hasTodayTasks ? ` · ${relevantDone}/${relevantTasks.length}` : ""}
-            </div>
-          </div>
-          {/* Right controls */}
-          <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-            <button style={{ width: 20, height: 20, background: "none", border: "none", cursor: "pointer", color: "var(--text2)", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, flexShrink: 0 }}
-              onClick={e => { e.stopPropagation(); isRunning ? pauseTimerSlot(slot.id) : startTimerSlot(slot.id); }}>
-              {isRunning
-                ? <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor"/></svg>
-                : <svg width="10" height="11" viewBox="0 0 16 18" fill="none"><path d="M1 1l14 8-14 8V1z" fill="currentColor"/></svg>
-              }
-            </button>
-            <span style={{ fontSize: 12, color: "var(--text2)", fontVariantNumeric: "tabular-nums", fontFamily: "'DM Sans', sans-serif" }}>{cdStr}</span>
-            {showBody && (
-              <button style={{ background: "none", border: "none", cursor: "pointer", padding: "2px 4px", color: "var(--text3)", display: "flex", alignItems: "center" }}
-                onClick={e => { e.stopPropagation(); setDwOverflowOpen(dwOverflowOpen === slot.id ? null : slot.id); }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="5" r="1.5" fill="currentColor"/>
-                  <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
-                  <circle cx="12" cy="19" r="1.5" fill="currentColor"/>
-                </svg>
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* ── EXPANDED BODY: tasks + done ── */}
-        {showBody && (
-          <div style={{ padding: "6px 16px 10px 20px", overflowY: "auto", maxHeight: 120 }} onClick={e => e.stopPropagation()}>
-            {isPicking ? (() => {
-              const ps = pickerState;
-              const confirmPick = () => {
-                let finalIds = [...ps.selected];
-                if (ps.newText.trim()) { const newId = addTaskToProject(proj.id, ps.newText.trim()); finalIds.push(newId); }
-                saveDWTodayTasks(slot.slotIndex, finalIds);
-                setPickerState(null);
-              };
-              return (
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text3)", letterSpacing: ".05em", textTransform: "uppercase", marginBottom: 8 }}>Pick today's tasks</div>
-                  {proj.tasks.filter(t => !t.done).map(t => {
-                    const checked = ps.selected.has(t.id);
-                    return (
-                      <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 2px", cursor: "pointer" }}
-                        onClick={() => setPickerState(prev => { const s = new Set(prev.selected); checked ? s.delete(t.id) : s.add(t.id); return { ...prev, selected: s }; })}>
-                        <div style={{ width: 18, height: 18, borderRadius: 5, border: checked ? "none" : "1.5px solid var(--border)", background: checked ? "var(--accent)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                          {checked && <span style={{ fontSize: 10, color: "#000", fontWeight: 800 }}>✓</span>}
-                        </div>
-                        <span style={{ fontSize: 14, color: checked ? "var(--text)" : "var(--text2)" }}>{t.text}</span>
-                      </div>
-                    );
-                  })}
-                  <input style={{ width: "100%", background: "var(--bg3)", border: "1px solid var(--border2)", borderRadius: 8, padding: "8px 10px", color: "var(--text)", fontSize: 13, fontFamily: "'DM Sans',sans-serif", marginTop: 8, boxSizing: "border-box" }}
-                    placeholder="Add new task…" value={ps.newText}
-                    onChange={e => setPickerState(prev => ({ ...prev, newText: e.target.value }))}
-                    onKeyDown={e => e.key === "Enter" && confirmPick()} />
-                  <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                    <button className="dw-confirm-btn" style={{ flex: 1 }} onClick={confirmPick}>✓ Confirm</button>
-                    <button className="dw-back" onClick={() => setPickerState(null)}>✕</button>
-                  </div>
-                </div>
-              );
-            })() : hasTodayTasks ? (
-              <>
-                {relevantTasks.map(t => (
-                  <TaskRow
-                    key={t.id}
-                    task={t}
-                    onToggle={() => {
-                      toggleTask(proj.id, t.id);
-                      if (!t.done) {
-                        const remaining = relevantTasks.filter(rt => rt.id !== t.id && !rt.done);
-                        if (remaining.length === 0) { logSession(proj.id, slot.durationMin, null); markManualDone(slot.id, proj.id, slot.todayTasks); }
-                      }
-                    }}
-                    onEdit={(newText) => setData(d => ({ ...d, projects: d.projects.map(p => p.id !== proj.id ? p : { ...p, tasks: p.tasks.map(tk => tk.id !== t.id ? tk : { ...tk, text: newText }) }) }))}
-                    onDelete={() => setData(d => ({ ...d, projects: d.projects.map(p => p.id !== proj.id ? p : { ...p, tasks: p.tasks.filter(tk => tk.id !== t.id) }) }))}
-                    onQuickWin={() => setData(d => ({ ...d, projects: d.projects.map(p => ({ ...p, tasks: p.tasks.map(tk => tk.id !== t.id ? tk : { ...tk, quickWin: !(tk.quickWin ?? false) }) })) }))}
-                  />
-                ))}
-                {timerActive && (
-                  <button onClick={handleDone}
-                    style={{ width: "100%", marginTop: 8, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "var(--green)", border: "none", borderRadius: 10, padding: "10px 0", fontSize: 13, fontWeight: 700, color: "#fff", cursor: "pointer", fontFamily: "'DM Sans',sans-serif" }}>
-                    Done ✓
-                  </button>
-                )}
-              </>
-            ) : (
-              <div style={{ cursor: "pointer", color: "var(--text3)", fontSize: 12 }}
-                onClick={() => setPickerState({ blockId: slot.id, projectId: proj.id, selected: new Set(), newText: "" })}>
-                + Pick tasks
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    );
-  }
+  // ── Determine animation classes ──
+  const getCardClass = (idx) => {
+    if (!cardAnim) return idx === activeCardIdx ? "dw-card-full active" : "dw-card-full";
+    if (idx === cardAnim.from) return `dw-card-full exiting-${cardAnim.direction}`;
+    if (idx === cardAnim.to) return `dw-card-full entering-${cardAnim.direction === "up" ? "down" : "up"} active`;
+    return "dw-card-full";
+  };
 
   // ══════ RENDER ══════
 
@@ -635,115 +572,153 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
       {/* Full-screen ambient phase glow */}
       <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0, background: `radial-gradient(ellipse at center, ${PHASE_COLORS[currentPhase]?.glow || "transparent"} 0%, transparent 70%)` }} />
       <StatusBar />
-      <div ref={scrollRef} className="scroll" style={{ flex: 1, paddingBottom: 80 }}>
 
-        {/* ── HEADER ── */}
-        <div className="ph">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <div>
-              <div className="ph-eye">Work</div>
-              <div className="ph-title">Today's Work</div>
-            </div>
-            <button className="tab-gear" onClick={() => {}}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" stroke="currentColor" strokeWidth="1.5" />
-                <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5" />
-              </svg>
-            </button>
+      {/* ── HEADER ── */}
+      <div className="ph">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div>
+            <div className="ph-eye">Work</div>
+            <div className="ph-title">Today's Work</div>
           </div>
+          <button className="tab-gear" onClick={() => {}}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" stroke="currentColor" strokeWidth="1.5" />
+              <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5" />
+            </svg>
+          </button>
         </div>
-
-        {/* ── PHASE BAR ── */}
-        <div className="phase-bar-wrap">
-          <div className="phase-bar-row">
-            <span className="phase-bar-label" style={{ color: PHASE_COLORS[currentPhase]?.css || "var(--text3)" }}>
-              {BIO_PHASES.find(p => p.id === currentPhase)?.label || ""}
-            </span>
-            <div className="phase-bar-dots" style={{ color: PHASE_COLORS[currentPhase]?.css || "var(--text3)" }}>
-              {BIO_PHASES.filter(p => p.id !== "wind").map(p => (
-                <div key={p.id} className={`phase-bar-dot${currentPhase === p.id ? " active" : ""}`} />
-              ))}
-            </div>
-          </div>
-          <div className="phase-bar-track">
-            <div className="phase-bar-fill" style={{ width: `${barPct}%`, background: PHASE_COLORS[currentPhase]?.css || "var(--accent)" }} />
-          </div>
-        </div>
-
-        {/* ── BLOCKS BY PHASE ── */}
-
-        {groupedBlocks.map(group => {
-          const hasItems = group.items.length > 0;
-          const isShallowPhase = group.id === "shallow";
-
-          if (group.id === "wind") return null;
-          if (!hasItems && !isShallowPhase) return null;
-
-          const phaseColor = PHASE_COLORS[group.id];
-          const isActivePhase = currentPhase === group.id;
-
-          return (
-            <div key={group.id}>
-              {/* Phase header */}
-              <div style={{ padding: "16px 16px 6px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: isActivePhase ? (phaseColor?.css || "var(--text3)") : "var(--text3)", flexShrink: 0 }} />
-                  <span style={{ fontSize: 11, fontWeight: isActivePhase ? 700 : 500, textTransform: "uppercase", color: isActivePhase ? "var(--text2)" : "var(--text3)", whiteSpace: "nowrap", letterSpacing: ".06em" }}>
-                    {group.label}
-                  </span>
-                  <div style={{ flex: 1, height: 1, background: "var(--border2)" }} />
-                </div>
-                {isShallowPhase && (
-                  <div style={{ fontSize: 11, fontWeight: 400, color: "var(--text3)", marginTop: 3, paddingLeft: 16 }}>quick tasks · emails · admin</div>
-                )}
-              </div>
-
-
-              {/* Block cards */}
-              {group.items.map(item => {
-                const isNow = currentItem?.id === item.id;
-                if (item.type === "routine") return renderRoutineCard(item, isNow);
-                if (item.type === "deepwork") {
-                  const slot = item.data;
-                  if (!slot.projectId) return renderUnassignedCard(slot);
-                  return renderAssignedCard(slot, isNow);
-                }
-                return null;
-              })}
-
-              {/* Shallow work section */}
-              {isShallowPhase && (
-                <div style={{ margin: "8px 12px 0", background: "var(--bg2)", borderRadius: 14, padding: 16, borderLeft: "3px solid var(--teal)" }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--teal)", marginBottom: 8 }}>Today's Shallow Work</div>
-                  {hasShallowPicks ? (
-                    <>
-                      {todayPickTasks.map(t => (
-                        <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: "1px solid var(--border2)", cursor: "pointer" }}
-                          onClick={() => toggleTodayPickTask(t)}>
-                          <div className={`tl-check ${t.done ? "done" : ""}`} style={{ width: 20, height: 20, flexShrink: 0 }}>
-                            {t.done && <span style={{ fontSize: 10, color: "#fff", fontWeight: 700 }}>✓</span>}
-                          </div>
-                          <span style={{ fontSize: 14, color: t.done ? "var(--text3)" : "var(--text)", textDecoration: t.done ? "line-through" : "none", flex: 1 }}>{t.text}</span>
-                        </div>
-                      ))}
-                    </>
-                  ) : (
-                    <div style={{ cursor: "pointer", color: "var(--text3)", fontSize: 13 }}
-                      onClick={() => onGoToTasks()}>
-                      + Add from Tasks
-                    </div>
-                  )}
-                </div>
-              )}
-
-            </div>
-          );
-        })}
-
-
-
       </div>
 
+      {/* ── PHASE BAR ── */}
+      <div className="phase-bar-wrap">
+        <div className="phase-bar-row">
+          <span className="phase-bar-label" style={{ color: PHASE_COLORS[currentPhase]?.css || "var(--text3)" }}>
+            {BIO_PHASES.find(p => p.id === currentPhase)?.label || ""}
+          </span>
+          <div className="phase-bar-dots" style={{ color: PHASE_COLORS[currentPhase]?.css || "var(--text3)" }}>
+            {BIO_PHASES.filter(p => p.id !== "wind").map(p => (
+              <div key={p.id} className={`phase-bar-dot${currentPhase === p.id ? " active" : ""}`} />
+            ))}
+          </div>
+        </div>
+        <div className="phase-bar-track">
+          <div className="phase-bar-fill" style={{ width: `${barPct}%`, background: PHASE_COLORS[currentPhase]?.css || "var(--accent)" }} />
+        </div>
+      </div>
+
+      {/* ── DW CARD CAROUSEL ── */}
+      <div className="dw-carousel"
+        onTouchStart={handleCarouselTouchStart}
+        onTouchMove={handleCarouselTouchMove}
+        onTouchEnd={handleCarouselTouchEnd}
+      >
+        {/* Side dots */}
+        {hasMultipleCards && (
+          <div className="dw-side-dots">
+            {carouselSlots.map((_, i) => (
+              <div key={i} className={`dw-side-dot${i === activeCardIdx ? " active" : ""}`} />
+            ))}
+          </div>
+        )}
+
+        {/* Cards — only render active + animating */}
+        {carouselSlots.map((slot, i) => {
+          const isVisible = i === activeCardIdx || (cardAnim && (i === cardAnim.from || i === cardAnim.to));
+          if (!isVisible) return null;
+          return <div key={slot.id} className={getCardClass(i)}>{renderDWCarouselCard(slot)}</div>;
+        })}
+
+        {/* Empty state when no slots at all */}
+        {carouselSlots.length === 0 && (
+          <div className="dw-card-full active" style={{
+            border: "1.5px dashed var(--border)", background: "var(--bg2)",
+            alignItems: "center", justifyContent: "center", textAlign: "center",
+          }}>
+            <div style={{ color: "var(--text3)", fontSize: 15, fontWeight: 500, marginBottom: 16 }}>No deep work scheduled</div>
+            <button style={{
+              background: "none", border: "1.5px solid var(--accent)", borderRadius: 10,
+              padding: "10px 20px", fontSize: 14, fontWeight: 700, color: "var(--accent)",
+              cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
+            }}>+ Plan your day</button>
+          </div>
+        )}
+      </div>
+
+      {/* ── ROUTINE BLOCKS (below carousel, above shallow bar) ── */}
+      {todayRoutines.length > 0 && (
+        <div style={{ padding: "0 4px 8px", flexShrink: 0 }}>
+          {todayRoutines.map(rb => renderRoutineCard(rb))}
+        </div>
+      )}
+
+      {/* ── SHALLOW WORK FIXED BAR ── */}
+      <div className="shallow-fixed-bar" onClick={() => setShallowOpen(!shallowOpen)}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--teal)" }}>Shallow Work</div>
+          <div style={{ fontSize: 11, color: "var(--text3)" }}>
+            {shallowCount === 0 ? "No tasks queued" : `${shallowCount} task${shallowCount !== 1 ? "s" : ""} queued${shallowDoneCount > 0 ? ` · ${shallowDoneCount} done` : ""}`}
+          </div>
+        </div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ color: "var(--text3)", transform: shallowOpen ? "rotate(180deg)" : "none", transition: "transform .2s" }}>
+          <path d="M18 15l-6-6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </div>
+
+      {/* ── SHALLOW WORK OVERLAY ── */}
+      <div className={`shallow-overlay-wrap${shallowOpen ? " open" : ""}`}>
+        <div className="shallow-backdrop" />
+        <div className="shallow-sheet">
+          {/* Header */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px 12px" }}>
+            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".07em", textTransform: "uppercase", color: "var(--teal)" }}>Today's Shallow Work</span>
+            <button onClick={() => setShallowOpen(false)} style={{
+              width: 26, height: 26, borderRadius: "50%", background: "var(--bg3)", border: "none",
+              display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--text2)",
+            }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></svg>
+            </button>
+          </div>
+
+          {/* Task list */}
+          <div style={{ flex: 1, overflowY: "auto", padding: "0 20px" }}>
+            {todayPickTasks.length === 0 ? (
+              <div style={{ textAlign: "center", color: "var(--text3)", fontSize: 14, padding: "32px 0" }}>No tasks queued. Add one below.</div>
+            ) : (
+              todayPickTasks.map((t, i) => (
+                <div key={t.id} style={{
+                  display: "flex", alignItems: "center", gap: 10, padding: "10px 0",
+                  borderBottom: i < todayPickTasks.length - 1 ? "1px solid var(--border2)" : "none",
+                  opacity: t.done ? 0.45 : 1, cursor: "pointer",
+                }} onClick={() => toggleTodayPickTask(t)}>
+                  <div style={{
+                    width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
+                    border: t.done ? "none" : "1.5px solid var(--border)",
+                    background: t.done ? "var(--green)" : "transparent",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>
+                    {t.done && <span style={{ fontSize: 10, color: "#fff", fontWeight: 700 }}>✓</span>}
+                  </div>
+                  <span style={{ fontSize: 14, color: t.done ? "var(--text3)" : "var(--text)", textDecoration: t.done ? "line-through" : "none", flex: 1 }}>{t.text}</span>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Bottom actions */}
+          <div style={{ display: "flex", gap: 8, padding: "12px 20px 16px", flexShrink: 0 }}>
+            <button onClick={() => onGoToTasks()} style={{
+              flex: 1, padding: "10px 12px", borderRadius: 10, fontSize: 13, fontWeight: 600,
+              background: "var(--bg3)", border: "none", color: "var(--text)", cursor: "pointer",
+              fontFamily: "'DM Sans',sans-serif",
+            }}>+ Add task</button>
+            <button onClick={() => onGoToTasks()} style={{
+              flex: 1, padding: "10px 12px", borderRadius: 10, fontSize: 13, fontWeight: 600,
+              background: "rgba(75,170,187,0.13)", border: "none", color: "var(--teal)", cursor: "pointer",
+              fontFamily: "'DM Sans',sans-serif",
+            }}>Pull from Tasks</button>
+          </div>
+        </div>
+      </div>
 
       {/* ── SHUTDOWN SHEET ── */}
       {shutdownOpen && (
