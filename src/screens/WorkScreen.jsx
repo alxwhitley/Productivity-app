@@ -349,6 +349,27 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
     }
 
     const proj = getProject(slot.projectId);
+
+    // Project was deleted or not found — treat as unassigned
+    if (!proj) {
+      return (
+        <div className="dw-card-inner" style={{
+          border: "1.5px dashed var(--border)",
+          background: "var(--bg2)",
+          alignItems: "center",
+          justifyContent: "center",
+          textAlign: "center",
+        }}>
+          <div style={{ color: "var(--text3)", fontSize: 15, fontWeight: 500, marginBottom: 16 }}>No deep work scheduled</div>
+          <button onClick={() => setDwPickerOpen({ slot })} style={{
+            background: "none", border: "1.5px solid var(--accent)", borderRadius: 10,
+            padding: "10px 20px", fontSize: 14, fontWeight: 700, color: "var(--accent)",
+            cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
+          }}>+ Plan your day</button>
+        </div>
+      );
+    }
+
     const domain = proj ? getDomain(proj.domainId) : null;
     const domainColor = domain?.color || "#5BA8D4";
     const domainName = domain?.name || "";
