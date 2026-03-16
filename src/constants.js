@@ -75,7 +75,7 @@ export const INITIAL_DATA = {
 //   3. The rest of the app is unchanged
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 export const STORAGE_KEY    = "nave_data_v1";       // new key — clean break from momentum_v2
 export const THEME_KEY      = "nave_theme";
 
@@ -235,5 +235,33 @@ export const MIGRATIONS = [
       seasonGoals: (data.seasonGoals || []).map(g => ({ type: "essential", ...g })),
       schemaVersion: 7,
     })
+  },
+  // v8: migrate shallowWork → looseTasks + todayLoosePicks, retire shallowWork
+  {
+    version: 8,
+    up: (data) => {
+      const sw = data.shallowWork || {};
+      const looseTasks = [...(data.looseTasks || [])];
+      const picks = { ...(data.todayLoosePicks || {}) };
+      const existingIds = new Set(looseTasks.map(t => t.id));
+
+      for (const [dateISO, tasks] of Object.entries(sw)) {
+        const datePicks = [...(picks[dateISO] || [])];
+        for (const t of (tasks || [])) {
+          if (!existingIds.has(t.id)) {
+            looseTasks.push({ id: t.id, text: t.text, done: t.done ?? false, doneAt: t.doneAt || null, domainId: t.domainId || null, quickWin: false });
+            existingIds.add(t.id);
+          }
+          if (!datePicks.includes(t.id)) {
+            datePicks.push(t.id);
+          }
+        }
+        picks[dateISO] = datePicks;
+      }
+
+      const next = { ...data, looseTasks, todayLoosePicks: picks, schemaVersion: 8 };
+      delete next.shallowWork;
+      return next;
+    }
   },
 ];

@@ -9,6 +9,9 @@ export default function TasksScreen({ data, setData }) {
   const [processedToday, setProcessedToday] = useState(0);
   const [showClearMsg, setShowClearMsg] = useState(false);
   const [removingId, setRemovingId] = useState(null);
+  const [addingInline, setAddingInline] = useState(false);
+  const [inlineText, setInlineText] = useState("");
+  const inlineInputRef = useRef(null);
 
   // Tasks checked during this tab visit stay visible in All view until unmount
   const sessionCompletedIds = useRef(new Set());
@@ -16,28 +19,7 @@ export default function TasksScreen({ data, setData }) {
   const todayISO = toISODate();
   const completedToday = (data.taskCompletions || {})[todayISO] || [];
   const completedSet = new Set(completedToday);
-
-  // Shallow work reset logic on mount
-  useEffect(() => {
-    if (data.swClearDate === todayISO) return;
-    const allDates = Object.keys(data.shallowWork || {}).filter(d => d < todayISO);
-    let movedItems = [];
-    const newSW = { ...(data.shallowWork || {}) };
-    allDates.forEach(dateKey => {
-      const tasks = newSW[dateKey] || [];
-      const toMove = tasks.filter(t => !t.done && t.sourceType === "manual" && !t.domainId);
-      movedItems = [...movedItems, ...toMove.map(t => ({ id: t.id, text: t.text, createdAt: t.addedAt || Date.now(), quickWin: false, done: false }))];
-      newSW[dateKey] = tasks.filter(t => t.done || t.sourceType !== "manual" || t.domainId);
-    });
-    if (movedItems.length > 0 || data.swClearDate !== todayISO) {
-      setData(d => ({
-        ...d,
-        fabQueue: [...(d.fabQueue || []), ...movedItems],
-        shallowWork: newSW,
-        swClearDate: todayISO,
-      }));
-    }
-  }, []);
+  const todayPickIds = (data.todayLoosePicks || {})[todayISO] || [];
 
   // Show "Queue clear" when queue empties
   const fabQueue = data.fabQueue || [];
@@ -83,8 +65,6 @@ export default function TasksScreen({ data, setData }) {
     const wasDone = completedSet.has(itemId);
 
     if (wasDone) {
-      // Unchecking — remove from completions, restore done: false
-      // Reinsert at stored queue position
       const queueOrder = data.taskQueueOrder || [];
       const storedIdx = queueOrder.indexOf(itemId);
 
@@ -92,11 +72,9 @@ export default function TasksScreen({ data, setData }) {
         const queue = (d.fabQueue || []).map(i =>
           i.id === itemId ? { ...i, done: false } : i
         );
-        // Reorder: move task to its stored position if known
         if (storedIdx >= 0) {
           const task = queue.find(i => i.id === itemId);
           const rest = queue.filter(i => i.id !== itemId);
-          // Find correct insertion point based on stored order
           let insertAt = rest.length;
           for (let j = 0; j < rest.length; j++) {
             const otherIdx = queueOrder.indexOf(rest[j].id);
@@ -127,17 +105,14 @@ export default function TasksScreen({ data, setData }) {
       });
       sessionCompletedIds.current.delete(itemId);
     } else {
-      // Checking — mark done, add to completions, record queue position
       sessionCompletedIds.current.add(itemId);
       setData(d => {
         const queue = d.fabQueue || [];
         const currentIdx = queue.findIndex(i => i.id === itemId);
-        // Build order snapshot: preserve existing order entries, add/update this one
         const prevOrder = d.taskQueueOrder || [];
         const orderSet = new Set(prevOrder);
         let newOrder;
         if (!orderSet.has(itemId)) {
-          // Insert at current position in the order array
           newOrder = [...prevOrder];
           newOrder.splice(currentIdx, 0, itemId);
         } else {
@@ -177,20 +152,43 @@ export default function TasksScreen({ data, setData }) {
     }));
   };
 
-  // ── Tap empty space to capture ──
-  const handleEmptyTap = () => {
-    if (newItemId) return;
-    const id = uid();
-    setData(d => ({
-      ...d,
-      fabQueue: [...(d.fabQueue || []), { id, text: "", createdAt: Date.now(), quickWin: false, done: false }],
-    }));
-    setNewItemId(id);
+  const toggleTodayPick = (taskId) => {
+    setData(d => {
+      const picks = d.todayLoosePicks || {};
+      const current = picks[todayISO] || [];
+      const next = current.includes(taskId)
+        ? current.filter(id => id !== taskId)
+        : [...current, taskId];
+      return { ...d, todayLoosePicks: { ...picks, [todayISO]: next } };
+    });
+  };
+
+  // ── Inline add row ──
+  const openInlineAdd = () => {
+    setAddingInline(true);
+    setInlineText("");
+    setTimeout(() => inlineInputRef.current?.focus(), 30);
+  };
+
+  const commitInlineAdd = () => {
+    const t = inlineText.trim();
+    if (t) {
+      setData(d => ({
+        ...d,
+        fabQueue: [...(d.fabQueue || []), { id: uid(), text: t, createdAt: Date.now(), quickWin: false, done: false }],
+      }));
+    }
+    setInlineText("");
+    setAddingInline(false);
+  };
+
+  const cancelInlineAdd = () => {
+    setInlineText("");
+    setAddingInline(false);
   };
 
   // ── Filtered lists ──
 
-  // All view: uncompleted tasks + tasks completed during this session (stay visible until tab change)
   const allTasks = fabQueue.filter(i =>
     !completedSet.has(i.id) || sessionCompletedIds.current.has(i.id)
   );
@@ -215,8 +213,18 @@ export default function TasksScreen({ data, setData }) {
 
         {/* ── HEADER ── */}
         <div className="ph">
-          <div className="ph-eye">Tasks</div>
-          <div className="ph-title">Tasks</div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div>
+              <div className="ph-eye">Tasks</div>
+              <div className="ph-title">Tasks</div>
+            </div>
+            <button className="tab-gear" onClick={() => {}}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" stroke="currentColor" strokeWidth="1.5" />
+                <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* ── PILL FILTERS ── */}
@@ -263,18 +271,55 @@ export default function TasksScreen({ data, setData }) {
                   onEdit={(text) => { saveFabEdit(item.id, text); setNewItemId(null); }}
                   onDelete={() => { deleteFabItem(item.id); setNewItemId(null); }}
                   onQuickWin={taskFilter === "completed" ? () => {} : () => toggleQuickWin(item.id)}
+                  onToday={() => toggleTodayPick(item.id)}
+                  isQueuedToday={todayPickIds.includes(item.id)}
                 />
               </div>
             );
           })}
+
+          {/* ── INLINE ADD ROW ── */}
+          {taskFilter !== "completed" && (
+            <div
+              onClick={() => { if (!addingInline) openInlineAdd(); }}
+              style={{
+                display: "flex", alignItems: "center", gap: 10,
+                padding: "10px 0", minHeight: 52, cursor: addingInline ? "default" : "pointer",
+              }}
+            >
+              {/* Empty circle */}
+              <div style={{
+                width: 22, height: 22, borderRadius: "50%", flexShrink: 0,
+                border: `1.5px solid ${addingInline ? "rgba(232,160,48,0.3)" : "var(--text3)"}`,
+                background: "transparent",
+                transition: "border-color .15s",
+              }} />
+
+              {addingInline ? (
+                <input
+                  ref={inlineInputRef}
+                  value={inlineText}
+                  onChange={e => setInlineText(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === "Enter") commitInlineAdd();
+                    if (e.key === "Escape") cancelInlineAdd();
+                  }}
+                  onBlur={commitInlineAdd}
+                  onClick={e => e.stopPropagation()}
+                  style={{
+                    flex: 1, background: "none", border: "none", outline: "none",
+                    color: "var(--text)", fontSize: 15, fontWeight: 500,
+                    fontFamily: "'DM Sans',sans-serif", padding: 0,
+                  }}
+                />
+              ) : null}
+            </div>
+          )}
         </div>
 
-        {/* ── TAP EMPTY SPACE TO CAPTURE ── */}
+        {/* Spacer below add row */}
         {taskFilter !== "completed" && (
-          <div
-            style={{ flex: 1, minHeight: 120, cursor: "pointer" }}
-            onClick={handleEmptyTap}
-          />
+          <div style={{ flex: 1, minHeight: 80 }} />
         )}
       </div>
     </div>

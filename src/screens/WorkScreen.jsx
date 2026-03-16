@@ -273,30 +273,23 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
   // ── Bio bar position ──
   const barPct = Math.max(0, Math.min(100, (nowMins - 420) / BIO_TOTAL * 100));
 
-  // ── Shallow work tasks ──
+  // ── Today's Shallow Work (exclusively from todayLoosePicks) ──
   const todayISO = toISODate();
-  const shallowTasks = (data.shallowWork || {})[todayISO] || [];
-  const shallowUndone = shallowTasks.filter(t => !t.done).length;
-  const shallowCount = shallowTasks.length;
-
-  // ── Today picks (project + loose tasks picked via "Today" swipe) ──
   const todayPickIds = (data.todayLoosePicks || {})[todayISO] || [];
   const todayPickTasks = todayPickIds.map(id => {
-    // Check project tasks first
-    for (const p of projects) {
-      const t = p.tasks.find(t => t.id === id);
-      if (t) return { ...t, _projectId: p.id, _source: "project" };
+    const loose = (data.looseTasks || []).find(t => t.id === id);
+    if (loose) return { ...loose, source: "loose" };
+    for (const proj of (data.projects || [])) {
+      const t = proj.tasks?.find(t => t.id === id);
+      if (t) return { ...t, source: "project", projectId: proj.id };
     }
-    // Check loose tasks
-    const lt = (data.looseTasks || []).find(t => t.id === id);
-    if (lt) return { ...lt, _source: "loose" };
     return null;
   }).filter(Boolean);
-  const hasShallowOrPicks = shallowCount > 0 || todayPickTasks.length > 0;
+  const hasShallowPicks = todayPickTasks.length > 0;
 
   const toggleTodayPickTask = (task) => {
-    if (task._source === "project") {
-      toggleTask(task._projectId, task.id);
+    if (task.source === "project") {
+      toggleTask(task.projectId, task.id);
     } else {
       setData(d => ({
         ...d,
@@ -305,16 +298,6 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
         ),
       }));
     }
-  };
-
-  const toggleShallowTask = (taskId) => {
-    setData(d => {
-      const sw = { ...(d.shallowWork || {}) };
-      const tasks = (sw[todayISO] || []).map(t =>
-        t.id === taskId ? { ...t, done: !t.done, doneAt: !t.done ? new Date().toISOString() : null } : t
-      );
-      return { ...d, shallowWork: { ...sw, [todayISO]: tasks } };
-    });
   };
 
   // ── Shutdown visibility: show at 12pm+ ──
@@ -653,7 +636,7 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
       <div ref={scrollRef} className="scroll" style={{ flex: 1, paddingBottom: 80 }}>
 
         {/* ── HEADER ── */}
-        <div style={{ padding: "14px 24px 10px" }}>
+        <div style={{ padding: "14px 24px 10px", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
             <div style={{ fontSize: 14, color: "var(--text2)", fontWeight: 500 }}>
               {days[viewDate.getDay()]}, {months[viewDate.getMonth()]} {viewDate.getDate()}
@@ -662,6 +645,12 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
               {`${greeting}${name ? `, ${name}` : ""}.`}
             </div>
           </div>
+          <button className="tab-gear" onClick={() => {}}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" stroke="currentColor" strokeWidth="1.5" />
+              <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5" />
+            </svg>
+          </button>
         </div>
 
         {/* ── BIO-PHASE BAR ── */}
@@ -725,33 +714,29 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
 
               {/* Shallow work section */}
               {isShallowPhase && (
-                hasShallowOrPicks ? (
-                  <div style={{ padding: "0 16px 8px" }}>
-                    {todayPickTasks.map((t, i) => (
-                      <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: "1px solid var(--border2)", cursor: "pointer" }}
-                        onClick={() => toggleTodayPickTask(t)}>
-                        <div className={`tl-check ${t.done ? "done" : ""}`} style={{ width: 20, height: 20, flexShrink: 0 }}>
-                          {t.done && <span style={{ fontSize: 10, color: "#fff", fontWeight: 700 }}>✓</span>}
-                        </div>
-                        <span style={{ fontSize: 14, color: t.done ? "var(--text3)" : "var(--text)", textDecoration: t.done ? "line-through" : "none", flex: 1 }}>{t.text}</span>
-                      </div>
-                    ))}
-                    {shallowTasks.map((t, i) => (
-                      <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: "1px solid var(--border2)", cursor: "pointer" }}
-                        onClick={() => toggleShallowTask(t.id)}>
-                        <div className={`tl-check ${t.done ? "done" : ""}`} style={{ width: 20, height: 20, flexShrink: 0 }}>
-                          {t.done && <span style={{ fontSize: 10, color: "#fff", fontWeight: 700 }}>✓</span>}
-                        </div>
-                        <span style={{ fontSize: 14, color: t.done ? "var(--text3)" : "var(--text)", textDecoration: t.done ? "line-through" : "none", flex: 1 }}>{t.text}</span>
-                      </div>
-                    ))}
+                <>
+                  <div className="sh" style={{ padding: "4px 16px 6px" }}>
+                    <span className="sh-label" style={{ color: "var(--teal)", borderColor: "var(--teal)" }}>Today's Shallow Work</span>
                   </div>
-                ) : (
-                  <div style={{ padding: "8px 16px 4px", cursor: "pointer", color: "var(--text3)", fontSize: 13 }}
-                    onClick={() => onGoToTasks()}>
-                    + Add from Tasks
-                  </div>
-                )
+                  {hasShallowPicks ? (
+                    <div style={{ padding: "0 16px 8px" }}>
+                      {todayPickTasks.map(t => (
+                        <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: "1px solid var(--border2)", cursor: "pointer" }}
+                          onClick={() => toggleTodayPickTask(t)}>
+                          <div className={`tl-check ${t.done ? "done" : ""}`} style={{ width: 20, height: 20, flexShrink: 0 }}>
+                            {t.done && <span style={{ fontSize: 10, color: "#fff", fontWeight: 700 }}>✓</span>}
+                          </div>
+                          <span style={{ fontSize: 14, color: t.done ? "var(--text3)" : "var(--text)", textDecoration: t.done ? "line-through" : "none", flex: 1 }}>{t.text}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ padding: "8px 16px 4px", cursor: "pointer", color: "var(--text3)", fontSize: 13 }}
+                      onClick={() => onGoToTasks()}>
+                      + Add from Tasks
+                    </div>
+                  )}
+                </>
               )}
 
             </div>

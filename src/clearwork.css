@@ -96,9 +96,9 @@
   .st-wrap.flash{animation:task-flash .4s ease forwards;}
   /* TaskRow shared component */
   .tr-wrap{position:relative;overflow:hidden;border-bottom:1px solid var(--border2);}
-  .tr-wrap:last-child{border-bottom:none;}
-  .tr-delete-bg{position:absolute;right:0;top:0;bottom:0;width:80px;background:var(--red);display:flex;align-items:center;justify-content:center;}
-  .tr-delete-label{font-size:13px;font-weight:700;color:#fff;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;}
+  .tr-action-bg{position:absolute;right:0;top:0;bottom:0;display:flex;align-items:stretch;}
+  .tr-today-btn{width:72px;background:var(--teal);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;}
+  .tr-delete-btn{width:80px;background:var(--red);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;}
   .tr-inner{display:flex;align-items:center;gap:10px;padding:10px 0;position:relative;z-index:1;}
   .tr-inner:not(.swiping){transition:transform .2s ease;}
   .tr-edit-input{flex:1;background:var(--bg3);border:1.5px solid var(--accent);border-radius:8px;padding:4px 8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:16px;outline:none;line-height:1.4;}

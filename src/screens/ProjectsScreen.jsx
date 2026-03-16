@@ -178,13 +178,17 @@ export default function ProjectsScreen({ data, setData }) {
     setNewLooseTopText("");
   };
 
-  const addToToday = (taskId) => {
-    const todayISO = toISODate();
+  const todayISO = toISODate();
+  const todayPickIds = (data.todayLoosePicks || {})[todayISO] || [];
+
+  const toggleTodayPick = (taskId) => {
     setData(d => {
-      const picks = { ...(d.todayLoosePicks || {}) };
-      const existing = picks[todayISO] || [];
-      if (existing.includes(taskId)) return d;
-      return { ...d, todayLoosePicks: { ...picks, [todayISO]: [...existing, taskId] } };
+      const picks = d.todayLoosePicks || {};
+      const current = picks[todayISO] || [];
+      const next = current.includes(taskId)
+        ? current.filter(id => id !== taskId)
+        : [...current, taskId];
+      return { ...d, todayLoosePicks: { ...picks, [todayISO]: next } };
     });
   };
 
@@ -224,7 +228,7 @@ export default function ProjectsScreen({ data, setData }) {
           <button key={d.id}
             className={`domain-tab ${activeDomain === d.id ? "active" : ""}`}
             style={activeDomain === d.id ? { color: d.color, borderBottomColor: d.color } : {}}
-            onClick={() => { setActiveDomain(d.id); setCollapsedProjs(new Set()); setLooseExpanded(false); setEditingLooseId(null); setAddingLooseTop(false); setAddingLooseBottom(false); }}>
+            onClick={() => { setActiveDomain(d.id); setCollapsedProjs(new Set()); setLooseExpanded(false); setAddingLooseTop(false); setAddingLooseBottom(false); }}>
             <div className="domain-tab-dot" style={{ background: activeDomain === d.id ? d.color : "var(--border)" }} />
             {d.name}
           </button>
@@ -310,6 +314,8 @@ export default function ProjectsScreen({ data, setData }) {
                     onEdit={(text) => saveLooseEdit(t.id, text)}
                     onDelete={() => deleteLoose(t.id)}
                     onQuickWin={() => toggleQuickWinLoose(t.id)}
+                    onToday={() => toggleTodayPick(t.id)}
+                    isQueuedToday={todayPickIds.includes(t.id)}
                   />
                 </div>
               ))}
@@ -366,6 +372,8 @@ export default function ProjectsScreen({ data, setData }) {
             onDeleteTask={taskId => deleteTask(proj.id, taskId)}
             onSaveTask={(taskId, text) => saveTask(proj.id, taskId, text)}
             onQuickWinTask={taskId => toggleQuickWinTask(proj.id, taskId)}
+            onTodayTask={taskId => toggleTodayPick(taskId)}
+            todayPickIds={todayPickIds}
             onNewTaskChange={v => setNewTaskText(t => ({ ...t, [proj.id]: v }))}
             onAddTask={() => addTask(proj.id)}
           />

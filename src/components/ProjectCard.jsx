@@ -4,7 +4,8 @@ import TaskRow from "./TaskRow.jsx";
 
 function ProjectCard({ proj, domain: domainProp, isExp, newTaskText,
   onToggleExpand, onToggleStatus, onDelete, onEditSave,
-  onToggleTask, onDeleteTask, onSaveTask, onQuickWinTask, onNewTaskChange, onAddTask, autoFocus,
+  onToggleTask, onDeleteTask, onSaveTask, onQuickWinTask, onTodayTask, todayPickIds,
+  onNewTaskChange, onAddTask, autoFocus,
   data, onTypeChange, scrollIntoView }) {
   // Always read domain from live data to avoid stale color references
   const domain = (data?.domains || []).find(d => d.id === proj.domainId) || domainProp;
@@ -209,6 +210,8 @@ function ProjectCard({ proj, domain: domainProp, isExp, newTaskText,
               onDelete={() => onDeleteTask(t.id)}
               onEdit={text => onSaveTask(t.id, text)}
               onQuickWin={() => onQuickWinTask(t.id)}
+              onToday={onTodayTask ? () => onTodayTask(t.id) : undefined}
+              isQueuedToday={(todayPickIds || []).includes(t.id)}
             />
           ))}
           {addingTask ? (

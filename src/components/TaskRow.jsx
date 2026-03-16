@@ -5,10 +5,10 @@ import { useState, useRef } from "react";
  *
  * Tap checkbox  → toggle done (bounce + green fill)
  * Tap text      → inline edit (Enter/blur saves, Escape cancels)
- * Swipe left    → reveal Delete (~80px)
+ * Swipe left    → reveal Today (teal) + Delete (red)
  * Swipe right   → toggle quickWin
  */
-export default function TaskRow({ task, onToggle, onEdit, onDelete, onQuickWin, className, bg, autoEdit }) {
+export default function TaskRow({ task, onToggle, onEdit, onDelete, onQuickWin, onToday, isQueuedToday, className, bg, autoEdit }) {
   const [offset, setOffset]     = useState(0);
   const [editing, setEditing]   = useState(!!autoEdit);
   const [draft, setDraft]       = useState(autoEdit ? (task.text || "") : task.text);
@@ -18,6 +18,9 @@ export default function TaskRow({ task, onToggle, onEdit, onDelete, onQuickWin, 
 
   const isDone     = task.done ?? false;
   const isQuickWin = task.quickWin ?? false;
+  const hasToday   = !!onToday;
+  const MAX_SWIPE  = hasToday ? 152 : 80;
+  const THRESHOLD  = hasToday ? 80 : 60;
 
   // ── Swipe handlers ──
   const handleTouchStart = (e) => {
@@ -35,7 +38,7 @@ export default function TaskRow({ task, onToggle, onEdit, onDelete, onQuickWin, 
       return;
     }
     ref.locked = true;
-    setOffset(Math.max(-80, Math.min(80, dx)));
+    setOffset(Math.max(-MAX_SWIPE, Math.min(80, dx)));
   };
 
   const handleTouchEnd = () => {
@@ -46,8 +49,8 @@ export default function TaskRow({ task, onToggle, onEdit, onDelete, onQuickWin, 
       setQwFlash(true);
       setTimeout(() => setQwFlash(false), 400);
       setOffset(0);
-    } else if (offset < -60) {
-      setOffset(-80);
+    } else if (offset < -THRESHOLD) {
+      setOffset(-MAX_SWIPE);
     } else {
       setOffset(0);
     }
@@ -79,9 +82,12 @@ export default function TaskRow({ task, onToggle, onEdit, onDelete, onQuickWin, 
       {/* Quick-win flash overlay */}
       {qwFlash && <div className="tr-qw-flash">★</div>}
 
-      {/* Delete reveal */}
-      <div className="tr-delete-bg">
-        <span className="tr-delete-label" onClick={() => { onDelete(); setOffset(0); }}>Delete</span>
+      {/* Swipe-left reveal: Today (optional) + Delete */}
+      <div className="tr-action-bg">
+        {hasToday && (
+          <div className="tr-today-btn" onClick={() => { onToday(); setOffset(0); }}>Today</div>
+        )}
+        <div className="tr-delete-btn" onClick={() => { onDelete(); setOffset(0); }}>Delete</div>
       </div>
 
       {/* Sliding row */}
@@ -91,7 +97,7 @@ export default function TaskRow({ task, onToggle, onEdit, onDelete, onQuickWin, 
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        onClick={() => { if (offset < -60) setOffset(0); }}
+        onClick={() => { if (offset < -THRESHOLD) setOffset(0); }}
       >
         {/* Checkbox */}
         <div
@@ -125,6 +131,11 @@ export default function TaskRow({ task, onToggle, onEdit, onDelete, onQuickWin, 
           >
             {task.text}
           </span>
+        )}
+
+        {/* Teal dot — queued for today */}
+        {!editing && isQueuedToday && (
+          <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--teal)", flexShrink: 0, alignSelf: "center" }} />
         )}
 
         {/* Quick Win bolt badge */}

@@ -101,7 +101,6 @@ function RadarChart({ domainData, size }) {
 // ── Swipeable goal row ──
 function GoalRow({ goal, idx, total, readOnly, getDomain, onToggle, onDelete }) {
   const dom = getDomain(goal.domainId);
-  const pill = TYPE_PILLS[goal.type] || TYPE_PILLS.essential;
   const rowRef = useRef(null);
   const touchStart = useRef(null);
   const [swipeX, setSwipeX] = useState(0);
@@ -126,7 +125,7 @@ function GoalRow({ goal, idx, total, readOnly, getDomain, onToggle, onDelete }) 
 
   const handleTouchEnd = useCallback(() => {
     if (readOnly) return;
-    if (swipeX < -40) {
+    if (swipeX < -60) {
       setSwipeX(-72);
       setShowDelete(true);
     } else {
@@ -138,14 +137,17 @@ function GoalRow({ goal, idx, total, readOnly, getDomain, onToggle, onDelete }) 
 
   const resetSwipe = () => { setSwipeX(0); setShowDelete(false); };
 
+  const typeLabel = (goal.type || "essential").toUpperCase();
+
   return (
-    <div ref={rowRef} style={{ position: "relative", overflow: "hidden", borderLeft: `4px solid ${dom?.color || "var(--text3)"}` }}>
+    <div ref={rowRef} style={{ position: "relative", overflow: "hidden", borderRadius: 8, marginBottom: 12 }}>
       {/* Delete reveal */}
       {!readOnly && (
         <div style={{
           position: "absolute", right: 0, top: 0, bottom: 0, width: 72,
           background: "var(--red)", display: "flex", alignItems: "center", justifyContent: "center",
           color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
+          borderRadius: "0 8px 8px 0",
         }} onClick={() => { onDelete(goal.id); resetSwipe(); }}>
           Delete
         </div>
@@ -158,25 +160,35 @@ function GoalRow({ goal, idx, total, readOnly, getDomain, onToggle, onDelete }) 
         onTouchEnd={handleTouchEnd}
         onClick={() => { if (showDelete) resetSwipe(); }}
         style={{
-          display: "flex", alignItems: "center", gap: 8, padding: "14px 16px",
+          display: "flex", alignItems: "center", gap: 10, padding: "12px 12px",
           transition: "transform .2s, opacity .15s",
-          transform: `translateX(${swipeX}px)`, background: "var(--bg)",
-          position: "relative", zIndex: 1,
+          transform: `translateX(${swipeX}px)`, background: "var(--bg3)",
+          position: "relative", zIndex: 1, borderRadius: 8,
         }}
       >
-        <span style={{
-          fontSize: 10, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase",
-          padding: "2px 6px", borderRadius: 4, lineHeight: 1, background: pill.bg, color: pill.color, flexShrink: 0,
-        }}>{goal.type}</span>
-        <div style={{
-          flex: 1, minWidth: 0, fontSize: 17, letterSpacing: "-0.01em",
-          color: goal.done ? "var(--text3)" : "var(--text)",
-          fontWeight: goal.done ? 500 : 600,
-          textDecoration: goal.done ? "line-through" : "none",
-          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-        }}>
-          {goal.text}
+        {/* Left: type label + domain dot + text */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{
+            fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase",
+            color: "var(--text3)", marginBottom: 4, lineHeight: 1,
+          }}>{typeLabel}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{
+              width: 6, height: 6, borderRadius: "50%", flexShrink: 0,
+              background: dom?.color || "var(--text3)",
+            }} />
+            <div style={{
+              flex: 1, minWidth: 0, fontSize: 17, letterSpacing: "-0.01em",
+              color: goal.done ? "var(--text3)" : "var(--text)",
+              fontWeight: goal.done ? 500 : 600,
+              textDecoration: goal.done ? "line-through" : "none",
+              whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+            }}>
+              {goal.text}
+            </div>
+          </div>
         </div>
+        {/* Checkbox */}
         {!readOnly && (
           <div onClick={(e) => { e.stopPropagation(); onToggle(goal.id); }} style={{
             width: 24, height: 24, borderRadius: "50%", flexShrink: 0, cursor: "pointer",
@@ -192,13 +204,11 @@ function GoalRow({ goal, idx, total, readOnly, getDomain, onToggle, onDelete }) 
           </div>
         )}
       </div>
-      {/* Bottom divider */}
-      <div style={{ borderBottom: "1px solid var(--border2)", marginLeft: 16 }} />
     </div>
   );
 }
 
-export default function SeasonScreen({ data, setData }) {
+export default function SeasonScreen({ data, setData, onOpenProfile }) {
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentQ = getQuarter(now);
@@ -366,10 +376,10 @@ export default function SeasonScreen({ data, setData }) {
             <div className="ph-eye">SEASON</div>
             <div className="ph-title">Q{currentQ} {currentYear}</div>
           </div>
-          <button className="tab-gear" onClick={() => {}}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" stroke="currentColor" strokeWidth="1.5" />
-              <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5" />
+          <button className="tab-gear" onClick={onOpenProfile}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <circle cx="12" cy="7" r="4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
         </div>
@@ -416,33 +426,29 @@ export default function SeasonScreen({ data, setData }) {
         )}
 
         {/* ── GOALS ── */}
-        <div className="sh" style={{ paddingTop: 8 }}>
-          <span className="sh-label">GOALS</span>
-          <span style={{ fontSize: 12, color: "var(--text3)", fontWeight: 500 }}>{goals.length} / {MAX_GOALS}</span>
-        </div>
+        <div style={{ background: "var(--bg2)", borderRadius: 14, padding: 16, margin: "0 16px 12px 16px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--text3)" }}>GOALS</span>
+            <span style={{ fontSize: 12, color: "var(--text3)", fontWeight: 500 }}>{goals.length} / {MAX_GOALS}</span>
+          </div>
 
-        <div style={{ padding: "0 16px" }}>
           {isPastQ ? (
-            /* Past quarter: read-only, currently no historical storage */
             <div style={{ textAlign: "center", color: "var(--text3)", fontSize: 13, padding: "20px 0" }}>
               No goals recorded for this season.
             </div>
           ) : (
             <>
-              {/* Filled slots */}
               {filledSlots.map((g, i) => (
                 <GoalRow key={g.id} goal={g} idx={i} total={MAX_GOALS} readOnly={false}
                   getDomain={getDomain} onToggle={toggleDone} onDelete={deleteGoal} />
               ))}
 
-              {/* Empty slots */}
               {Array.from({ length: emptyCount }, (_, i) => {
                 const slotIdx = filledSlots.length + i;
                 const isAdding = addingSlot === slotIdx;
 
                 return (
                   <div key={`empty-${i}`} ref={isAdding ? addFormRef : null}>
-                    {/* "+ Add goal" row */}
                     <div
                       onClick={() => { if (!isAdding) openAddSlot(slotIdx); }}
                       style={{
@@ -455,7 +461,6 @@ export default function SeasonScreen({ data, setData }) {
                       <span style={{ fontSize: 14, color: "var(--text3)" }}>Add goal</span>
                     </div>
 
-                    {/* Inline add form — expands below the row */}
                     {isAdding && (
                       <div style={{ padding: "12px 0 8px" }}>
                         <input ref={inputRef}
@@ -470,7 +475,6 @@ export default function SeasonScreen({ data, setData }) {
                           style={{ marginBottom: 10 }}
                         />
 
-                        {/* Type selector */}
                         <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
                           {["essential", "maintain", "bonus"].map(t => {
                             const sel = addType === t;
@@ -500,7 +504,6 @@ export default function SeasonScreen({ data, setData }) {
                           {TYPE_DESC[addType]}
                         </div>
 
-                        {/* Domain color picker — locked palette */}
                         <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
                           {domains.map(d => (
                             <div key={d.id}
@@ -530,54 +533,58 @@ export default function SeasonScreen({ data, setData }) {
         </div>
 
         {/* ── DOMAIN BALANCE — RADAR CHART ── */}
-        <div className="sh" style={{ paddingTop: 20 }}>
-          <span className="sh-label">DOMAIN BALANCE</span>
-          <div style={{ display: "flex", gap: 2 }}>
-            {["hours", "tasks"].map(m => (
-              <button key={m} onClick={() => setBalanceMode(m)}
-                style={{
-                  background: "none", border: "none", cursor: "pointer", padding: "2px 8px",
-                  fontSize: 12, fontWeight: balanceMode === m ? 700 : 500,
-                  color: balanceMode === m ? "#E8A030" : "var(--text3)",
-                  fontFamily: "'DM Sans',sans-serif", transition: "color .15s",
-                }}>
-                {m === "hours" ? "Hours" : "Tasks"}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div style={{ padding: "16px 0" }}>
-          {radarDomains.length === 0 || !hasRadarData ? (
-            <div style={{ textAlign: "center", color: "var(--text3)", fontSize: 13, padding: "32px 16px" }}>
-              Block time will appear here as you log work sessions.
+        <div style={{ background: "var(--bg2)", borderRadius: 14, padding: 16, margin: "0 16px 12px 16px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--text3)" }}>DOMAIN BALANCE</span>
+            <div style={{ display: "flex", gap: 2 }}>
+              {["hours", "tasks"].map(m => (
+                <button key={m} onClick={() => setBalanceMode(m)}
+                  style={{
+                    background: "none", border: "none", cursor: "pointer", padding: "2px 8px",
+                    fontSize: 12, fontWeight: balanceMode === m ? 700 : 500,
+                    color: balanceMode === m ? "#E8A030" : "var(--text3)",
+                    fontFamily: "'DM Sans',sans-serif", transition: "color .15s",
+                  }}>
+                  {m === "hours" ? "Hours" : "Tasks"}
+                </button>
+              ))}
             </div>
-          ) : (
-            <RadarChart domainData={radarData} size={260} />
-          )}
+          </div>
+          <div style={{ padding: "8px 0 0" }}>
+            {radarDomains.length === 0 || !hasRadarData ? (
+              <div style={{ textAlign: "center", color: "var(--text3)", fontSize: 13, padding: "24px 0" }}>
+                Block time will appear here as you log work sessions.
+              </div>
+            ) : (
+              <RadarChart domainData={radarData} size={260} />
+            )}
+          </div>
         </div>
 
         {/* ── DEEP WORK ── */}
-        <div className="sh" style={{ paddingTop: 20 }}>
-          <span className="sh-label">DEEP WORK</span>
-        </div>
-        <div style={{ display: "flex", gap: 12, padding: "0 16px" }}>
-          <div style={{ flex: 1, background: "var(--bg2)", borderRadius: 12, padding: 16, textAlign: "center" }}>
-            <div style={{ fontSize: 28, fontWeight: 700, color: "var(--text)" }}>{fmtHrs(totalDWHrs)}</div>
-            <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>hrs</div>
-            <div style={{ fontSize: 12, color: "var(--text3)" }}>This Season</div>
+        <div style={{ background: "var(--bg2)", borderRadius: 14, padding: 16, margin: "0 16px 12px 16px" }}>
+          <div style={{ marginBottom: 12 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--text3)" }}>DEEP WORK</span>
           </div>
-          <div style={{ flex: 1, background: "var(--bg2)", borderRadius: 12, padding: 16, textAlign: "center" }}>
-            <div style={{ fontSize: 28, fontWeight: 700, color: "var(--text)" }}>{fmtHrs(avgDWPerWeek)}</div>
-            <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>hrs/wk</div>
-            <div style={{ fontSize: 12, color: "var(--text3)" }}>Weekly Avg</div>
+          <div style={{ display: "flex", gap: 12 }}>
+            <div style={{ flex: 1, background: "var(--bg3)", borderRadius: 12, padding: 16, textAlign: "center" }}>
+              <div style={{ fontSize: 28, fontWeight: 700, color: "var(--text)" }}>{fmtHrs(totalDWHrs)}</div>
+              <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>hrs</div>
+              <div style={{ fontSize: 12, color: "var(--text3)" }}>This Season</div>
+            </div>
+            <div style={{ flex: 1, background: "var(--bg3)", borderRadius: 12, padding: 16, textAlign: "center" }}>
+              <div style={{ fontSize: 28, fontWeight: 700, color: "var(--text)" }}>{fmtHrs(avgDWPerWeek)}</div>
+              <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>hrs/wk</div>
+              <div style={{ fontSize: 12, color: "var(--text3)" }}>Weekly Avg</div>
+            </div>
           </div>
         </div>
 
         {/* ── COMPLETED PROJECTS ── */}
-        <div className="sh" style={{ paddingTop: 20 }}>
-          <span className="sh-label">COMPLETED PROJECTS</span>
-        </div>
-        <div style={{ padding: "0 16px" }}>
+        <div style={{ background: "var(--bg2)", borderRadius: 14, padding: 16, margin: "0 16px 12px 16px" }}>
+          <div style={{ marginBottom: 12 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--text3)" }}>COMPLETED PROJECTS</span>
+          </div>
           {completedProjects.length === 0 ? (
             <div style={{ textAlign: "center", color: "var(--text3)", fontSize: 13, padding: "16px 0" }}>
               Completed projects will appear here.
@@ -597,7 +604,7 @@ export default function SeasonScreen({ data, setData }) {
         </div>
 
         {/* ── WEEKLY REVIEWS ── */}
-        <div className="sh" style={{ paddingTop: 20 }}>
+        <div className="sh" style={{ paddingTop: 8 }}>
           <span className="sh-label">WEEKLY REVIEWS</span>
         </div>
         <div style={{ padding: "0 16px" }}>
