@@ -364,21 +364,28 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
         boxShadow: `inset 0 0 0 1.5px ${domainColor}60`,
         opacity: isPast && isCompleted ? 0.45 : 1,
       }}>
-        {/* Deep Work label */}
-        <div className="dw-card-label">Deep Work</div>
-        {/* Row 1: domain pill + type badge */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span className="domain-pill" style={{ background: `${domainColor}30`, color: domainColor }}>{domainName || "No domain"}</span>
+        {/* Header row: DEEP WORK · domain */}
+        <div className="dw-card-header-row">
+          <span className="dw-card-label">Deep Work</span>
+          <span className="dw-card-domain" style={{ color: domainColor }}>· {domainName || "No domain"}</span>
+        </div>
+
+        {/* Type badge */}
+        <div style={{ marginTop: 4 }}>
           <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text2)", background: "var(--bg3)", borderRadius: 6, padding: "2px 8px" }}>{typeBadge}</span>
         </div>
 
-        {/* Row 2: project name */}
+        {/* Project name */}
         <div style={{ fontSize: 22, fontWeight: 700, color: "var(--text)", marginTop: 12, lineHeight: 1.2 }}>{proj?.name}</div>
 
-        {/* Row 3: timer */}
+        {/* Timer / Complete row */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
           {isCompleted ? (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <div className="dw-complete-row" onClick={() => unmarkManualDone(slot.id, proj?.id, slot.todayTasks)}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              <span className="dw-complete-label">Complete</span>
+              <span className="dw-undo-label">Tap to undo</span>
+            </div>
           ) : (
             <>
               <button onClick={(e) => { e.stopPropagation(); isRunning ? pauseTimerSlot(slot.id) : startTimerSlot(slot.id); }} style={{
