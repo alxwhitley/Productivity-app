@@ -419,7 +419,10 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
           height: isExpDone ? 180 : 64, overflow: "hidden", transition: "height .2s ease",
         }} onClick={() => setExpandedId(isExpDone ? null : slot.id)}>
           <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: "var(--border)", borderRadius: "14px 0 0 14px" }} />
-          <div style={{ padding: "12px 16px 0 20px", display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ padding: "12px 16px 0 20px", display: "flex", alignItems: "center", gap: 10 }}>
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ color: domainColor || "var(--text3)", flexShrink: 0 }}>
+              <circle cx="10" cy="10" r="8.5" stroke="currentColor" strokeWidth="1.8"/><circle cx="10" cy="10" r="5" stroke="currentColor" strokeWidth="1.8"/><circle cx="10" cy="10" r="1.5" fill="currentColor"/>
+            </svg>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text3)", letterSpacing: "-.01em" }}>{proj?.name}</div>
               <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>{data.todayPrefs?.hideTimes ? "" : `${fmtTime(slot.startHour, slot.startMin)} · `}{slot.durationMin} min</div>
@@ -511,7 +514,10 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
         )}
 
         {/* Header row */}
-        <div style={{ padding: "12px 16px 0 20px", display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ padding: "12px 16px 0 20px", display: "flex", alignItems: "center", gap: 10 }}>
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ color: domainColor || "var(--text3)", flexShrink: 0 }}>
+            <circle cx="10" cy="10" r="8.5" stroke="currentColor" strokeWidth="1.8"/><circle cx="10" cy="10" r="5" stroke="currentColor" strokeWidth="1.8"/><circle cx="10" cy="10" r="1.5" fill="currentColor"/>
+          </svg>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", letterSpacing: "-.01em", lineHeight: 1.15 }}>{proj?.name}</div>
             <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>

@@ -243,15 +243,12 @@ export default function TasksScreen({ data, setData }) {
           )}
 
           {/* Empty states */}
-          {visibleTasks.length === 0 && !showClearMsg && (
+          {visibleTasks.length === 0 && !showClearMsg && taskFilter !== "all" && (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", paddingTop: "25vh" }}>
               {taskFilter === "completed" ? (
                 <div style={{ fontSize: 14, color: "var(--text3)" }}>No completed tasks yet today.</div>
               ) : (
-                <>
-                  <div style={{ fontSize: 15, fontWeight: 500, color: "var(--text2)" }}>Nothing in the queue</div>
-                  <div style={{ fontSize: 13, fontWeight: 400, color: "var(--text3)", marginTop: 6 }}>Tap below to capture a task</div>
-                </>
+                <div style={{ fontSize: 14, color: "var(--text3)" }}>No quick wins tagged.</div>
               )}
             </div>
           )}
@@ -279,7 +276,7 @@ export default function TasksScreen({ data, setData }) {
           })}
 
           {/* ── INLINE ADD ROW ── */}
-          {taskFilter !== "completed" && (
+          {taskFilter === "all" && (
             <div
               onClick={() => { if (!addingInline) openInlineAdd(); }}
               style={{
@@ -318,7 +315,7 @@ export default function TasksScreen({ data, setData }) {
         </div>
 
         {/* Spacer below add row */}
-        {taskFilter !== "completed" && (
+        {taskFilter === "all" && (
           <div style={{ flex: 1, minHeight: 80 }} />
         )}
       </div>

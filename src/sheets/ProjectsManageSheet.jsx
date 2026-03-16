@@ -220,14 +220,16 @@ function ProjectsManageSheet({ data, setData, onClose }) {
                       <DomainNameInput domain={dom} onSave={saveDomainName} />
 
                       {/* Color picker */}
-                      <div style={{ display: "flex", gap: 10, marginTop: 12, marginBottom: 16 }}>
+                      <div style={{ display: "flex", gap: 10, marginTop: 12, marginBottom: 16, background: "var(--bg)", borderRadius: 10, padding: "10px 12px" }}>
                         {COLORS.map(col => (
                           <div key={col} onClick={() => saveDomainColor(dom.id, col)}
                             style={{
                               width: 28, height: 28, borderRadius: "50%", background: col, cursor: "pointer",
-                              border: dom.color === col ? "2px solid #fff" : "2px solid transparent",
-                              transform: dom.color === col ? "scale(1.15)" : "scale(1)",
-                              transition: "transform .1s, border-color .1s",
+                              border: "none",
+                              outline: dom.color === col ? "2.5px solid var(--text)" : "none",
+                              outlineOffset: dom.color === col ? 2 : 0,
+                              transform: dom.color === col ? "scale(1.2)" : "scale(1)",
+                              transition: "transform .1s, outline .1s",
                             }}
                           />
                         ))}
@@ -316,14 +318,16 @@ function ProjectsManageSheet({ data, setData, onClose }) {
                     outline: "none", marginBottom: 12, boxSizing: "border-box",
                   }}
                 />
-                <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
+                <div style={{ display: "flex", gap: 10, marginBottom: 12, background: "var(--bg)", borderRadius: 10, padding: "10px 12px" }}>
                   {COLORS.map(col => (
                     <div key={col} onClick={() => setNewDomainColor(col)}
                       style={{
                         width: 28, height: 28, borderRadius: "50%", background: col, cursor: "pointer",
-                        border: newDomainColor === col ? "2px solid #fff" : "2px solid transparent",
-                        transform: newDomainColor === col ? "scale(1.15)" : "scale(1)",
-                        transition: "transform .1s, border-color .1s",
+                        border: "none",
+                        outline: newDomainColor === col ? "2.5px solid var(--text)" : "none",
+                        outlineOffset: newDomainColor === col ? 2 : 0,
+                        transform: newDomainColor === col ? "scale(1.2)" : "scale(1)",
+                        transition: "transform .1s, outline .1s",
                       }}
                     />
                   ))}
