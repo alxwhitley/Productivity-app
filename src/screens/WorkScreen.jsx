@@ -344,9 +344,7 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
     const isPast = blockEndMins < nowMins;
     const isActive = blockStartMins <= nowMins && nowMins < blockEndMins;
 
-    const cardBg = `${domainColor}18`; // ~9% opacity hex
-    const cardBorder = `${domainColor}40`; // ~25% opacity hex
-    const activeBorder = `${domainColor}66`; // ~40% opacity hex
+    const cardBg = `${domainColor}26`; // ~15% opacity hex
 
     const isPicking = pickerState?.blockId === slot.id;
 
@@ -362,15 +360,13 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
     return (
       <div className="dw-card-inner" style={{
         background: cardBg,
-        border: `1.5px solid ${isActive ? activeBorder : cardBorder}`,
+        border: "none",
+        boxShadow: `inset 0 0 0 1.5px ${domainColor}60`,
         opacity: isPast && isCompleted ? 0.45 : 1,
       }}>
-        {/* Row 1: domain + type badge */}
+        {/* Row 1: domain pill + type badge */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <div style={{ width: 8, height: 8, borderRadius: "50%", background: domainColor, flexShrink: 0 }} />
-            <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--text3)" }}>{domainName}</span>
-          </div>
+          <span className="domain-pill" style={{ background: `${domainColor}30`, color: domainColor }}>{domainName || "No domain"}</span>
           <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text2)", background: "var(--bg3)", borderRadius: 6, padding: "2px 8px" }}>{typeBadge}</span>
         </div>
 
@@ -440,28 +436,19 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
             );
           })() : hasTodayTasks ? (
             <>
-              {relevantTasks.map((t, i) => (
-                <div key={t.id} style={{
-                  display: "flex", alignItems: "center", gap: 10, padding: "8px 0",
-                  borderBottom: i < relevantTasks.length - 1 ? "1px solid var(--border2)" : "none",
-                  opacity: t.done ? 0.45 : 1,
-                  cursor: "pointer",
-                }} onClick={() => {
-                  toggleTask(proj.id, t.id);
-                  if (!t.done) {
-                    const remaining = relevantTasks.filter(rt => rt.id !== t.id && !rt.done);
-                    if (remaining.length === 0) { logSession(proj.id, slot.durationMin, null); markManualDone(slot.id, proj.id, slot.todayTasks); }
-                  }
-                }}>
-                  <div style={{
-                    width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
-                    border: t.done ? "none" : "1.5px solid var(--border)",
-                    background: t.done ? "var(--green)" : "transparent",
-                    display: "flex", alignItems: "center", justifyContent: "center",
+              {relevantTasks.map(t => (
+                <div key={t.id} className="dw-task-row" style={{ opacity: t.done ? 0.45 : 1, cursor: "pointer" }}
+                  onClick={() => {
+                    toggleTask(proj.id, t.id);
+                    if (!t.done) {
+                      const remaining = relevantTasks.filter(rt => rt.id !== t.id && !rt.done);
+                      if (remaining.length === 0) { logSession(proj.id, slot.durationMin, null); markManualDone(slot.id, proj.id, slot.todayTasks); }
+                    }
                   }}>
+                  <div className={`dw-task-circle${t.done ? " done" : ""}`}>
                     {t.done && <span style={{ fontSize: 10, color: "#fff", fontWeight: 700 }}>✓</span>}
                   </div>
-                  <span style={{ fontSize: 13, color: t.done ? "var(--text2)" : "var(--text2)", textDecoration: t.done ? "line-through" : "none", flex: 1 }}>{t.text}</span>
+                  <span className={`dw-task-text${t.done ? " done" : ""}`} style={{ flex: 1 }}>{t.text}</span>
                 </div>
               ))}
               {timerActive && !isCompleted && (
