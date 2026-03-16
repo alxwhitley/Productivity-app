@@ -86,6 +86,8 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
 
   // Shallow card expand
   const [shallowExpanded, setShallowExpanded] = useState(false);
+  const [shallowPicking, setShallowPicking] = useState(false);
+  const [shallowPickSelected, setShallowPickSelected] = useState(new Set());
 
   // Routine expand
   const [expandedRoutineId, setExpandedRoutineId] = useState(null);
@@ -643,7 +645,7 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
             {/* Header */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
               <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".07em", textTransform: "uppercase", color: "var(--teal)" }}>Shallow Work</span>
-              <button onClick={(e) => { e.stopPropagation(); setShallowExpanded(false); }} style={{
+              <button onClick={(e) => { e.stopPropagation(); setShallowExpanded(false); setShallowPicking(false); }} style={{
                 width: 26, height: 26, borderRadius: "50%", background: "var(--bg3)", border: "none",
                 display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--text2)",
               }}>
@@ -651,44 +653,85 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
               </button>
             </div>
 
-            {/* Task list */}
+            {/* Task list or picker */}
             <div style={{ flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
-              {todayPickTasks.length === 0 ? (
-                <div style={{ textAlign: "center", color: "var(--text3)", fontSize: 14, padding: "32px 0" }}>No tasks queued</div>
-              ) : (
-                todayPickTasks.map((t, i) => (
-                  <div key={t.id} style={{
-                    display: "flex", alignItems: "center", gap: 10, padding: "10px 0",
-                    borderBottom: i < todayPickTasks.length - 1 ? "1px solid var(--border2)" : "none",
-                    opacity: t.done ? 0.45 : 1, cursor: "pointer",
-                  }} onClick={(e) => { e.stopPropagation(); toggleTodayPickTask(t); }}>
-                    <div style={{
-                      width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
-                      border: t.done ? "none" : "1.5px solid var(--border)",
-                      background: t.done ? "var(--green)" : "transparent",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                    }}>
-                      {t.done && <span style={{ fontSize: 10, color: "#fff", fontWeight: 700 }}>✓</span>}
+              {shallowPicking ? (() => {
+                const allLoose = (data.looseTasks || []).filter(t => !t.done);
+                const allFab = (data.fabQueue || []).filter(t => !t.done);
+                const pickable = [...allLoose, ...allFab.filter(f => !allLoose.some(l => l.id === f.id))];
+                return (
+                  <>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text3)", letterSpacing: ".05em", textTransform: "uppercase", marginBottom: 8 }}>Select tasks for today</div>
+                    {pickable.length === 0 ? (
+                      <div style={{ textAlign: "center", color: "var(--text3)", fontSize: 14, padding: "32px 0" }}>No tasks available</div>
+                    ) : (
+                      pickable.map(t => {
+                        const checked = shallowPickSelected.has(t.id);
+                        return (
+                          <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 2px", cursor: "pointer" }}
+                            onClick={() => setShallowPickSelected(prev => { const s = new Set(prev); checked ? s.delete(t.id) : s.add(t.id); return s; })}>
+                            <div style={{ width: 18, height: 18, borderRadius: 5, border: checked ? "none" : "1.5px solid var(--border)", background: checked ? "var(--teal)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                              {checked && <span style={{ fontSize: 10, color: "#fff", fontWeight: 800 }}>✓</span>}
+                            </div>
+                            <span style={{ fontSize: 14, color: checked ? "var(--text)" : "var(--text2)" }}>{t.text}</span>
+                          </div>
+                        );
+                      })
+                    )}
+                    <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                      <button onClick={(e) => {
+                        e.stopPropagation();
+                        const newIds = [...new Set([...todayPickIds, ...shallowPickSelected])];
+                        setData(d => ({ ...d, todayLoosePicks: { ...(d.todayLoosePicks || {}), [todayISO]: newIds } }));
+                        setShallowPicking(false);
+                        setShallowPickSelected(new Set());
+                      }} style={{
+                        flex: 1, padding: "10px", borderRadius: 10, fontSize: 13, fontWeight: 700,
+                        background: "var(--teal)", border: "none", color: "#fff", cursor: "pointer",
+                        fontFamily: "'DM Sans',sans-serif",
+                      }}>✓ Confirm</button>
+                      <button onClick={(e) => { e.stopPropagation(); setShallowPicking(false); setShallowPickSelected(new Set()); }} style={{
+                        padding: "10px 16px", borderRadius: 10, fontSize: 13, fontWeight: 700,
+                        background: "var(--bg3)", border: "none", color: "var(--text2)", cursor: "pointer",
+                        fontFamily: "'DM Sans',sans-serif",
+                      }}>✕</button>
                     </div>
-                    <span style={{ fontSize: 14, color: t.done ? "var(--text3)" : "var(--text)", textDecoration: t.done ? "line-through" : "none", flex: 1 }}>{t.text}</span>
-                  </div>
-                ))
+                  </>
+                );
+              })() : (
+                <>
+                  {todayPickTasks.length === 0 ? (
+                    <div style={{ textAlign: "center", color: "var(--text3)", fontSize: 14, padding: "32px 0" }}>No tasks queued</div>
+                  ) : (
+                    todayPickTasks.map(t => (
+                      <div key={t.id} className="sw-task-row" style={{ cursor: "pointer" }}
+                        onClick={(e) => { e.stopPropagation(); toggleTodayPickTask(t); }}>
+                        <div className={`sw-task-circle${t.done ? " done" : ""}`}>
+                          {t.done && <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                        </div>
+                        <span className={`sw-task-text${t.done ? " done" : ""}`}>{t.text}</span>
+                      </div>
+                    ))
+                  )}
+                </>
               )}
             </div>
 
             {/* Bottom actions */}
-            <div style={{ display: "flex", gap: 10, paddingTop: 12, borderTop: "1px solid var(--border2)", flexShrink: 0 }}>
-              <button onClick={(e) => { e.stopPropagation(); onGoToTasks(); }} style={{
-                flex: 1, padding: "12px", borderRadius: 10, fontSize: 14, fontWeight: 600,
-                background: "var(--bg3)", border: "none", color: "var(--text)", cursor: "pointer",
-                fontFamily: "'DM Sans',sans-serif", textAlign: "center",
-              }}>+ Add task</button>
-              <button onClick={(e) => { e.stopPropagation(); onGoToTasks(); }} style={{
-                flex: 1, padding: "12px", borderRadius: 10, fontSize: 14, fontWeight: 600,
-                background: "rgba(75,170,187,0.13)", border: "none", color: "var(--teal)", cursor: "pointer",
-                fontFamily: "'DM Sans',sans-serif", textAlign: "center",
-              }}>Pull from Tasks</button>
-            </div>
+            {!shallowPicking && (
+              <div style={{ display: "flex", gap: 10, paddingTop: 12, borderTop: "1px solid var(--border2)", flexShrink: 0 }}>
+                <button onClick={(e) => { e.stopPropagation(); onGoToTasks(); }} style={{
+                  flex: 1, padding: "12px", borderRadius: 12, fontSize: 14, fontWeight: 600,
+                  background: "var(--bg2)", border: "none", color: "var(--text)", cursor: "pointer",
+                  fontFamily: "'DM Sans',sans-serif", textAlign: "center",
+                }}>+ Add task</button>
+                <button onClick={(e) => { e.stopPropagation(); setShallowPicking(true); setShallowPickSelected(new Set()); }} style={{
+                  flex: 1, padding: "12px", borderRadius: 12, fontSize: 14, fontWeight: 600,
+                  background: "var(--bg2)", border: "none", color: "var(--teal)", cursor: "pointer",
+                  fontFamily: "'DM Sans',sans-serif", textAlign: "center",
+                }}>Pull from Tasks</button>
+              </div>
+            )}
           </div>
         </div>
       </div>
