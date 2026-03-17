@@ -773,8 +773,8 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
           {/* Rest state row */}
           <div className="shallow-card-rest">
             <div>
-              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".07em", textTransform: "uppercase", color: "var(--teal)" }}>Shallow Work</div>
-              <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 2 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".07em", textTransform: "uppercase", color: "rgba(255,255,255,0.3)" }}>Shallow Work</div>
+              <div style={{ fontSize: 11, fontWeight: 300, color: "rgba(255,255,255,0.25)", marginTop: 2 }}>
                 {shallowCount === 0 ? "No tasks queued" : `${shallowCount} task${shallowCount !== 1 ? "s" : ""} queued${shallowDoneCount > 0 ? ` · ${shallowDoneCount} done` : ""}`}
               </div>
             </div>
@@ -787,7 +787,7 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
           <div className="shallow-card-full">
             {/* Header */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".07em", textTransform: "uppercase", color: "var(--teal)" }}>Shallow Work</span>
+              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".07em", textTransform: "uppercase", color: "rgba(255,255,255,0.3)" }}>Shallow Work</span>
               <button onClick={(e) => { e.stopPropagation(); setShallowExpanded(false); setShallowPicking(false); }} style={{
                 width: 26, height: 26, borderRadius: "50%", background: "var(--bg3)", border: "none",
                 display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--text2)",

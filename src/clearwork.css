@@ -303,7 +303,7 @@
   .dw-side-dot.active{background:var(--accent);opacity:1;}
 
   /* Shallow Work card */
-  .shallow-card{position:absolute;bottom:0;left:16px;right:16px;height:64px;border-radius:28px;background:linear-gradient(180deg, rgba(75,170,187,0.10) 0%, rgba(75,170,187,0.04) 50%, transparent 100%), var(--bg2);border:none;box-shadow:inset 0 0 0 1.5px rgba(75,170,187,0.35), 0 0 24px 0 rgba(75,170,187,0.12);overflow:hidden;transition:all 280ms ease-in-out;display:flex;flex-direction:column;cursor:pointer;}
+  .shallow-card{position:absolute;bottom:0;left:0;right:0;height:72px;border-radius:0;background:transparent;border:none;border-top:1px solid rgba(255,255,255,0.08);overflow:hidden;transition:all 280ms ease-in-out;display:flex;flex-direction:column;cursor:pointer;}
   .shallow-card.expanded{top:0;height:auto;bottom:0;left:0;right:0;border-radius:0;background:var(--bg);border:none;cursor:default;}
   .sw-task-row{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--border2);}
   .sw-task-row:last-child{border-bottom:none;}
@@ -311,7 +311,7 @@
   .sw-task-circle.done{background:var(--green);border-color:var(--green);}
   .sw-task-text{font-size:15px;color:var(--text);flex:1;line-height:1.3;}
   .sw-task-text.done{color:var(--text3);text-decoration:line-through;}
-  .shallow-card-rest{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:64px;flex-shrink:0;}
+  .shallow-card-rest{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:72px;flex-shrink:0;}
   .shallow-card.expanded .shallow-card-rest{display:none;}
   .shallow-card-full{display:none;flex-direction:column;flex:1;padding:20px;overflow:hidden;}
   .shallow-card.expanded .shallow-card-full{display:flex;}
