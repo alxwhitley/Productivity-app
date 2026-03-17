@@ -498,7 +498,7 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
         {/* Pick tasks button */}
         {!isCompleted && !isSkipped && (
           <button
-            onClick={() => setPickerState({ blockId: slot.id, projectId: proj.id, selected: new Set(), newText: "" })}
+            onClick={() => setDwPickerOpen({ slot, preProjectId: slot.projectId, preTasks: slot.todayTasks || [] })}
             style={{
               width: "100%", marginTop: 10, padding: "9px 0", borderRadius: 10,
               background: "var(--bg3)", border: "1px solid var(--border)", fontSize: 13, fontWeight: 600,
