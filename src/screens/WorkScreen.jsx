@@ -5,6 +5,7 @@ import StatusBar from "../components/StatusBar.jsx";
 import ShutdownSheet from "../sheets/ShutdownSheet.jsx";
 import DWPickerSheet from "../sheets/DWPickerSheet.jsx";
 import TaskRow from "../components/TaskRow.jsx";
+import DWCard from "../components/DWCard.jsx";
 
 // Bio-phase definitions (hardcoded wake 7am)
 const BIO_PHASES = [
@@ -14,12 +15,7 @@ const BIO_PHASES = [
   { id: "wind", label: "Wind Down", startMin: 1020, endMin: 1260 },
 ];
 
-const PHASE_COLORS = {
-  peak: { css: "var(--blue)", glow: "rgba(91,138,240,0.08)" },
-  second: { css: "var(--green)", glow: "rgba(69,193,122,0.08)" },
-  shallow: { css: "var(--teal)", glow: "rgba(75,170,187,0.08)" },
-  wind: { css: "var(--purple)", glow: "rgba(155,114,207,0.08)" },
-};
+
 const BIO_TOTAL = 840; // 7am–9pm in minutes
 
 // Fixed deep work slots: 2 under Mental Peak, 1 under Second Wind
@@ -29,12 +25,6 @@ const FIXED_DW_SLOTS = [
   { slotIndex: 2, startHour: 13, startMin: 0, durationMin: 90, phase: "second" },
 ];
 
-function getPhaseForMins(mins) {
-  for (const p of BIO_PHASES) {
-    if (mins >= p.startMin && mins < p.endMin) return p.id;
-  }
-  return mins < 420 ? "peak" : "wind";
-}
 
 function getTodayBlockCompletionState({ slot, project, manualCompleted, manualSkipped }) {
   const isSessionMode = (project?.type || project?.mode) === "sessions";
@@ -274,7 +264,7 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
   const now = new Date();
   const today = new Date();
   const nowMins = now.getHours() * 60 + now.getMinutes();
-  const currentPhase = getPhaseForMins(nowMins);
+
 
   const dateKey = today.toDateString();
   const dateKeyISO = toISODate(today);
@@ -348,313 +338,6 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
     return () => el.removeEventListener("scroll", onScroll);
   }, []);
 
-  // ── Render a single DW carousel card ──
-  function renderDWCarouselCard(slot) {
-    const isAssigned = !!slot.projectId;
-    if (!isAssigned) {
-      // Unassigned empty card
-      return (
-        <div className="dw-card-inner" style={{
-          border: "1.5px dashed var(--border)",
-          background: "var(--bg2)",
-          alignItems: "center",
-          justifyContent: "center",
-          textAlign: "center",
-        }}>
-          <div style={{ color: "var(--text3)", fontSize: 15, fontWeight: 500, marginBottom: 16 }}>No deep work scheduled</div>
-          <button onClick={() => setDwPickerOpen({ slot })} style={{
-            background: "none", border: "1.5px solid var(--accent)", borderRadius: 10,
-            padding: "10px 20px", fontSize: 14, fontWeight: 700, color: "var(--accent)",
-            cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
-          }}>+ Plan your day</button>
-        </div>
-      );
-    }
-
-    const proj = getProject(slot.projectId);
-
-    // Project was deleted or not found — treat as unassigned
-    if (!proj) {
-      return (
-        <div className="dw-card-inner" style={{
-          border: "1.5px dashed var(--border)",
-          background: "var(--bg2)",
-          alignItems: "center",
-          justifyContent: "center",
-          textAlign: "center",
-        }}>
-          <div style={{ color: "var(--text3)", fontSize: 15, fontWeight: 500, marginBottom: 16 }}>No deep work scheduled</div>
-          <button onClick={() => setDwPickerOpen({ slot })} style={{
-            background: "none", border: "1.5px solid var(--accent)", borderRadius: 10,
-            padding: "10px 20px", fontSize: 14, fontWeight: 700, color: "var(--accent)",
-            cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
-          }}>+ Plan your day</button>
-        </div>
-      );
-    }
-
-    const domain = proj ? getDomain(proj.domainId) : null;
-    const domainColor = domain?.color || "#5BA8D4";
-    const domainName = domain?.name || "";
-    const isSessionMode = (proj?.type || proj?.mode) === "sessions";
-    const typeBadge = isSessionMode ? "Session" : "Task-based";
-
-    const { hasTodayTasks, relevantTasks, relevantDone, isCompleted, isSkipped } = getTodayBlockCompletionState({ slot, project: proj, manualCompleted, manualSkipped });
-    const { timerActive, isRunning, countdownLabel: cdStr } = getTodayBlockTimingState({ slot, lateStarted, getElapsedMs });
-
-    const blockEndMins = slot.startHour * 60 + slot.startMin + slot.durationMin;
-    const blockStartMins = slot.startHour * 60 + slot.startMin;
-    const isPast = blockEndMins < nowMins;
-    const isActive = blockStartMins <= nowMins && nowMins < blockEndMins;
-
-    const cardBg = `${domainColor}26`; // ~15% opacity hex
-
-    const isPicking = pickerState?.blockId === slot.id;
-
-    const handleDone = () => {
-      const info = lateStarted[slot.id];
-      const elapsedMs = getElapsedMs(info);
-      const elapsedMin = Math.round(elapsedMs / 60000);
-      if (elapsedMin > 0) logSession(proj.id, elapsedMin, null);
-      markManualDone(slot.id, proj.id, slot.todayTasks);
-      setLateStarted(prev => { const n = { ...prev }; delete n[slot.id]; return n; });
-    };
-
-    return (
-      <div className="dw-card-inner" style={{
-        background: `linear-gradient(160deg, ${domainColor}A6 0%, ${domainColor}59 60%, ${domainColor}26 100%), #0D0D0D`,
-        border: "none",
-        boxShadow: `none`,
-        opacity: (isPast && isCompleted) || isSkipped ? 0.45 : 1,
-      }}>
-        {/* Header row: DEEP WORK · domain + edit button */}
-        <div className="dw-card-header-row" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            {isSkipped ? (
-              <span className="dw-card-label" style={{ color: "var(--text3)" }}>Skipped</span>
-            ) : (
-              <span className="dw-card-label">Deep Work</span>
-            )}
-            <span className="dw-card-domain" style={{ color: domainColor }}>· {domainName || "No domain"}</span>
-          </div>
-          {!isCompleted && !isSkipped && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                mutateDWSlot(viewDateKeyISO_ref.current, slot.slotIndex, null);
-              }}
-              style={{
-                background: "none", border: "none", cursor: "pointer", padding: 4,
-                color: "var(--text3)", display: "flex", alignItems: "center", justifyContent: "center",
-                borderRadius: 6,
-              }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-          )}
-        </div>
-
-        {/* Type badge */}
-        <div style={{ marginTop: 4 }}>
-          <span style={{
-            display: "inline-flex", alignItems: "center", gap: 5,
-            fontSize: 11, fontWeight: 700, color: "var(--blue)",
-            background: "rgba(91,138,240,0.12)", borderRadius: 20,
-            padding: "3px 10px 3px 7px",
-          }}>
-            {isSessionMode
-              ? <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2.5"/><polyline points="12 6 12 12 16 14" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></svg>
-              : <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            }
-            {typeBadge}
-          </span>
-        </div>
-
-        {/* Project name */}
-        <div style={{ fontSize: 22, fontWeight: 700, color: "var(--text)", marginTop: 12, lineHeight: 1.2 }}>{proj?.name}</div>
-
-        {/* Timer row */}
-        {!isCompleted && !isSkipped && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
-            <button onClick={(e) => { e.stopPropagation(); isRunning ? pauseTimerSlot(slot.id) : startTimerSlot(slot.id); }} style={{
-              width: 20, height: 20, background: "none", border: "none", cursor: "pointer",
-              color: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
-            }}>
-              {isRunning
-                ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor"/></svg>
-                : <svg width="12" height="13" viewBox="0 0 16 18" fill="none"><path d="M1 1l14 8-14 8V1z" fill="currentColor"/></svg>
-              }
-            </button>
-            <span style={{ fontSize: 15, color: "var(--text2)", fontVariantNumeric: "tabular-nums", fontFamily: "'DM Sans', sans-serif" }}>
-              {cdStr}
-            </span>
-            <span style={{ fontSize: 13, color: "var(--text3)" }}>{slot.durationMin} min</span>
-          </div>
-        )}
-
-        {/* Pick tasks button */}
-        {!isCompleted && !isSkipped && !isSessionMode && (
-          <button
-            onClick={() => setDwPickerOpen({ slot, preProjectId: slot.projectId, preTasks: slot.todayTasks || [] })}
-            style={{
-              width: "100%", marginTop: 10, padding: "9px 0", borderRadius: 10,
-              background: "var(--bg3)", border: "1px solid var(--border)", fontSize: 13, fontWeight: 600,
-              color: "var(--text)", cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
-              textAlign: "center",
-            }}
-          >+ Pick tasks</button>
-        )}
-
-        {/* Inline add task row */}
-        {!isCompleted && !isSkipped && !isSessionMode && (
-          <div
-            onClick={() => {
-              if (dwInlineActive !== slot.id) {
-                setDwInlineActive(slot.id);
-                setDwInlineText("");
-                setTimeout(() => dwInlineRef.current?.focus(), 30);
-              }
-            }}
-            style={{
-              display: "flex", alignItems: "center", gap: 10,
-              padding: "10px 0", minHeight: 44, cursor: dwInlineActive === slot.id ? "default" : "pointer",
-            }}
-          >
-            <div style={{
-              width: 22, height: 22, borderRadius: "50%", flexShrink: 0,
-              border: `1.5px solid ${dwInlineActive === slot.id ? "rgba(232,160,48,0.4)" : "var(--text3)"}`,
-              background: "transparent", transition: "border-color .15s",
-            }} />
-            {dwInlineActive === slot.id ? (
-              <input
-                ref={dwInlineRef}
-                value={dwInlineText}
-                onChange={e => setDwInlineText(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === "Enter") commitDwInlineAdd(slot, proj);
-                  if (e.key === "Escape") { setDwInlineText(""); setDwInlineActive(null); }
-                }}
-                onBlur={() => commitDwInlineAdd(slot, proj)}
-                onClick={e => e.stopPropagation()}
-                placeholder="Add task…"
-                style={{
-                  flex: 1, background: "none", border: "none", outline: "none",
-                  color: "var(--text)", fontSize: 15, fontWeight: 500,
-                  fontFamily: "'DM Sans',sans-serif", padding: 0,
-                }}
-              />
-            ) : (
-              <span style={{ fontSize: 14, color: "var(--text3)", fontWeight: 400 }}>Add task…</span>
-            )}
-          </div>
-        )}
-
-        {/* Skipped state row */}
-        {isSkipped && (
-          <div className="dw-skipped-row" onClick={() => unmarkSkipped(slot.id)}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M13 5l7 7-7 7M5 5l7 7-7 7" stroke="var(--text3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            <span className="dw-skipped-label">Skipped</span>
-            <span className="dw-undo-label">Tap to undo</span>
-          </div>
-        )}
-
-        {/* Divider */}
-        <div style={{ height: 1, background: "var(--border)", margin: "12px 0" }} />
-
-        {/* Task list — scrollable */}
-        <div className="task-scroll">
-          {isPicking ? (() => {
-            const ps = pickerState;
-            const confirmPick = () => {
-              let finalIds = [...ps.selected];
-              if (ps.newText.trim()) { const newId = addTaskToProject(proj.id, ps.newText.trim()); finalIds.push(newId); }
-              saveDWTodayTasks(slot.slotIndex, finalIds);
-              setPickerState(null);
-            };
-            return (
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text3)", letterSpacing: ".05em", textTransform: "uppercase", marginBottom: 8 }}>Pick today's tasks</div>
-                {proj.tasks.filter(t => !t.done).map(t => {
-                  const checked = ps.selected.has(t.id);
-                  return (
-                    <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 2px", cursor: "pointer" }}
-                      onClick={() => setPickerState(prev => { const s = new Set(prev.selected); checked ? s.delete(t.id) : s.add(t.id); return { ...prev, selected: s }; })}>
-                      <div style={{ width: 18, height: 18, borderRadius: 5, border: checked ? "none" : "1.5px solid var(--border)", background: checked ? "var(--accent)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                        {checked && <span style={{ fontSize: 10, color: "#000", fontWeight: 800 }}>✓</span>}
-                      </div>
-                      <span style={{ fontSize: 14, color: checked ? "var(--text)" : "var(--text2)" }}>{t.text}</span>
-                    </div>
-                  );
-                })}
-                <input style={{ width: "100%", background: "var(--bg3)", border: "1px solid var(--border2)", borderRadius: 8, padding: "8px 10px", color: "var(--text)", fontSize: 13, fontFamily: "'DM Sans',sans-serif", marginTop: 8, boxSizing: "border-box" }}
-                  placeholder="Add new task…" value={ps.newText}
-                  onChange={e => setPickerState(prev => ({ ...prev, newText: e.target.value }))}
-                  onKeyDown={e => e.key === "Enter" && confirmPick()} />
-                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                  <button className="dw-confirm-btn" style={{ flex: 1 }} onClick={confirmPick}>✓ Confirm</button>
-                  <button className="dw-back" onClick={() => setPickerState(null)}>✕</button>
-                </div>
-              </div>
-            );
-          })() : hasTodayTasks ? (
-            <>
-              {relevantTasks.map(t => (
-                <div key={t.id} className="dw-task-row" style={{ opacity: t.done ? 0.45 : 1, cursor: "pointer" }}
-                  onClick={() => {
-                    if (isCompleted) {
-                      unmarkManualDone(slot.id, proj?.id, slot.todayTasks);
-                    }
-                    toggleTask(proj.id, t.id);
-                  }}>
-                  <div className={`dw-task-circle${t.done ? " done" : ""}`}>
-                    {t.done && <span style={{ fontSize: 10, color: "#fff", fontWeight: 700 }}>✓</span>}
-                  </div>
-                  <span className={`dw-task-text${t.done ? " done" : ""}`} style={{ flex: 1 }}>{t.text}</span>
-                </div>
-              ))}
-            </>
-          ) : null}
-        </div>
-
-        {/* Bottom action row — Complete + Skip */}
-        {!isCompleted && !isSkipped && (() => {
-          const allTasksDone = isSessionMode
-            ? true
-            : (relevantTasks.length > 0 && relevantTasks.every(t => t.done));
-          const canComplete = allTasksDone;
-          const showSkip = !isSessionMode || !canComplete;
-          return (
-            <div style={{ display: "flex", gap: 10, padding: "12px 0 0", marginTop: "auto", flexShrink: 0 }}>
-              {showSkip && (
-                <button
-                  onClick={() => markSkipped(slot.id)}
-                  style={{
-                    flex: 1, padding: "13px 0", borderRadius: 12, fontSize: 15, fontWeight: 700,
-                    border: "none", cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
-                    background: "var(--bg3)", color: "var(--text3)",
-                  }}
-                >Skip</button>
-              )}
-              <button
-                onClick={canComplete ? handleDone : undefined}
-                style={{
-                  flex: 1, padding: "13px 0", borderRadius: 12, fontSize: 15, fontWeight: 700,
-                  border: "none", cursor: canComplete ? "pointer" : "default",
-                  fontFamily: "'DM Sans',sans-serif",
-                  background: canComplete ? "var(--accent)" : "var(--bg3)",
-                  color: canComplete ? "#000" : "var(--text3)",
-                  transition: "background .2s, color .2s",
-                }}
-              >Complete</button>
-            </div>
-          );
-        })()}
-      </div>
-    );
-  }
 
   // ── Render routine card (kept from old design, still in scroll area) ──
   function renderRoutineCard(rb) {
@@ -710,8 +393,6 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
 
   return (
     <div className="screen active" style={{ display: "flex", flexDirection: "column", position: "relative" }}>
-      {/* Full-screen ambient phase glow */}
-      <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0, background: `radial-gradient(ellipse at center, ${PHASE_COLORS[currentPhase]?.glow || "transparent"} 0%, transparent 70%)` }} />
       <StatusBar />
 
       {/* ── HEADER ── */}
@@ -746,7 +427,38 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
           {carouselSlots.length > 0 ? (
             carouselSlots.map(slot => (
               <div key={slot.id} className="dw-card-snap">
-                {renderDWCarouselCard(slot)}
+                <DWCard
+                  slot={slot}
+                  getProject={getProject}
+                  getDomain={getDomain}
+                  manualCompleted={manualCompleted}
+                  manualSkipped={manualSkipped}
+                  lateStarted={lateStarted}
+                  getElapsedMs={getElapsedMs}
+                  nowMins={nowMins}
+                  pickerState={pickerState}
+                  setPickerState={setPickerState}
+                  dwInlineActive={dwInlineActive}
+                  setDwInlineActive={setDwInlineActive}
+                  dwInlineText={dwInlineText}
+                  setDwInlineText={setDwInlineText}
+                  dwInlineRef={dwInlineRef}
+                  logSession={logSession}
+                  markManualDone={markManualDone}
+                  setLateStarted={setLateStarted}
+                  unmarkSkipped={unmarkSkipped}
+                  markSkipped={markSkipped}
+                  unmarkManualDone={unmarkManualDone}
+                  toggleTask={toggleTask}
+                  addTaskToProject={addTaskToProject}
+                  saveDWTodayTasks={saveDWTodayTasks}
+                  commitDwInlineAdd={commitDwInlineAdd}
+                  mutateDWSlot={mutateDWSlot}
+                  viewDateKeyISO_ref={viewDateKeyISO_ref}
+                  startTimerSlot={startTimerSlot}
+                  pauseTimerSlot={pauseTimerSlot}
+                  setDwPickerOpen={setDwPickerOpen}
+                />
               </div>
             ))
           ) : (
