@@ -501,8 +501,8 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
             onClick={() => setPickerState({ blockId: slot.id, projectId: proj.id, selected: new Set(), newText: "" })}
             style={{
               width: "100%", marginTop: 10, padding: "9px 0", borderRadius: 10,
-              background: "var(--bg3)", border: "none", fontSize: 13, fontWeight: 600,
-              color: "var(--text2)", cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
+              background: "var(--bg3)", border: "1px solid var(--border)", fontSize: 13, fontWeight: 600,
+              color: "var(--text)", cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
               textAlign: "center",
             }}
           >+ Pick tasks</button>
@@ -625,9 +625,10 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
             ? true
             : (relevantTasks.length > 0 && relevantTasks.every(t => t.done));
           const canComplete = allTasksDone;
+          const showSkip = !isSessionMode || !canComplete;
           return (
             <div style={{ display: "flex", gap: 10, padding: "12px 0 0", marginTop: "auto", flexShrink: 0 }}>
-              {!canComplete && (
+              {showSkip && (
                 <button
                   onClick={() => markSkipped(slot.id)}
                   style={{
