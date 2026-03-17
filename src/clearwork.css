@@ -5,11 +5,11 @@
   /* Visual compensation: scale text down visually where needed without triggering zoom */
   input.small-input,textarea.small-input,select.small-input{transform-origin:left center;}
   :root{
-    --bg:#000000;--bg2:#090909;--bg3:#111111;--bg4:#141414;
-    --border:rgba(255,255,255,0.05);--border2:rgba(255,255,255,0.04);
+    --bg:#0b0b0c;--bg2:#161718;--bg3:#2f3330;--bg4:#1e211f;
+    --border:rgba(100,100,100,0.4);--border2:rgba(100,100,100,0.15);
     --accent:#FFFFFF;--accent-s:rgba(255,255,255,0.08);
     --green:#10B981;--red:#E05555;--blue:#3B82F6;--purple:#8B5CF6;--teal:#14B8A6;
-    --text:#FFFFFF;--text2:#A1A1A1;--text3:#404040;
+    --text:#e4e1d3;--text2:#b5b2a3;--text3:#646464;
   }
 
   /* ── LIGHT MODE ── */
