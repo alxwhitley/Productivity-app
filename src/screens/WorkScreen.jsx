@@ -404,14 +404,34 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
         boxShadow: `inset 0 0 0 1.5px ${domainColor}55, 0 0 32px 0 ${domainColor}18`,
         opacity: (isPast && isCompleted) || isSkipped ? 0.45 : 1,
       }}>
-        {/* Header row: DEEP WORK · domain (or SKIPPED) */}
-        <div className="dw-card-header-row">
-          {isSkipped ? (
-            <span className="dw-card-label" style={{ color: "var(--text3)" }}>Skipped</span>
-          ) : (
-            <span className="dw-card-label">Deep Work</span>
+        {/* Header row: DEEP WORK · domain + edit button */}
+        <div className="dw-card-header-row" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            {isSkipped ? (
+              <span className="dw-card-label" style={{ color: "var(--text3)" }}>Skipped</span>
+            ) : (
+              <span className="dw-card-label">Deep Work</span>
+            )}
+            <span className="dw-card-domain" style={{ color: domainColor }}>· {domainName || "No domain"}</span>
+          </div>
+          {!isCompleted && !isSkipped && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                mutateDWSlot(viewDateKeyISO_ref.current, slot.slotIndex, null);
+              }}
+              style={{
+                background: "none", border: "none", cursor: "pointer", padding: 4,
+                color: "var(--text3)", display: "flex", alignItems: "center", justifyContent: "center",
+                borderRadius: 6,
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
           )}
-          <span className="dw-card-domain" style={{ color: domainColor }}>· {domainName || "No domain"}</span>
         </div>
 
         {/* Type badge */}
