@@ -496,7 +496,7 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
         )}
 
         {/* Pick tasks button */}
-        {!isCompleted && !isSkipped && (
+        {!isCompleted && !isSkipped && !isSessionMode && (
           <button
             onClick={() => setDwPickerOpen({ slot, preProjectId: slot.projectId, preTasks: slot.todayTasks || [] })}
             style={{
@@ -509,7 +509,7 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
         )}
 
         {/* Inline add task row */}
-        {!isCompleted && !isSkipped && (
+        {!isCompleted && !isSkipped && !isSessionMode && (
           <div
             onClick={() => {
               if (dwInlineActive !== slot.id) {
