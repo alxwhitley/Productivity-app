@@ -532,6 +532,16 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
           const canComplete = allTasksDone;
           return (
             <div style={{ display: "flex", gap: 10, padding: "12px 0 0", marginTop: "auto", flexShrink: 0 }}>
+              {!canComplete && (
+                <button
+                  onClick={() => markSkipped(slot.id)}
+                  style={{
+                    flex: 1, padding: "13px 0", borderRadius: 12, fontSize: 15, fontWeight: 700,
+                    border: "none", cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
+                    background: "var(--bg3)", color: "var(--text3)",
+                  }}
+                >Skip</button>
+              )}
               <button
                 onClick={canComplete ? handleDone : undefined}
                 style={{
@@ -543,16 +553,6 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
                   transition: "background .2s, color .2s",
                 }}
               >Complete</button>
-              {!canComplete && (
-                <button
-                  onClick={() => markSkipped(slot.id)}
-                  style={{
-                    flex: 1, padding: "13px 0", borderRadius: 12, fontSize: 15, fontWeight: 700,
-                    border: "none", cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
-                    background: "var(--bg3)", color: "var(--text3)",
-                  }}
-                >Skip</button>
-              )}
             </div>
           );
         })()}
