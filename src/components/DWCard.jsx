@@ -137,16 +137,17 @@ export default function DWCard({
 
   return (
     <div className="dw-card-inner" style={{
-      background: "var(--bg2)",
-      border: "1px solid var(--border)",
+      background: "#161718",
+      border: "1px solid rgba(100,100,100,0.4)",
       borderLeft: `3px solid ${domainColor}`,
       borderRadius: 14,
       boxShadow: "none",
+      minHeight: 520,
       opacity: (isPast && isCompleted) || isSkipped ? 0.40 : 1,
     }}>
-      {/* Header row: domain pill + edit button */}
+      {/* Header row: domain pill + menu button */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span style={{ display: "inline-flex", fontSize: 11, fontWeight: 700, color: "var(--text2)", background: "var(--bg3)", borderRadius: 20, padding: "3px 10px" }}>{domainName || "No domain"}</span>
+        <span style={{ display: "inline-flex", fontSize: 12, fontWeight: 500, color: "#b5b2a3", background: "#2f3330", borderRadius: 9999, padding: "4px 10px" }}>{domainName || "No domain"}</span>
         {!isCompleted && !isSkipped && (
           <button
             onClick={(e) => {
@@ -155,39 +156,40 @@ export default function DWCard({
             }}
             style={{
               background: "none", border: "none", cursor: "pointer", padding: 4,
-              color: "var(--text3)", display: "flex", alignItems: "center", justifyContent: "center",
+              color: "#646464", display: "flex", alignItems: "center", justifyContent: "center",
               borderRadius: 6,
             }}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <circle cx="5" cy="12" r="1.5" fill="currentColor"/>
+              <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+              <circle cx="19" cy="12" r="1.5" fill="currentColor"/>
             </svg>
           </button>
         )}
       </div>
 
       {/* Project name */}
-      <div style={{ fontSize: 26, fontWeight: 700, color: "var(--text)", marginTop: 12, lineHeight: 1.2 }}>{proj?.name}</div>
+      <div style={{ fontSize: 26, fontWeight: 700, color: "#e4e1d3", marginTop: 12, marginBottom: 12, lineHeight: 1.2 }}>{proj?.name}</div>
 
       {/* Progress bar */}
       {relevantTasks.length > 0 && (
-        <div style={{ marginTop: 12 }}>
-          <div style={{ height: 4, borderRadius: 2, background: "var(--bg4)", width: "100%" }}>
-            <div style={{ height: 4, borderRadius: 2, background: domainColor, width: `${Math.round((relevantTasks.filter(t => t.done).length / relevantTasks.length) * 100)}%`, transition: "width 0.3s ease" }} />
+        <div style={{ marginTop: 0, marginBottom: 12 }}>
+          <div style={{ height: 4, borderRadius: 9999, background: "#1e211f", width: "100%" }}>
+            <div style={{ height: 4, borderRadius: 9999, background: domainColor, width: `${Math.round((relevantTasks.filter(t => t.done).length / relevantTasks.length) * 100)}%`, transition: "width 0.3s ease" }} />
           </div>
         </div>
       )}
 
       {/* Pick tasks + Add button row */}
       {!isCompleted && !isSkipped && !isSessionMode && (
-        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+        <div style={{ display: "flex", gap: 8, marginTop: 0 }}>
           <button
             onClick={() => setDwPickerOpen({ slot, preProjectId: slot.projectId, preTasks: slot.todayTasks || [] })}
             style={{
-              flex: 1, padding: "10px 16px", borderRadius: 22,
-              background: "var(--bg3)", border: "1px solid var(--border)", fontSize: 14, fontWeight: 500,
-              color: "var(--text2)", cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
+              flex: 1, height: 44, borderRadius: 26,
+              background: "#2f3330", border: "1px solid rgba(100,100,100,0.4)", fontSize: 15, fontWeight: 500,
+              color: "#e4e1d3", cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
               textAlign: "center",
             }}
           >Pick tasks</button>
@@ -199,9 +201,9 @@ export default function DWCard({
               setTimeout(() => dwInlineRef.current?.focus(), 30);
             }}
             style={{
-              width: 40, height: 40, flexShrink: 0, borderRadius: 22,
-              background: "var(--bg3)", border: "1px solid var(--border)",
-              color: "var(--text2)", fontSize: 18, fontWeight: 400,
+              width: 44, height: 44, flexShrink: 0, borderRadius: 26,
+              background: "#2f3330", border: "1px solid rgba(100,100,100,0.4)",
+              color: "#e4e1d3", fontSize: 18, fontWeight: 400,
               display: "flex", alignItems: "center", justifyContent: "center",
               cursor: "pointer", fontFamily: "'DM Sans',sans-serif", padding: 0,
             }}
@@ -310,10 +312,15 @@ export default function DWCard({
                   }
                   toggleTask(proj.id, t.id);
                 }}>
-                <div className={`dw-task-circle${t.done ? " done" : ""}`}>
+                <div style={{
+                  width: 22, height: 22, borderRadius: "50%", flexShrink: 0, boxSizing: "border-box",
+                  border: t.done ? `2px solid ${domainColor}` : "2px solid rgba(100,100,100,0.6)",
+                  background: t.done ? domainColor : "transparent",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
                   {t.done && <span style={{ fontSize: 10, color: "#fff", fontWeight: 700 }}>✓</span>}
                 </div>
-                <span className={`dw-task-text${t.done ? " done" : ""}`} style={{ flex: 1 }}>{t.text}</span>
+                <span style={{ flex: 1, fontSize: 16, fontWeight: 500, color: t.done ? "#646464" : "#e4e1d3", textDecoration: t.done ? "line-through" : "none", lineHeight: 1.3 }}>{t.text}</span>
               </div>
             ))}
           </>
@@ -328,15 +335,21 @@ export default function DWCard({
             <button
               onClick={canComplete ? handleDone : undefined}
               style={{
-                width: "100%", padding: "13px 0", borderRadius: 22, fontSize: 15, fontWeight: 700,
+                width: "100%", height: 44, borderRadius: 26, fontSize: 15, fontWeight: 700,
                 fontFamily: "'DM Sans',sans-serif",
-                background: canComplete ? "var(--accent)" : "var(--bg3)",
-                color: canComplete ? "#000000" : "var(--text3)",
-                border: canComplete ? "none" : "1px solid var(--border)",
+                background: canComplete ? "#e4e1d3" : "#2f3330",
+                color: canComplete ? "#0b0b0c" : "#646464",
+                border: canComplete ? "none" : "1px solid rgba(100,100,100,0.4)",
                 cursor: canComplete ? "pointer" : "default",
                 transition: "background .2s, color .2s, border .2s",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
               }}
-            >Complete</button>
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Complete
+            </button>
           </div>
         );
       })()}

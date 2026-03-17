@@ -278,7 +278,7 @@
   .dw-carousel::-webkit-scrollbar{display:none;}
   .dw-carousel.single{overflow-y:hidden;}
   .work-card-area.shallow-expanded .dw-carousel{transform:translateY(-100%);opacity:0;pointer-events:none;}
-  .dw-card-snap{scroll-snap-align:start;scroll-snap-stop:always;flex-shrink:0;height:100%;padding:8px 16px;box-sizing:border-box;}
+  .dw-card-snap{scroll-snap-align:start;scroll-snap-stop:always;flex-shrink:0;height:100%;padding:8px 16px;box-sizing:border-box;background:#161718;}
   .dw-card-header-row{display:flex;align-items:center;gap:6px;margin-bottom:4px;}
   .dw-card-label{font-size:11px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:var(--blue);}
   .dw-card-domain{font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;}
@@ -289,20 +289,20 @@
   .dw-complete-label{font-size:14px;font-weight:600;color:var(--green);}
   .dw-skipped-label{font-size:14px;font-weight:600;color:var(--text3);}
   .dw-undo-label{font-size:12px;color:var(--text3);margin-left:4px;}
-  .dw-card-inner{width:100%;height:100%;border-radius:28px;padding:20px;display:flex;flex-direction:column;overflow:hidden;box-sizing:border-box;}
+  .dw-card-inner{width:100%;border-radius:14px;padding:20px;display:flex;flex-direction:column;overflow:hidden;box-sizing:border-box;}
   .dw-card-inner .task-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
   .dw-task-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border2);}
   .dw-task-row:last-child{border-bottom:none;}
-  .dw-task-circle{width:22px;height:22px;border-radius:50%;border:2px solid var(--text3);flex-shrink:0;box-sizing:border-box;}
+  .dw-task-circle{width:22px;height:22px;border-radius:50%;border:2px solid rgba(100,100,100,0.6);flex-shrink:0;box-sizing:border-box;}
   .dw-task-circle.done{background:var(--green);border-color:var(--green);display:flex;align-items:center;justify-content:center;}
-  .dw-task-text{font-size:15px;color:var(--text);line-height:1.3;}
-  .dw-task-text.done{color:var(--text3);text-decoration:line-through;}
+  .dw-task-text{font-size:16px;font-weight:500;color:#e4e1d3;line-height:1.3;}
+  .dw-task-text.done{color:#646464;text-decoration:line-through;}
   .dw-side-dots{position:absolute;left:8px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:6px;align-items:center;z-index:2;}
   .dw-side-dot{width:5px;height:5px;border-radius:50%;background:var(--text3);opacity:0.35;transition:background 200ms, opacity 200ms;flex-shrink:0;}
   .dw-side-dot.active{background:var(--accent);opacity:1;}
 
   /* Shallow Work card */
-  .shallow-card{position:absolute;bottom:0;left:0;right:0;height:72px;border-radius:0;background:transparent;border:none;border-top:1px solid rgba(255,255,255,0.08);overflow:hidden;transition:all 280ms ease-in-out;display:flex;flex-direction:column;cursor:pointer;}
+  .shallow-card{position:absolute;bottom:0;left:0;right:0;height:56px;border-radius:14px;background:#161718;border:1px solid rgba(100,100,100,0.4);overflow:hidden;transition:all 280ms ease-in-out;display:flex;flex-direction:column;cursor:pointer;}
   .shallow-card.expanded{top:0;height:auto;bottom:0;left:0;right:0;border-radius:0;background:var(--bg);border:none;cursor:default;}
   .sw-task-row{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--border2);}
   .sw-task-row:last-child{border-bottom:none;}
@@ -310,7 +310,7 @@
   .sw-task-circle.done{background:var(--green);border-color:var(--green);}
   .sw-task-text{font-size:15px;color:var(--text);flex:1;line-height:1.3;}
   .sw-task-text.done{color:var(--text3);text-decoration:line-through;}
-  .shallow-card-rest{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:72px;flex-shrink:0;}
+  .shallow-card-rest{display:flex;align-items:center;justify-content:space-between;padding:0 18px;height:56px;flex-shrink:0;}
   .shallow-card.expanded .shallow-card-rest{display:none;}
   .shallow-card-full{display:none;flex-direction:column;flex:1;padding:20px;overflow:hidden;}
   .shallow-card.expanded .shallow-card-full{display:flex;}

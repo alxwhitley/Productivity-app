@@ -484,13 +484,15 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
 
           {/* Rest state row */}
           <div className="shallow-card-rest">
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".07em", textTransform: "uppercase", color: "rgba(255,255,255,0.3)" }}>Shallow Work</div>
-              <div style={{ fontSize: 11, fontWeight: 300, color: "rgba(255,255,255,0.25)", marginTop: 2 }}>
-                {shallowCount === 0 ? "No tasks queued" : `${shallowCount} task${shallowCount !== 1 ? "s" : ""} queued${shallowDoneCount > 0 ? ` · ${shallowDoneCount} done` : ""}`}
-              </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "#646464" }}>Shallow Work</span>
+              {shallowCount > 0 && (
+                <span style={{ fontSize: 10, fontWeight: 700, color: "#b5b2a3", background: "#2f3330", borderRadius: 4, padding: "2px 6px" }}>
+                  {shallowDoneCount}/{shallowCount}
+                </span>
+              )}
             </div>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ color: "var(--text3)" }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ color: "#646464" }}>
               <path d="M18 15l-6-6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </div>

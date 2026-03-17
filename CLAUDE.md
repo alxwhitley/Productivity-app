@@ -69,9 +69,10 @@ nave-source_1/
 
 1. Read the relevant source file(s) before editing — use `sed -n 'START,ENDp'` for large files
 2. Make surgical edits only — do not refactor outside the scope of the task
-3. Run `npm run build` — must pass before declaring done
-4. Push: `cd ~/Desktop/nave-source_1 && git add . && git commit -m "message" && git push`
-5. Vercel auto-deploys on push (~12 seconds)
+3. **Before finishing any visual change: grep clearwork.css for all classNames used in the edited component and check for conflicts**
+4. Run `npm run build` — must pass before declaring done
+5. Push: `cd ~/Desktop/nave-source_1 && git add . && git commit -m "message" && git push`
+6. Vercel auto-deploys on push (~12 seconds)
 
 **Never declare a task complete if the build fails.**
 
@@ -85,6 +86,23 @@ nave-source_1/
 - All new persistent fields go in `FIELD_DEFAULTS` in `constants.js` only — never use localStorage directly
 - Hooks at top level only — never inside conditionals, IIFEs, or render functions
 - Surgical edits only — do not touch code outside the task scope
+
+---
+
+## CSS vs Inline Styles Rule
+
+Visual styles live in ONE place only — either inline styles in the component OR classes in clearwork.css, never both for the same property on the same element.
+
+**DWCard.jsx** uses inline styles for all visual properties (background, border, border-radius, colors). Do not add or modify visual styles for DWCard in clearwork.css.
+
+**clearwork.css DW classes** (`.dw-card-inner`, `.dw-task-row`, etc.) must only contain structural/layout properties:
+- `display`, `flex-direction`, `align-items`, `justify-content`
+- `overflow`, `padding`, `box-sizing`
+- `width`, `height`, `flex`
+
+Never put colors, backgrounds, borders, or border-radius for DWCard in clearwork.css — these live in DWCard.jsx inline styles only.
+
+**When editing any component's visual styles:** grep clearwork.css for every className used in that component and check for conflicting properties before finishing.
 
 ---
 
@@ -146,6 +164,9 @@ mutateDWSlot(dateStr, i, null);                                 // clear
 
 ### todayPrefs
 Always access as `data.todayPrefs || {}` — never destructure directly without guarding.
+
+### CSS class conflicts
+When a component uses both inline styles and CSS classes on the same element, CSS class properties can override inline styles depending on specificity. Always check clearwork.css for conflicting properties when visual changes aren't showing up.
 
 ---
 
