@@ -27,13 +27,16 @@ export default function useData(userId) {
     supabase.from("user_data").select("data").eq("user_id", userId).single()
       .then(({ data: row, error }) => {
         if (row?.data) {
-          let migrated = applyDefaults(row.data, FIELD_DEFAULTS);
-          // Force migrations — run even if schemaVersion is current
+          // Run all pending migrations on raw data first
+          let migrated = { ...row.data };
+          const savedVersion = migrated.schemaVersion || 0;
           for (const m of MIGRATIONS) {
-            if (m.force) {
+            if (m.version > savedVersion || m.force) {
               migrated = m.up(migrated);
             }
           }
+          // Then apply defaults for any missing keys
+          migrated = applyDefaults(migrated, FIELD_DEFAULTS);
           setData(migrated);
           try { localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated)); } catch {}
         }

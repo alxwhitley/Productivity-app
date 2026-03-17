@@ -248,7 +248,6 @@ export const MIGRATIONS = [
   // v9: migrate domain colors from old neutral palette to new vibrant palette
   {
     version: 9,
-    force: true,
     up: (data) => {
       const colorMap = {
         "#6B7A8D": "#5BA8D4", // Slate → Sky
