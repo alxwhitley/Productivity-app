@@ -422,9 +422,9 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
 
     return (
       <div className="dw-card-inner" style={{
-        background: `linear-gradient(180deg, ${domainColor}18 0%, ${domainColor}0A 40%, transparent 100%), var(--bg2)`,
+        background: `linear-gradient(160deg, ${domainColor}A6 0%, ${domainColor}59 60%, ${domainColor}26 100%), #0D0D0D`,
         border: "none",
-        boxShadow: `inset 0 0 0 1.5px ${domainColor}55, 0 0 32px 0 ${domainColor}18`,
+        boxShadow: `none`,
         opacity: (isPast && isCompleted) || isSkipped ? 0.45 : 1,
       }}>
         {/* Header row: DEEP WORK · domain + edit button */}
