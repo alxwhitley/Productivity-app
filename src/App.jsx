@@ -112,14 +112,17 @@ export default function App() {
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
                 borderRadius: 20,
                 background: shutdownDoneToday
-                  ? "linear-gradient(135deg, #2A2A2A 0%, #1E1E1E 100%)"
-                  : "linear-gradient(135deg, #2D1B4E 0%, #1E1235 100%)",
+                  ? "#0A0A0A"
+                  : "#0A0A0A",
                 border: shutdownDoneToday
-                  ? "1px solid rgba(138,144,153,0.4)"
-                  : "1px solid rgba(155,114,207,0.4)",
+                  ? "1px solid rgba(255,255,255,0.06)"
+                  : "1px solid rgba(255,255,255,0.12)",
+                borderTop: shutdownDoneToday
+                  ? "1px solid rgba(255,255,255,0.06)"
+                  : "1px solid rgba(255,255,255,0.18)",
                 boxShadow: shutdownDoneToday
                   ? "none"
-                  : "0 0 32px 8px rgba(155,114,207,0.35), 0 0 64px 16px rgba(155,114,207,0.15)",
+                  : "0 8px 32px rgba(0,0,0,0.6)",
                 color: shutdownDoneToday ? "var(--text3)" : "#fff",
                 fontSize: 13, fontWeight: 600,
                 cursor: shutdownDoneToday ? "default" : "pointer",
