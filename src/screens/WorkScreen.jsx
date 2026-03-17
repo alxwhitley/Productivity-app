@@ -89,6 +89,11 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
   const [shallowPicking, setShallowPicking] = useState(false);
   const [shallowPickSelected, setShallowPickSelected] = useState(new Set());
 
+  // Inline DW task add
+  const [dwInlineText, setDwInlineText] = useState("");
+  const [dwInlineActive, setDwInlineActive] = useState(null); // slot.id or null
+  const dwInlineRef = useRef(null);
+
   // Routine expand
   const [expandedRoutineId, setExpandedRoutineId] = useState(null);
 
@@ -161,6 +166,24 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
     const newId = uid();
     setData(d => ({ ...d, projects: d.projects.map(p => p.id === projectId ? { ...p, tasks: [...p.tasks, { id: newId, text, done: false }] } : p) }));
     return newId;
+  };
+
+  const commitDwInlineAdd = (slot, proj) => {
+    const t = dwInlineText.trim();
+    if (t) {
+      const newId = addTaskToProject(proj.id, t);
+      setData(d => {
+        const dateStr = viewDateKeyISO_ref.current;
+        const existing = [...((d.deepWorkSlots || {})[dateStr] || [])];
+        while (existing.length <= slot.slotIndex) existing.push({});
+        const prev = existing[slot.slotIndex] || {};
+        const prevTasks = Array.isArray(prev.todayTasks) ? prev.todayTasks : [];
+        existing[slot.slotIndex] = { ...prev, todayTasks: [...prevTasks, newId] };
+        return { ...d, deepWorkSlots: { ...(d.deepWorkSlots || {}), [dateStr]: existing } };
+      });
+    }
+    setDwInlineText("");
+    setDwInlineActive(null);
   };
 
   const markManualDone = (blockId, projectId, todayTaskIds) => {
@@ -472,6 +495,63 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
           </div>
         )}
 
+        {/* Pick tasks button */}
+        {!isCompleted && !isSkipped && (
+          <button
+            onClick={() => setPickerState({ blockId: slot.id, projectId: proj.id, selected: new Set(), newText: "" })}
+            style={{
+              width: "100%", marginTop: 10, padding: "9px 0", borderRadius: 10,
+              background: "var(--bg3)", border: "none", fontSize: 13, fontWeight: 600,
+              color: "var(--text2)", cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
+              textAlign: "center",
+            }}
+          >+ Pick tasks</button>
+        )}
+
+        {/* Inline add task row */}
+        {!isCompleted && !isSkipped && (
+          <div
+            onClick={() => {
+              if (dwInlineActive !== slot.id) {
+                setDwInlineActive(slot.id);
+                setDwInlineText("");
+                setTimeout(() => dwInlineRef.current?.focus(), 30);
+              }
+            }}
+            style={{
+              display: "flex", alignItems: "center", gap: 10,
+              padding: "10px 0", minHeight: 44, cursor: dwInlineActive === slot.id ? "default" : "pointer",
+            }}
+          >
+            <div style={{
+              width: 22, height: 22, borderRadius: "50%", flexShrink: 0,
+              border: `1.5px solid ${dwInlineActive === slot.id ? "rgba(232,160,48,0.4)" : "var(--text3)"}`,
+              background: "transparent", transition: "border-color .15s",
+            }} />
+            {dwInlineActive === slot.id ? (
+              <input
+                ref={dwInlineRef}
+                value={dwInlineText}
+                onChange={e => setDwInlineText(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === "Enter") commitDwInlineAdd(slot, proj);
+                  if (e.key === "Escape") { setDwInlineText(""); setDwInlineActive(null); }
+                }}
+                onBlur={() => commitDwInlineAdd(slot, proj)}
+                onClick={e => e.stopPropagation()}
+                placeholder="Add task…"
+                style={{
+                  flex: 1, background: "none", border: "none", outline: "none",
+                  color: "var(--text)", fontSize: 15, fontWeight: 500,
+                  fontFamily: "'DM Sans',sans-serif", padding: 0,
+                }}
+              />
+            ) : (
+              <span style={{ fontSize: 14, color: "var(--text3)", fontWeight: 400 }}>Add task…</span>
+            )}
+          </div>
+        )}
+
         {/* Skipped state row */}
         {isSkipped && (
           <div className="dw-skipped-row" onClick={() => unmarkSkipped(slot.id)}>
@@ -536,11 +616,6 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
                 </div>
               ))}
             </>
-          ) : (
-            <div style={{ cursor: "pointer", color: "var(--blue)", fontSize: 13, fontWeight: 600 }}
-              onClick={() => setPickerState({ blockId: slot.id, projectId: proj.id, selected: new Set(), newText: "" })}>
-              + Pick tasks
-            </div>
           )}
         </div>
 
