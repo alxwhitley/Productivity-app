@@ -616,7 +616,7 @@ export default function WorkScreen({ data, setData, onGoToTasks }) {
                 </div>
               ))}
             </>
-          )}
+          ) : null}
         </div>
 
         {/* Bottom action row — Complete + Skip */}
